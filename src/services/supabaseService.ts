@@ -133,3 +133,66 @@ export const userPreferencesService = {
     }
   },
 };
+
+export interface PopularPost {
+  post_id: string;
+  total_views: number;
+  views_last_7_days: number;
+  views_last_30_days: number;
+  popularity_score: number;
+}
+
+export const postViewsService = {
+  async trackView(postId: string): Promise<boolean> {
+    try {
+      const userId = await getDeviceId();
+      const { error } = await supabase
+        .from('post_views')
+        .insert({
+          post_id: postId,
+          user_id: userId,
+        });
+
+      if (error) throw error;
+
+      await supabase.rpc('update_post_popularity', { p_post_id: postId });
+
+      return true;
+    } catch (error) {
+      console.error('Error tracking view:', error);
+      return false;
+    }
+  },
+
+  async getPopularPosts(limit: number = 10): Promise<PopularPost[]> {
+    try {
+      const { data, error } = await supabase
+        .from('post_popularity')
+        .select('*')
+        .order('popularity_score', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching popular posts:', error);
+      return [];
+    }
+  },
+
+  async getPostViews(postId: string): Promise<number> {
+    try {
+      const { data, error } = await supabase
+        .from('post_popularity')
+        .select('total_views')
+        .eq('post_id', postId)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data?.total_views || 0;
+    } catch (error) {
+      console.error('Error getting post views:', error);
+      return 0;
+    }
+  },
+};

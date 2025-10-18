@@ -3,7 +3,7 @@ import { View, Text, ScrollView, Image, StyleSheet, TouchableOpacity, Share, Dim
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
-import { savedArticlesService } from '../services/supabaseService';
+import { savedArticlesService, postViewsService } from '../services/supabaseService';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -18,7 +18,12 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
 
   useEffect(() => {
     checkIfSaved();
+    trackView();
   }, []);
+
+  const trackView = async () => {
+    await postViewsService.trackView(article.id.toString());
+  };
 
   const checkIfSaved = async () => {
     const saved = await savedArticlesService.isArticleSaved(article.id.toString());

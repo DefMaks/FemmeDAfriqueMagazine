@@ -1,29 +1,149 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, FlatList } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
+import { getCategories, getCategoryById, getPostsByCategory } from '../services/api';
+import { Category } from '../models/Category';
+import { Post } from '../models/Post';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { ErrorMessage } from '../components/ErrorMessage';
+import { ArticleCard } from '../components/ArticleCard';
+import { RootStackParamList } from '../navigation/RootNavigator';
+
+type DiscoverScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+const FEATURED_CATEGORIES = {
+    'Communiqués': 3038,
+    'Espace Tendresse': 2483,
+    'Gastronomie': 20,
+    'Entrepreneuriat': 115,
+};
+
+const CATEGORY_ICONS: { [key: string]: any } = {
+    'Communiqués': 'megaphone-outline',
+    'Espace Tendresse': 'heart-outline',
+    'Gastronomie': 'restaurant-outline',
+    'Entrepreneuriat': 'briefcase-outline',
+    'Mode': 'shirt-outline',
+    'Beauté': 'sparkles-outline',
+    'Culture': 'book-outline',
+    'Business': 'trending-up-outline',
+    'Lifestyle': 'happy-outline',
+    'Santé': 'fitness-outline',
+    'Tech': 'laptop-outline',
+    'Art': 'color-palette-outline',
+};
+
+const CATEGORY_COLORS = [
+    '#FF6B9D', '#C44569', '#FFA502', '#4834DF',
+    '#E74C3C', '#26DE81', '#4B7BEC', '#A55EEA',
+];
 
 const DiscoverScreen = () => {
+    const navigation = useNavigation<DiscoverScreenNavigationProp>();
     const [searchQuery, setSearchQuery] = useState('');
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [featuredPosts, setFeaturedPosts] = useState<{ [key: string]: Post[] }>({});
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+    const [categoryPosts, setCategoryPosts] = useState<Post[]>([]);
 
-    const categories = [
-        { id: '1', name: 'Mode', icon: 'shirt-outline', color: '#FF6B9D' },
-        { id: '2', name: 'Beauté', icon: 'sparkles-outline', color: '#C44569' },
-        { id: '3', name: 'Culture', icon: 'book-outline', color: '#FFA502' },
-        { id: '4', name: 'Business', icon: 'briefcase-outline', color: '#4834DF' },
-        { id: '5', name: 'Lifestyle', icon: 'heart-outline', color: '#E74C3C' },
-        { id: '6', name: 'Santé', icon: 'fitness-outline', color: '#26DE81' },
-        { id: '7', name: 'Tech', icon: 'laptop-outline', color: '#4B7BEC' },
-        { id: '8', name: 'Art', icon: 'color-palette-outline', color: '#A55EEA' },
-    ];
+    useEffect(() => {
+        loadCategories();
+        loadFeaturedCategories();
+    }, []);
 
-    const trendingTopics = [
-        'Tendances 2024',
-        'Mode Africaine',
-        'Entrepreneuriat',
-        'Bien-être',
-        'Leadership Féminin',
-    ];
+    const loadCategories = async () => {
+        try {
+            const data = await getCategories();
+            setCategories(data.filter((cat: Category) => cat.count > 0).slice(0, 20));
+        } catch (err) {
+            setError('Impossible de charger les catégories');
+            console.error('Error loading categories:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const loadFeaturedCategories = async () => {
+        try {
+            const promises = Object.entries(FEATURED_CATEGORIES).map(async ([name, id]) => {
+                const posts = await getPostsByCategory(id, 1, 3);
+                return { name, posts };
+            });
+
+            const results = await Promise.all(promises);
+            const postsMap: { [key: string]: Post[] } = {};
+            results.forEach(({ name, posts }) => {
+                postsMap[name] = posts;
+            });
+            setFeaturedPosts(postsMap);
+        } catch (err) {
+            console.error('Error loading featured categories:', err);
+        }
+    };
+
+    const handleCategoryPress = async (categoryId: number, categoryName: string) => {
+        setSelectedCategory(categoryId);
+        try {
+            const posts = await getPostsByCategory(categoryId, 1, 10);
+            setCategoryPosts(posts);
+        } catch (err) {
+            console.error('Error loading category posts:', err);
+        }
+    };
+
+    const handleArticlePress = (article: Post) => {
+        navigation.navigate('ArticleDetail', { article });
+    };
+
+    const getCategoryIcon = (categoryName: string) => {
+        return CATEGORY_ICONS[categoryName] || 'folder-outline';
+    };
+
+    const getCategoryColor = (index: number) => {
+        return CATEGORY_COLORS[index % CATEGORY_COLORS.length];
+    };
+
+    if (loading) {
+        return <LoadingSpinner message="Chargement des catégories..." />;
+    }
+
+    if (error) {
+        return <ErrorMessage message={error} onRetry={loadCategories} />;
+    }
+
+    if (selectedCategory) {
+        return (
+            <View style={styles.container}>
+                <View style={styles.header}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => setSelectedCategory(null)}
+                    >
+                        <Ionicons name="arrow-back" size={24} color={Colors.text} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Articles</Text>
+                </View>
+                <FlatList
+                    data={categoryPosts}
+                    renderItem={({ item }) => (
+                        <ArticleCard
+                            article={item}
+                            onPress={() => handleArticlePress(item)}
+                            variant="horizontal"
+                        />
+                    )}
+                    keyExtractor={(item) => item.id.toString()}
+                    contentContainerStyle={styles.list}
+                    showsVerticalScrollIndicator={false}
+                />
+            </View>
+        );
+    }
 
     return (
         <View style={styles.container}>
@@ -44,35 +164,53 @@ const DiscoverScreen = () => {
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Catégories</Text>
-                    <View style={styles.categoriesGrid}>
-                        {categories.map((category) => (
+                    <Text style={styles.sectionTitle}>Catégories en vedette</Text>
+                    {Object.entries(FEATURED_CATEGORIES).map(([name, id], index) => (
+                        <View key={id} style={styles.featuredCategory}>
                             <TouchableOpacity
-                                key={category.id}
-                                style={[styles.categoryCard, { borderColor: category.color }]}
-                                activeOpacity={0.8}
+                                style={styles.featuredCategoryHeader}
+                                onPress={() => handleCategoryPress(id, name)}
                             >
-                                <View style={[styles.categoryIconContainer, { backgroundColor: category.color + '20' }]}>
-                                    <Ionicons name={category.icon as any} size={28} color={category.color} />
+                                <View style={[styles.featuredCategoryIcon, { backgroundColor: getCategoryColor(index) + '20' }]}>
+                                    <Ionicons name={getCategoryIcon(name)} size={24} color={getCategoryColor(index)} />
                                 </View>
-                                <Text style={styles.categoryName}>{category.name}</Text>
+                                <Text style={styles.featuredCategoryName}>{name}</Text>
+                                <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
                             </TouchableOpacity>
-                        ))}
-                    </View>
+                            {featuredPosts[name] && featuredPosts[name].length > 0 && (
+                                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.featuredPostsScroll}>
+                                    {featuredPosts[name].map((post) => (
+                                        <TouchableOpacity
+                                            key={post.id}
+                                            style={styles.featuredPostCard}
+                                            onPress={() => handleArticlePress(post)}
+                                        >
+                                            <Text style={styles.featuredPostTitle} numberOfLines={2}>
+                                                {post.title.rendered}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </ScrollView>
+                            )}
+                        </View>
+                    ))}
                 </View>
 
                 <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>Sujets Tendance</Text>
-                        <TouchableOpacity>
-                            <Text style={styles.sectionLink}>Voir tout</Text>
-                        </TouchableOpacity>
-                    </View>
-                    <View style={styles.topicsContainer}>
-                        {trendingTopics.map((topic, index) => (
-                            <TouchableOpacity key={index} style={styles.topicTag} activeOpacity={0.8}>
-                                <Ionicons name="trending-up" size={16} color={Colors.primary} />
-                                <Text style={styles.topicText}>{topic}</Text>
+                    <Text style={styles.sectionTitle}>Toutes les catégories</Text>
+                    <View style={styles.categoriesGrid}>
+                        {categories.map((category, index) => (
+                            <TouchableOpacity
+                                key={category.id}
+                                style={[styles.categoryCard, { borderColor: getCategoryColor(index) }]}
+                                activeOpacity={0.8}
+                                onPress={() => handleCategoryPress(category.id, category.name)}
+                            >
+                                <View style={[styles.categoryIconContainer, { backgroundColor: getCategoryColor(index) + '20' }]}>
+                                    <Ionicons name={getCategoryIcon(category.name)} size={28} color={getCategoryColor(index)} />
+                                </View>
+                                <Text style={styles.categoryName} numberOfLines={1}>{category.name}</Text>
+                                <Text style={styles.categoryCount}>{category.count} articles</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
@@ -88,10 +226,21 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.background,
     },
     header: {
+        flexDirection: 'row',
+        alignItems: 'center',
         paddingHorizontal: 20,
         paddingTop: 60,
         paddingBottom: 20,
         backgroundColor: Colors.backgroundLight,
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: Colors.borderLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
     },
     headerTitle: {
         fontSize: 28,
@@ -128,13 +277,6 @@ const styles = StyleSheet.create({
     section: {
         marginBottom: 32,
     },
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        marginBottom: 16,
-    },
     sectionTitle: {
         fontSize: 20,
         fontWeight: '700',
@@ -142,10 +284,48 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         marginBottom: 16,
     },
-    sectionLink: {
+    featuredCategory: {
+        marginBottom: 20,
+    },
+    featuredCategoryHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        backgroundColor: Colors.backgroundLight,
+        marginHorizontal: 20,
+        borderRadius: 12,
+        marginBottom: 12,
+    },
+    featuredCategoryIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    featuredCategoryName: {
+        flex: 1,
+        fontSize: 16,
+        fontWeight: '600',
+        color: Colors.text,
+    },
+    featuredPostsScroll: {
+        paddingLeft: 20,
+    },
+    featuredPostCard: {
+        width: 200,
+        backgroundColor: Colors.backgroundLight,
+        padding: 12,
+        borderRadius: 12,
+        marginRight: 12,
+    },
+    featuredPostTitle: {
         fontSize: 14,
         fontWeight: '600',
-        color: Colors.primary,
+        color: Colors.text,
+        lineHeight: 18,
     },
     categoriesGrid: {
         flexDirection: 'row',
@@ -178,29 +358,16 @@ const styles = StyleSheet.create({
         fontSize: 15,
         fontWeight: '600',
         color: Colors.text,
+        marginBottom: 4,
+        textAlign: 'center',
     },
-    topicsContainer: {
-        paddingHorizontal: 20,
+    categoryCount: {
+        fontSize: 12,
+        color: Colors.textSecondary,
     },
-    topicTag: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: Colors.backgroundLight,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        borderRadius: 12,
-        marginBottom: 12,
-        shadowColor: Colors.shadow,
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 1,
-    },
-    topicText: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: Colors.text,
-        marginLeft: 10,
+    list: {
+        paddingTop: 16,
+        paddingBottom: 100,
     },
 });
 

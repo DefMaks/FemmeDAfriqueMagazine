@@ -82,3 +82,67 @@ export const getMedia = async (id: number) => {
     throw error;
   }
 };
+
+// Fonction pour récupérer les catégories
+export const getCategories = async () => {
+  try {
+    const response = await api.get("categories", {
+      params: {
+        per_page: 100,
+        orderby: 'count',
+        order: 'desc',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération des catégories:", error);
+    throw error;
+  }
+};
+
+// Fonction pour récupérer une catégorie par ID
+export const getCategoryById = async (id: number) => {
+  try {
+    const response = await api.get(`categories/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération de la catégorie:", error);
+    throw error;
+  }
+};
+
+// Fonction pour récupérer les posts d'une catégorie
+export const getPostsByCategory = async (categoryId: number, page = 1, perPage = 10) => {
+  try {
+    const response = await api.get("posts", {
+      params: {
+        categories: categoryId,
+        page,
+        per_page: perPage,
+        _embed: true,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération des posts par catégorie:", error);
+    throw error;
+  }
+};
+
+// Fonction pour récupérer les posts avec un tag spécifique (pour featured posts)
+export const getPostsByTag = async (tagId: number, page = 1, perPage = 10) => {
+  try {
+    const response = await api.get("posts", {
+      params: {
+        tags: tagId,
+        page,
+        per_page: perPage,
+        _embed: true,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération des posts par tag:", error);
+    throw error;
+  }
+};

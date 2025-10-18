@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ScrollView, Dimensions, RefreshControl } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { getPosts } from '../services/api';
+import { getPosts, getPostsByTag } from '../services/api';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,17 +35,38 @@ const HomeScreen = () => {
             setError(null);
             if (!append) setLoading(true);
 
-            const data = await getPosts(pageNum, 10);
+            const FEATURED_TAG_ID = 184;
+            const POSTS_PER_PAGE = 5;
 
-            if (data.length < 10) {
-                setHasMore(false);
-            }
+            if (pageNum === 1) {
+                const [featuredData, regularData] = await Promise.all([
+                    getPostsByTag(FEATURED_TAG_ID, 1, 1),
+                    getPosts(1, POSTS_PER_PAGE)
+                ]);
 
-            if (pageNum === 1 && data.length > 0) {
-                setFeaturedPost(data[0]);
-                setPosts(data.slice(1));
-            } else if (append) {
-                setPosts(prev => [...prev, ...data]);
+                if (featuredData.length > 0) {
+                    setFeaturedPost(featuredData[0]);
+                } else if (regularData.length > 0) {
+                    setFeaturedPost(regularData[0]);
+                    setPosts(regularData.slice(1));
+                    if (regularData.length < POSTS_PER_PAGE) {
+                        setHasMore(false);
+                    }
+                    return;
+                }
+
+                setPosts(regularData);
+                if (regularData.length < POSTS_PER_PAGE) {
+                    setHasMore(false);
+                }
+            } else {
+                const data = await getPosts(pageNum, POSTS_PER_PAGE);
+                if (data.length < POSTS_PER_PAGE) {
+                    setHasMore(false);
+                }
+                if (append) {
+                    setPosts(prev => [...prev, ...data]);
+                }
             }
         } catch (err) {
             setError('Impossible de charger les articles');
