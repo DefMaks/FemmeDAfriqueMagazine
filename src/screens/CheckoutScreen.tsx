@@ -14,7 +14,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
-import { initiatePayment, checkPaymentStatus } from '../services/twigaPaie';
+import { twigaPaieService, walletService } from '../services/paymentService';
 import { Magazine } from '../models/Magazine';
 import { getMedia } from '../services/api';
 import * as FileSystem from 'expo-file-system';
@@ -27,9 +27,12 @@ const CheckoutScreen = ({ route }: CheckoutScreenProps) => {
     const navigation = useNavigation();
     const { magazine } = route.params;
     const [phone, setPhone] = useState('');
+    const [email, setEmail] = useState('');
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [loading, setLoading] = useState(false);
     const [showInfoModal, setShowInfoModal] = useState(true);
+    const [orderId, setOrderId] = useState<string | null>(null);
+    const [hasPurchased, setHasPurchased] = useState(false);
 
     // Calcul du prix TTC
     const totalPrice = magazine.acf.prix_mag + magazine.acf.tva;
@@ -42,13 +45,20 @@ const CheckoutScreen = ({ route }: CheckoutScreenProps) => {
 
         setLoading(true);
         try {
-            const result = await initiatePayment(phone, totalPrice.toString(), `MAG-${magazine.id}`);
+            const result = await twigaPaieService.initiatePayment({
+                customer_phone: phone,
+                amount: totalPrice.toString(),
+                currency: 'USD',
+                client_order_id: `MAG-${magazine.id}-${Date.now()}`,
+            });
 
-            // Simuler une vérification après quelques secondes
+            setOrderId(result.order_id);
+
             setTimeout(async () => {
                 try {
-                    const status = await checkPaymentStatus(result.order_id);
+                    const status = await twigaPaieService.checkPaymentStatus(result.order_id);
                     if (status.status === 'completed') {
+                        await recordPurchase(result.order_id, parseFloat(status.amount));
                         setPaymentSuccess(true);
                     } else {
                         Alert.alert('Paiement en attente', 'Le paiement est en cours de traitement. Veuillez vérifier plus tard.');
@@ -65,6 +75,28 @@ const CheckoutScreen = ({ route }: CheckoutScreenProps) => {
             const message = error.response?.data?.error?.message || 'Le paiement a échoué. Veuillez réessayer.';
             Alert.alert('Erreur', message);
             setLoading(false);
+        }
+    };
+
+    const recordPurchase = async (paymentOrderId: string, amount: number) => {
+        try {
+            const profile = await walletService.getOrCreateProfile(phone, email);
+            const wallet = await walletService.getOrCreateWallet(profile.id);
+
+            await walletService.createTransaction({
+                wallet_id: wallet.id,
+                amount,
+                currency: 'USD',
+                transaction_type: 'PURCHASE',
+                description: `Achat Magazine N°${magazine.acf.numero}`,
+                external_reference: paymentOrderId,
+            });
+
+            const transactionId = wallet.id;
+            await walletService.purchaseMagazine(profile.id, magazine.id.toString(), transactionId);
+            setHasPurchased(true);
+        } catch (error) {
+            console.error('Error recording purchase:', error);
         }
     };
 

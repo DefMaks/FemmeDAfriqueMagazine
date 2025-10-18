@@ -3,7 +3,9 @@ import { View, Text, ScrollView, Image, StyleSheet, TouchableOpacity, Share, Dim
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
-import { savedArticlesService, postViewsService } from '../services/supabaseService';
+import { savedArticlesService } from '../services/supabaseService';
+import axios from 'axios';
+import { CommentsList } from '../components/CommentsList';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
@@ -15,14 +17,25 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
   const { article } = route.params;
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [comments, setComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(true);
 
   useEffect(() => {
     checkIfSaved();
-    trackView();
+    loadComments();
   }, []);
 
-  const trackView = async () => {
-    await postViewsService.trackView(article.id.toString());
+  const loadComments = async () => {
+    try {
+      const response = await axios.get(
+        `https://femmedafrique.net/wp-json/wp/v2/comments?post=${article.id}`
+      );
+      setComments(response.data);
+    } catch (error) {
+      console.error('Error loading comments:', error);
+    } finally {
+      setLoadingComments(false);
+    }
   };
 
   const checkIfSaved = async () => {
@@ -111,6 +124,15 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
           <View style={styles.divider} />
 
           <Text style={styles.body}>{stripHtml(article.content.rendered)}</Text>
+
+          <View style={styles.commentsSection}>
+            <Text style={styles.commentsTitle}>Commentaires ({comments.length})</Text>
+            {loadingComments ? (
+              <Text style={styles.loadingText}>Chargement des commentaires...</Text>
+            ) : (
+              <CommentsList comments={comments} />
+            )}
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -181,6 +203,24 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: Colors.text,
     lineHeight: 28,
+  },
+  commentsSection: {
+    marginTop: 32,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  commentsTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 16,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: Colors.textLight,
+    textAlign: 'center',
+    padding: 20,
   },
 });
 

@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { getCategories, getCategoryById, getPostsByCategory } from '../services/api';
+import { getCategories, getCategoryById, getPostsByCategory, searchPosts } from '../services/api';
 import { Category } from '../models/Category';
 import { Post } from '../models/Post';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -50,6 +50,8 @@ const DiscoverScreen = () => {
     const [error, setError] = useState<string | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
     const [categoryPosts, setCategoryPosts] = useState<Post[]>([]);
+    const [searchResults, setSearchResults] = useState<Post[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
 
     useEffect(() => {
         loadCategories();
@@ -100,6 +102,22 @@ const DiscoverScreen = () => {
         navigation.navigate('ArticleDetail', { article });
     };
 
+    const handleSearch = async (query: string) => {
+        if (!query.trim()) {
+            setIsSearching(false);
+            setSearchResults([]);
+            return;
+        }
+
+        setIsSearching(true);
+        try {
+            const results = await searchPosts(query);
+            setSearchResults(results);
+        } catch (err) {
+            console.error('Error searching:', err);
+        }
+    };
+
     const getCategoryIcon = (categoryName: string) => {
         return CATEGORY_ICONS[categoryName] || 'folder-outline';
     };
@@ -114,6 +132,40 @@ const DiscoverScreen = () => {
 
     if (error) {
         return <ErrorMessage message={error} onRetry={loadCategories} />;
+    }
+
+    if (isSearching) {
+        return (
+            <View style={styles.container}>
+                <View style={styles.header}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => setIsSearching(false)}
+                    >
+                        <Ionicons name="arrow-back" size={24} color={Colors.text} />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Résultats</Text>
+                </View>
+                <FlatList
+                    data={searchResults}
+                    renderItem={({ item }) => (
+                        <ArticleCard
+                            article={item}
+                            onPress={() => handleArticlePress(item)}
+                            variant="horizontal"
+                        />
+                    )}
+                    keyExtractor={(item) => item.id.toString()}
+                    contentContainerStyle={styles.list}
+                    showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={
+                        <View style={styles.emptyState}>
+                            <Text style={styles.emptyText}>Aucun résultat trouvé</Text>
+                        </View>
+                    }
+                />
+            </View>
+        );
     }
 
     if (selectedCategory) {
@@ -159,7 +211,17 @@ const DiscoverScreen = () => {
                     placeholderTextColor={Colors.textLight}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
+                    onSubmitEditing={() => handleSearch(searchQuery)}
+                    returnKeyType="search"
                 />
+                {searchQuery.length > 0 && (
+                    <TouchableOpacity onPress={() => {
+                        setSearchQuery('');
+                        setIsSearching(false);
+                    }} style={styles.clearButton}>
+                        <Ionicons name="close-circle" size={20} color={Colors.textLight} />
+                    </TouchableOpacity>
+                )}
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -368,6 +430,17 @@ const styles = StyleSheet.create({
     list: {
         paddingTop: 16,
         paddingBottom: 100,
+    },
+    clearButton: {
+        padding: 4,
+    },
+    emptyState: {
+        padding: 40,
+        alignItems: 'center',
+    },
+    emptyText: {
+        fontSize: 14,
+        color: Colors.textLight,
     },
 });
 
