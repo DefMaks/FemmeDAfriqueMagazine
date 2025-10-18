@@ -1,38 +1,19 @@
-// src/navigation/RootNavigator.tsx
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, View } from 'react-native';
 
-// Importe uniquement les écrans existants
 import HomeScreen from '../screens/HomeScreen';
+import DiscoverScreen from '../screens/DiscoverScreen';
+import SavedScreen from '../screens/SavedScreen';
 import ShopScreen from '../screens/ShopScreen';
-import CheckoutScreen from '../screens/CheckoutScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import CheckoutScreen, { RootStackParamList } from '../screens/CheckoutScreen';
 import { Colors } from '../theme/colors';
 
 const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator();
-
-// Écrans temporaires (tu les remplaceras plus tard)
-const DiscoverScreen = () => (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Découvrir (à venir)</Text>
-    </View>
-);
-
-const SavedScreen = () => (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Sauvegardés (à venir)</Text>
-    </View>
-);
-
-const ProfileScreen = () => (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Profil (à venir)</Text>
-    </View>
-);
+const Stack = createStackNavigator<RootStackParamList>();
 
 function MainTabs() {
     return (
@@ -48,7 +29,19 @@ function MainTabs() {
                     return <Ionicons name={iconName as any} size={size} color={color} />;
                 },
                 tabBarActiveTintColor: Colors.primary,
-                tabBarInactiveTintColor: 'gray',
+                tabBarInactiveTintColor: Colors.textLight,
+                tabBarStyle: {
+                    backgroundColor: Colors.backgroundLight,
+                    borderTopColor: Colors.border,
+                    borderTopWidth: 1,
+                    paddingBottom: 8,
+                    paddingTop: 8,
+                    height: 65,
+                },
+                tabBarLabelStyle: {
+                    fontSize: 12,
+                    fontWeight: '600',
+                },
                 headerShown: false,
             })}
         >
