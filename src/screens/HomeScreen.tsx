@@ -1,33 +1,80 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ScrollView, Dimensions, RefreshControl } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getPosts } from '../services/api';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { Ionicons } from '@expo/vector-icons';
+import { ArticleCard } from '../components/ArticleCard';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { ErrorMessage } from '../components/ErrorMessage';
+import { RootStackParamList } from '../navigation/RootNavigator';
 
 const { width } = Dimensions.get('window');
 
+type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 const HomeScreen = () => {
+    const navigation = useNavigation<HomeScreenNavigationProp>();
     const [posts, setPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [featuredPost, setFeaturedPost] = useState<Post | null>(null);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
 
     useEffect(() => {
-        fetchPosts();
+        fetchPosts(1);
     }, []);
 
-    const fetchPosts = async () => {
+    const fetchPosts = async (pageNum: number, append = false) => {
         try {
-            const data = await getPosts(1, 10);
-            if (data.length > 0) {
+            setError(null);
+            if (!append) setLoading(true);
+
+            const data = await getPosts(pageNum, 10);
+
+            if (data.length < 10) {
+                setHasMore(false);
+            }
+
+            if (pageNum === 1 && data.length > 0) {
                 setFeaturedPost(data[0]);
                 setPosts(data.slice(1));
+            } else if (append) {
+                setPosts(prev => [...prev, ...data]);
             }
-        } catch (error) {
-            console.error('Erreur:', error);
+        } catch (err) {
+            setError('Impossible de charger les articles');
+            console.error('Erreur:', err);
         } finally {
             setLoading(false);
+            setRefreshing(false);
+            setLoadingMore(false);
         }
+    };
+
+    const onRefresh = () => {
+        setRefreshing(true);
+        setPage(1);
+        setHasMore(true);
+        fetchPosts(1);
+    };
+
+    const loadMore = () => {
+        if (!loadingMore && hasMore) {
+            setLoadingMore(true);
+            const nextPage = page + 1;
+            setPage(nextPage);
+            fetchPosts(nextPage, true);
+        }
+    };
+
+    const handleArticlePress = (article: Post) => {
+        navigation.navigate('ArticleDetail', { article });
     };
 
     const formatDate = (dateString: string) => {
@@ -43,15 +90,15 @@ const HomeScreen = () => {
         return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
     };
 
-    const stripHtml = (html: string) => {
-        return html.replace(/<[^>]*>/g, '').substring(0, 100) + '...';
-    };
-
     const renderFeaturedPost = () => {
         if (!featuredPost) return null;
 
         return (
-            <TouchableOpacity style={styles.featuredCard} activeOpacity={0.9}>
+            <TouchableOpacity
+                style={styles.featuredCard}
+                activeOpacity={0.9}
+                onPress={() => handleArticlePress(featuredPost)}
+            >
                 {featuredPost._embedded?.['wp:featuredmedia']?.[0]?.source_url && (
                     <Image
                         source={{ uri: featuredPost._embedded['wp:featuredmedia'][0].source_url }}
@@ -77,38 +124,21 @@ const HomeScreen = () => {
         );
     };
 
-    const renderPost = ({ item, index }: { item: Post; index: number }) => (
-        <TouchableOpacity style={styles.postCard} activeOpacity={0.8}>
-            <View style={styles.postContent}>
-                <View style={styles.postTextContainer}>
-                    <Text style={styles.postTitle} numberOfLines={3}>
-                        {item.title.rendered}
-                    </Text>
-                    <Text style={styles.postExcerpt} numberOfLines={2}>
-                        {stripHtml(item.excerpt.rendered)}
-                    </Text>
-                    <View style={styles.postMeta}>
-                        <Ionicons name="time-outline" size={12} color={Colors.textLight} />
-                        <Text style={styles.postMetaText}>{formatDate(item.date)}</Text>
-                    </View>
-                </View>
-                {item._embedded?.['wp:featuredmedia']?.[0]?.source_url && (
-                    <Image
-                        source={{ uri: item._embedded['wp:featuredmedia'][0].source_url }}
-                        style={styles.postImage}
-                    />
-                )}
-            </View>
-        </TouchableOpacity>
-    );
-
-    if (loading) {
+    const renderFooter = () => {
+        if (!loadingMore) return null;
         return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={styles.loadingText}>Chargement...</Text>
+            <View style={styles.footerLoader}>
+                <Text style={styles.footerText}>Chargement...</Text>
             </View>
         );
+    };
+
+    if (loading) {
+        return <LoadingSpinner />;
+    }
+
+    if (error) {
+        return <ErrorMessage message={error} onRetry={() => fetchPosts(1)} />;
     }
 
     return (
@@ -149,17 +179,31 @@ const HomeScreen = () => {
                         {renderFeaturedPost()}
                         <View style={styles.sectionHeader}>
                             <Text style={styles.sectionTitle}>Derniers Articles</Text>
-                            <TouchableOpacity>
-                                <Text style={styles.sectionLink}>Voir tout</Text>
-                            </TouchableOpacity>
                         </View>
                     </View>
                 }
                 data={posts}
-                renderItem={renderPost}
+                renderItem={({ item }) => (
+                    <ArticleCard
+                        article={item}
+                        onPress={() => handleArticlePress(item)}
+                        variant="horizontal"
+                    />
+                )}
                 keyExtractor={(item) => item.id.toString()}
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={Colors.primary}
+                        colors={[Colors.primary]}
+                    />
+                }
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={renderFooter}
             />
         </View>
     );
@@ -303,70 +347,15 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: Colors.text,
     },
-    sectionLink: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: Colors.primary,
-    },
     list: {
         paddingBottom: 100,
     },
-    postCard: {
-        backgroundColor: Colors.backgroundLight,
-        marginHorizontal: 20,
-        marginBottom: 16,
-        borderRadius: 16,
-        overflow: 'hidden',
-        shadowColor: Colors.shadow,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 3,
-    },
-    postContent: {
-        flexDirection: 'row',
-        padding: 16,
-    },
-    postTextContainer: {
-        flex: 1,
-        paddingRight: 12,
-    },
-    postTitle: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: Colors.text,
-        lineHeight: 22,
-        marginBottom: 8,
-    },
-    postExcerpt: {
-        fontSize: 13,
-        color: Colors.textSecondary,
-        lineHeight: 18,
-        marginBottom: 12,
-    },
-    postMeta: {
-        flexDirection: 'row',
+    footerLoader: {
+        paddingVertical: 20,
         alignItems: 'center',
     },
-    postMetaText: {
-        fontSize: 12,
-        color: Colors.textLight,
-        marginLeft: 4,
-    },
-    postImage: {
-        width: 100,
-        height: 100,
-        borderRadius: 12,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: Colors.background,
-    },
-    loadingText: {
-        marginTop: 16,
-        fontSize: 16,
+    footerText: {
+        fontSize: 14,
         color: Colors.textSecondary,
     },
 });

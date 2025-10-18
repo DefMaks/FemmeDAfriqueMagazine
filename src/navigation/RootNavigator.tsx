@@ -9,8 +9,17 @@ import DiscoverScreen from '../screens/DiscoverScreen';
 import SavedScreen from '../screens/SavedScreen';
 import ShopScreen from '../screens/ShopScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-import CheckoutScreen, { RootStackParamList } from '../screens/CheckoutScreen';
+import CheckoutScreen from '../screens/CheckoutScreen';
+import ArticleDetailScreen from '../screens/ArticleDetailScreen';
 import { Colors } from '../theme/colors';
+import { Post } from '../models/Post';
+import { Magazine } from '../models/Magazine';
+
+export type RootStackParamList = {
+  Main: undefined;
+  Checkout: { magazine: Magazine };
+  ArticleDetail: { article: Post };
+};
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator<RootStackParamList>();
@@ -59,6 +68,7 @@ export default function RootNavigator() {
         <NavigationContainer>
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="Main" component={MainTabs} />
+                <Stack.Screen name="ArticleDetail" component={ArticleDetailScreen} />
                 <Stack.Screen name="Checkout" component={CheckoutScreen} />
             </Stack.Navigator>
         </NavigationContainer>

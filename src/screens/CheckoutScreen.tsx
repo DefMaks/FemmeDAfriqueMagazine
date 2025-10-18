@@ -19,12 +19,7 @@ import { Magazine } from '../models/Magazine';
 import { getMedia } from '../services/api';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-
-// 🔹 Définir les paramètres de navigation
-export type RootStackParamList = {
-    Main: undefined;
-    Checkout: { magazine: Magazine };
-};
+import { RootStackParamList } from '../navigation/RootNavigator';
 
 type CheckoutScreenProps = NativeStackScreenProps<RootStackParamList, 'Checkout'>;
 
