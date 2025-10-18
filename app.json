@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "FemmeDAfriqueMagazine",
+    "name": "Femme D'Afrique Magazine",
     "slug": "FemmeDAfriqueMagazine",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,9 +13,20 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.defmaks.fda",
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"]
+      },
+      "entitlements": {
+        "aps-environment": "development",
+        "com.apple.security.application-groups": [
+          "group.${ios.bundleIdentifier}.onesignal"
+        ]
+      }
     },
     "android": {
+      "package": "com.defmaks.fda",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -23,6 +34,14 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
+    "plugins": [
+      [
+        "onesignal-expo-plugin",
+        {
+          "mode": "development"
+        }
+      ]
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     }
