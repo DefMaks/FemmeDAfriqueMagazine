@@ -1,0 +1,46 @@
+export default {
+  expo: {
+    name: "Femme D'Afrique Magazine",
+    slug: "FemmeDAfriqueMagazine",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/icon.png",
+    userInterfaceStyle: "light",
+    newArchEnabled: true,
+    splash: {
+      image: "./assets/splash-icon.png",
+      resizeMode: "contain",
+      backgroundColor: "#ffffff"
+    },
+    ios: {
+      bundleIdentifier: "com.defmaks.fda",
+      supportsTablet: true,
+      infoPlist: {
+        UIBackgroundModes: ["remote-notification"]
+      },
+      entitlements: {
+        "aps-environment": "development",
+        "com.apple.security.application-groups": [
+          "group.${ios.bundleIdentifier}.onesignal"
+        ]
+      }
+    },
+    android: {
+      package: "com.defmaks.fda",
+      adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#ffffff"
+      },
+      edgeToEdgeEnabled: true,
+      predictiveBackGestureEnabled: false
+    },
+    plugins: [],
+    web: {
+      favicon: "./assets/favicon.png"
+    },
+    extra: {
+      EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    }
+  }
+};
