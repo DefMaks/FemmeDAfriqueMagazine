@@ -146,3 +146,47 @@ export const getPostsByTag = async (tagId: number, page = 1, perPage = 10) => {
     throw error;
   }
 };
+
+// Fonction pour récupérer les ads
+export const getAds = async () => {
+  try {
+    const response = await api.get("app-ad", {
+      params: {
+        per_page: 10,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération des ads:", error);
+    throw error;
+  }
+};
+
+// Fonction pour récupérer les ad zones
+export const getAdZones = async () => {
+  try {
+    const response = await api.get("app_ad_zone");
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération des ad zones:", error);
+    throw error;
+  }
+};
+
+// Fonction pour rechercher des posts
+export const searchPosts = async (query: string, page = 1, perPage = 10) => {
+  try {
+    const response = await api.get("posts", {
+      params: {
+        search: query,
+        page,
+        per_page: perPage,
+        _embed: true,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la recherche:", error);
+    throw error;
+  }
+};
