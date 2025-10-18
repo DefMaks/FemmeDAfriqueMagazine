@@ -8,7 +8,7 @@ import { savedArticlesService } from '../services/supabaseService';
 interface ArticleCardProps {
   article: Post;
   onPress: () => void;
-  variant?: 'horizontal' | 'vertical';
+  variant?: 'horizontal' | 'vertical' | 'compact';
 }
 
 export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onPress, variant = 'horizontal' }) => {
@@ -52,6 +52,32 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onPress, vari
     }
     setIsLoading(false);
   };
+
+  if (variant === 'compact') {
+    return (
+      <TouchableOpacity style={styles.horizontalCard} activeOpacity={0.8} onPress={onPress}>
+        <View style={styles.horizontalContent}>
+          <View style={styles.textContainer}>
+            <Text style={styles.horizontalTitle} numberOfLines={2}>
+              {article.title.rendered}
+            </Text>
+            <View style={styles.metaRow}>
+              <View style={styles.metaItem}>
+                <Ionicons name="time-outline" size={12} color={Colors.textLight} />
+                <Text style={styles.metaText}>{formatDate(article.date)}</Text>
+              </View>
+            </View>
+          </View>
+          {article._embedded?.['wp:featuredmedia']?.[0]?.source_url && (
+            <Image
+              source={{ uri: article._embedded['wp:featuredmedia'][0].source_url }}
+              style={styles.compactImage}
+            />
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  }
 
   if (variant === 'vertical') {
     return (
@@ -156,6 +182,11 @@ const styles = StyleSheet.create({
   horizontalImage: {
     width: 100,
     height: 100,
+    borderRadius: 12,
+  },
+  compactImage: {
+    width: 80,
+    height: 80,
     borderRadius: 12,
   },
   verticalCard: {

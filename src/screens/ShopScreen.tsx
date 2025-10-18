@@ -106,17 +106,17 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingTop: 60,
         paddingBottom: 20,
-        backgroundColor: Colors.backgroundLight,
+        backgroundColor: '#000000',
     },
     headerSubtitle: {
         fontSize: 14,
-        color: Colors.textSecondary,
+        color: '#999999',
         marginBottom: 4,
     },
     headerTitle: {
         fontSize: 24,
         fontWeight: '700',
-        color: Colors.text,
+        color: '#FFFFFF',
     },
     searchButton: {
         width: 44,
