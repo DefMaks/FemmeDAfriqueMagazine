@@ -97,7 +97,7 @@ const ShopScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.background,
+        backgroundColor: '#000000',
     },
     header: {
         flexDirection: 'row',

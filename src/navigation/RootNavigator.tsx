@@ -30,12 +30,16 @@ function MainTabs() {
             screenOptions={({ route }) => ({
                 tabBarIcon: ({ focused, color, size }) => {
                     let iconName = 'ellipse';
+                    let iconSize = size;
                     if (route.name === 'Accueil') iconName = focused ? 'home' : 'home-outline';
                     else if (route.name === 'Découvrir') iconName = focused ? 'search' : 'search-outline';
                     else if (route.name === 'Sauvegardés') iconName = focused ? 'bookmark' : 'bookmark-outline';
-                    else if (route.name === 'Boutique') iconName = focused ? 'cart' : 'cart-outline';
+                    else if (route.name === 'Boutique') {
+                        iconName = focused ? 'cart' : 'cart-outline';
+                        iconSize = size + 4;
+                    }
                     else if (route.name === 'Profil') iconName = focused ? 'person' : 'person-outline';
-                    return <Ionicons name={iconName as any} size={size} color={color} />;
+                    return <Ionicons name={iconName as any} size={iconSize} color={color} />;
                 },
                 tabBarActiveTintColor: Colors.primary,
                 tabBarInactiveTintColor: Colors.textLight,
