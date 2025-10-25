@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Femme D'Afrique Magazine",
-    "slug": "FemmeDAfriqueMagazine",
+    "slug": "fda",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -9,7 +9,7 @@
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
+      "resizeMode": "cover",
       "backgroundColor": "#ffffff"
     },
     "ios": {
@@ -34,7 +34,15 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
-    "plugins": [],
+    "plugins": [
+      [
+        "onesignal-expo-plugin",
+        {
+          "mode": "development",
+          "appId": "e9dda2dd-a0c7-4221-ad6c-71ce91c540ce"
+        }
+      ]
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     }

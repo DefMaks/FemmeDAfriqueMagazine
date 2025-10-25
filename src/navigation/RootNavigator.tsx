@@ -14,11 +14,12 @@ import ArticleDetailScreen from '../screens/ArticleDetailScreen';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { Magazine } from '../models/Magazine';
+import { Text, TouchableOpacity } from 'react-native';
 
 export type RootStackParamList = {
-  Main: undefined;
-  Checkout: { magazine: Magazine };
-  ArticleDetail: { article: Post };
+    Main: undefined;
+    Checkout: { magazine: Magazine };
+    ArticleDetail: { article: Post };
 };
 
 const Tab = createBottomTabNavigator();
@@ -30,16 +31,11 @@ function MainTabs() {
             screenOptions={({ route }) => ({
                 tabBarIcon: ({ focused, color, size }) => {
                     let iconName = 'ellipse';
-                    let iconSize = size;
                     if (route.name === 'Accueil') iconName = focused ? 'home' : 'home-outline';
                     else if (route.name === 'Découvrir') iconName = focused ? 'search' : 'search-outline';
-                    else if (route.name === 'Sauvegardés') iconName = focused ? 'bookmark' : 'bookmark-outline';
-                    else if (route.name === 'Boutique') {
-                        iconName = focused ? 'cart' : 'cart-outline';
-                        iconSize = size + 4;
-                    }
+                    else if (route.name === 'Favoris') iconName = focused ? 'bookmark' : 'bookmark-outline';
                     else if (route.name === 'Profil') iconName = focused ? 'person' : 'person-outline';
-                    return <Ionicons name={iconName as any} size={iconSize} color={color} />;
+                    return <Ionicons name={iconName as any} size={size} color={color} />;
                 },
                 tabBarActiveTintColor: Colors.primary,
                 tabBarInactiveTintColor: Colors.textLight,
@@ -49,7 +45,7 @@ function MainTabs() {
                     borderTopWidth: 1,
                     paddingBottom: 8,
                     paddingTop: 8,
-                    height: 65,
+                    height: 70,
                 },
                 tabBarLabelStyle: {
                     fontSize: 12,
@@ -60,8 +56,52 @@ function MainTabs() {
         >
             <Tab.Screen name="Accueil" component={HomeScreen} />
             <Tab.Screen name="Découvrir" component={DiscoverScreen} />
-            <Tab.Screen name="Sauvegardés" component={SavedScreen} />
-            <Tab.Screen name="Boutique" component={ShopScreen} />
+            <Tab.Screen
+                name="Boutique"
+                component={ShopScreen}
+                options={{
+                    tabBarIcon: ({ focused }) => (
+                        <Ionicons
+                            name={focused ? 'bag' : 'bag-outline'}
+                            size={26}
+                            color="#FFFFFF"
+                        />
+                    ),
+                    tabBarLabel: ({ focused }) => (
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF', marginTop: 4 }}>
+                            Boutique
+                        </Text>
+                    ),
+                    tabBarButton: (props) => (
+                        <TouchableOpacity
+                            onPress={props.onPress}
+                            accessibilityLabel={props.accessibilityLabel}
+                            accessibilityRole={props.accessibilityRole}
+                            accessibilityState={props.accessibilityState}
+                            testID={props.testID}
+                            style={{
+                                top: -15,
+                                marginBottom: -15,
+                                backgroundColor: Colors.primary,
+                                borderRadius: 35,
+                                width: 70,
+                                height: 70,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                shadowColor: '#000',
+                                shadowOffset: { width: 0, height: 4 },
+                                shadowOpacity: 0.25,
+                                shadowRadius: 6,
+                                elevation: 6,
+                                marginHorizontal: 10
+                            }}
+                        >
+                            <Ionicons name="bag" size={26} color="#FFFFFF" />
+                        </TouchableOpacity>
+                    ),
+                }}
+            />
+            <Tab.Screen name="Favoris" component={SavedScreen} />
             <Tab.Screen name="Profil" component={ProfileScreen} />
         </Tab.Navigator>
     );

@@ -1,3 +1,4 @@
+// src/screens/ArticleDetailScreen
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Image, StyleSheet, TouchableOpacity, Share, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';

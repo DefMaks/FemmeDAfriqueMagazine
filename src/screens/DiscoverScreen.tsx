@@ -1,16 +1,30 @@
+// src/screens/DiscoverScreen.tsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, ScrollView, TouchableOpacity, FlatList } from 'react-native';
+import {
+    View,
+    Text,
+    StyleSheet,
+    TextInput,
+    ScrollView,
+    TouchableOpacity,
+    FlatList,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { getCategories, getCategoryById, getPostsByCategory, searchPosts } from '../services/api';
+import {
+    getCategories,
+    getPostsByCategory,
+    searchPosts,
+} from '../services/api';
 import { Category } from '../models/Category';
 import { Post } from '../models/Post';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { ArticleCard } from '../components/ArticleCard';
 import { RootStackParamList } from '../navigation/RootNavigator';
+import CategoryCard from '../components/CategoryCard';
 
 type DiscoverScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -37,9 +51,25 @@ const CATEGORY_ICONS: { [key: string]: any } = {
 };
 
 const CATEGORY_COLORS = [
-    '#FF6B9D', '#C44569', '#FFA502', '#4834DF',
-    '#E74C3C', '#26DE81', '#4B7BEC', '#A55EEA',
+    '#A93F55',
+    '#A93F55',
+    '#A93F55',
+    '#A93F55',
+    '#A93F55',
+    '#A93F55',
+    '#A93F55',
+    '#A93F55',
 ];
+// const CATEGORY_COLORS = [
+//     '#FF6B9D',
+//     '#C44569',
+//     '#FFA502',
+//     '#4834DF',
+//     '#E74C3C',
+//     '#26DE81',
+//     '#4B7BEC',
+//     '#A55EEA',
+// ];
 
 const DiscoverScreen = () => {
     const navigation = useNavigation<DiscoverScreenNavigationProp>();
@@ -57,6 +87,8 @@ const DiscoverScreen = () => {
         loadCategories();
         loadFeaturedCategories();
     }, []);
+
+    console.log(`rgba(${Colors.primary_rgb}, 0.1)`);
 
     const loadCategories = async () => {
         try {
@@ -215,10 +247,13 @@ const DiscoverScreen = () => {
                     returnKeyType="search"
                 />
                 {searchQuery.length > 0 && (
-                    <TouchableOpacity onPress={() => {
-                        setSearchQuery('');
-                        setIsSearching(false);
-                    }} style={styles.clearButton}>
+                    <TouchableOpacity
+                        onPress={() => {
+                            setSearchQuery('');
+                            setIsSearching(false);
+                        }}
+                        style={styles.clearButton}
+                    >
                         <Ionicons name="close-circle" size={20} color={Colors.textLight} />
                     </TouchableOpacity>
                 )}
@@ -244,10 +279,13 @@ const DiscoverScreen = () => {
                                     {featuredPosts[name].map((post) => (
                                         <TouchableOpacity
                                             key={post.id}
-                                            style={styles.featuredPostCard}
-                                            onPress={() => handleArticlePress(post)}
+                                            style={[styles.featuredPostCard,
+                                            {
+                                                borderWidth: 1,
+                                                borderColor: `rgba(${Colors.primary_rgb}, 0.2)`,
+                                            }]}
                                         >
-                                            <Text style={styles.featuredPostTitle} numberOfLines={2}>
+                                            <Text style={[styles.featuredPostTitle, {}]} numberOfLines={2}>
                                                 {post.title.rendered}
                                             </Text>
                                         </TouchableOpacity>
@@ -258,25 +296,41 @@ const DiscoverScreen = () => {
                     ))}
                 </View>
 
-                <View style={styles.section}>
+                {/* <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Toutes les catégories</Text>
                     <View style={styles.categoriesGrid}>
                         {categories.map((category, index) => (
                             <TouchableOpacity
                                 key={category.id}
-                                style={[styles.categoryCard, { borderColor: getCategoryColor(index) }]}
+                                style={styles.categoryCard}
                                 activeOpacity={0.8}
                                 onPress={() => handleCategoryPress(category.id, category.name)}
                             >
                                 <View style={[styles.categoryIconContainer, { backgroundColor: getCategoryColor(index) + '20' }]}>
                                     <Ionicons name={getCategoryIcon(category.name)} size={28} color={getCategoryColor(index)} />
                                 </View>
-                                <Text style={styles.categoryName} numberOfLines={1}>{category.name}</Text>
+                                <Text style={styles.categoryName} numberOfLines={1}>
+                                    {category.name}
+                                </Text>
                                 <Text style={styles.categoryCount}>{category.count} articles</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
+                </View> */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Toutes les catégories</Text>
+                    <View style={styles.categoriesGrid}>
+                        {categories.map((category) => (
+                            <CategoryCard
+                                key={category.id}
+                                name={category.name}
+                                count={category.count}
+                                onPress={() => handleCategoryPress(category.id, category.name)}
+                            />
+                        ))}
+                    </View>
                 </View>
+
             </ScrollView>
         </View>
     );
@@ -392,14 +446,15 @@ const styles = StyleSheet.create({
     categoriesGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
+        justifyContent: 'space-between',
         paddingHorizontal: 12,
     },
     categoryCard: {
-        width: '46%',
+        width: '48%',
         backgroundColor: Colors.backgroundLight,
         borderRadius: 16,
         padding: 20,
-        margin: 8,
+        marginBottom: 16,
         alignItems: 'center',
         borderWidth: 2,
         shadowColor: Colors.shadow,
