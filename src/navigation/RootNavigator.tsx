@@ -113,7 +113,7 @@ export default function RootNavigator() {
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="Main" component={MainTabs} />
                 <Stack.Screen name="ArticleDetail" component={ArticleDetailScreen} />
-                <Stack.Screen name="Checkout" component={CheckoutScreen} />
+                {/* <Stack.Screen name="Checkout" component={CheckoutScreen} /> */}
             </Stack.Navigator>
         </NavigationContainer>
     );

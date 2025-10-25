@@ -158,34 +158,36 @@ const CheckoutScreen = ({ route }: CheckoutScreenProps) => {
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>✅ Paiement sécurisé et traçable</Text>
                         </View>
-                        <Text style={styles.modalText}>
-                            Soyez assuré(e) que votre paiement est directement enregistré sur le compte officiel de Femme d’Afrique Magazine grâce à l’intégration de TwigaPaie.
-                        </Text>
-                        <Text style={styles.modalText}>
-                            • Traçabilité garantie : Chaque transaction est soigneusement suivie et documentée pour vous offrir une transparence totale.
-                        </Text>
-                        <Text style={styles.modalText}>
-                            • Sécurité assurée : Vos paiements sont protégés et traités dans un environnement hautement sécurisé, répondant aux standards internationaux.
-                        </Text>
-                        <Text style={styles.modalText}>
-                            • Confidentialité respectée : Vos données personnelles et bancaires sont traitées avec la plus grande confidentialité, en conformité avec les réglementations en vigueur.
-                        </Text>
-                        <Text style={styles.modalText}>
-                            En outre, DefMaks veille au suivi rigoureux de chaque paiement et, une fois les transactions validées, transfère l’intégralité des fonds à Femme d’Afrique Magazine, conformément aux accords signés entre les deux parties.
-                        </Text>
-                        <Text style={styles.modalText}>
-                            Après votre paiement, vous pourrez télécharger immédiatement le magazine au format PDF et profiter de nos contenus exclusifs.
-                        </Text>
-                        <Text style={styles.modalText}>
-                            En cas de questions ou de réclamations, notre équipe est à votre écoute. N’hésitez pas à nous contacter via le bouton ci-dessous :
-                        </Text>
-                        <TouchableOpacity style={styles.supportButton}>
-                            <Text style={styles.supportButtonText}>📧 Contactez notre support</Text>
-                        </TouchableOpacity>
-                        <Text style={styles.modalText}>
-                            Nous sommes là pour vous accompagner à chaque étape et garantir votre satisfaction. Votre confiance est notre priorité, et nous mettons tout en œuvre pour vous offrir une expérience exceptionnelle.
-                        </Text>
-                        <Text style={styles.modalText}>Avec nos meilleures salutations, L’équipe Femme d’Afrique Magazine</Text>
+                        <ScrollView>
+                            <Text style={styles.modalText}>
+                                Soyez assuré(e) que votre paiement est directement enregistré sur le compte officiel de Femme d’Afrique Magazine grâce à l’intégration de TwigaPaie.
+                            </Text>
+                            <Text style={styles.modalText}>
+                                • Traçabilité garantie : Chaque transaction est soigneusement suivie et documentée pour vous offrir une transparence totale.
+                            </Text>
+                            <Text style={styles.modalText}>
+                                • Sécurité assurée : Vos paiements sont protégés et traités dans un environnement hautement sécurisé, répondant aux standards internationaux.
+                            </Text>
+                            <Text style={styles.modalText}>
+                                • Confidentialité respectée : Vos données personnelles et bancaires sont traitées avec la plus grande confidentialité, en conformité avec les réglementations en vigueur.
+                            </Text>
+                            <Text style={styles.modalText}>
+                                En outre, DefMaks veille au suivi rigoureux de chaque paiement et, une fois les transactions validées, transfère l’intégralité des fonds à Femme d’Afrique Magazine, conformément aux accords signés entre les deux parties.
+                            </Text>
+                            <Text style={styles.modalText}>
+                                Après votre paiement, vous pourrez télécharger immédiatement le magazine au format PDF et profiter de nos contenus exclusifs.
+                            </Text>
+                            <Text style={styles.modalText}>
+                                En cas de questions ou de réclamations, notre équipe est à votre écoute. N’hésitez pas à nous contacter via le bouton ci-dessous :
+                            </Text>
+                            <TouchableOpacity style={styles.supportButton}>
+                                <Text style={styles.supportButtonText}>📧 Contactez notre support</Text>
+                            </TouchableOpacity>
+                            <Text style={styles.modalText}>
+                                Nous sommes là pour vous accompagner à chaque étape et garantir votre satisfaction. Votre confiance est notre priorité, et nous mettons tout en œuvre pour vous offrir une expérience exceptionnelle.
+                            </Text>
+                            <Text style={styles.modalText}>Avec nos meilleures salutations, L’équipe Femme d’Afrique Magazine</Text>
+                        </ScrollView>
                         <TouchableOpacity style={styles.modalButton} onPress={closeModal}>
                             <Text style={styles.modalButtonText}>COMPRIS !</Text>
                         </TouchableOpacity>
@@ -259,7 +261,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 16,
+        paddingHorizontal: 20,
+        paddingTop: 60,
+        paddingBottom: 20,
         backgroundColor: Colors.primary,
     },
     headerTitle: {
@@ -271,16 +275,35 @@ const styles = StyleSheet.create({
         fontSize: 24,
         color: '#FFFFFF',
     },
+    //
+    //
+
     magazineInfo: {
-        alignItems: 'center',
-        padding: 16,
+        marginVertical: 10,
+    },
+    row: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+    },
+    column: {
+        flex: 1,
+        paddingHorizontal: 8,
     },
     coverImage: {
-        width: 200,
-        height: 250,
-        borderRadius: 8,
-        marginBottom: 16,
+        width: '100%',
+        height: 200,
+        resizeMode: 'contain',
     },
+    // magazineInfo: {
+    //     alignItems: 'center',
+    //     padding: 16,
+    // },
+    // coverImage: {
+    //     width: 200,
+    //     height: 250,
+    //     borderRadius: 8,
+    //     marginBottom: 16,
+    // },
     magazineTitle: {
         fontSize: 18,
         fontWeight: 'bold',

@@ -97,7 +97,7 @@ const HomeScreen = () => {
                     style={styles.logo}
                     resizeMode="contain"
                 />
-                <Text style={styles.headerTitle}>Femme d'Afrique</Text>
+                {/* <Text style={styles.headerTitle}>Femme d'Afrique</Text> */}
             </View>
 
             <ScrollView
@@ -229,15 +229,17 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 20,
         paddingTop: 60,
-        paddingBottom: 16,
+        // paddingBottom: 16,
+        paddingBottom: 8,
         backgroundColor: Colors.backgroundLight,
         borderBottomWidth: 1,
         borderBottomColor: Colors.borderLight,
     },
     logo: {
-        width: 40,
-        height: 40,
+        width: 110,
+        height: 50,
         marginRight: 12,
+        // resizeMode: 'cover'
     },
     headerTitle: {
         fontSize: 24,
