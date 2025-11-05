@@ -14,6 +14,8 @@ const { width } = Dimensions.get('window');
 
 type ArticleDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
 
+
+
 const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) => {
   const { article } = route.params;
   const [isSaved, setIsSaved] = useState(false);

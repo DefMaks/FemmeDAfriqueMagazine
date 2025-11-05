@@ -1,171 +1,78 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+// src/screens/SavedScreen.tsx
+import React, { useEffect, useState } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import { getSavedArticles, removeArticle } from '../services/savedArticles';
+import { Post } from '../models/Post';
 import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
-import { savedArticlesService, SavedArticle } from '../services/supabaseService';
-import { ArticleCard } from '../components/ArticleCard';
-import { LoadingSpinner } from '../components/LoadingSpinner';
-import { ErrorMessage } from '../components/ErrorMessage';
 
 const SavedScreen = () => {
-  const [savedArticles, setSavedArticles] = useState<SavedArticle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [savedPosts, setSavedPosts] = useState<Post[]>([]);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadSavedArticles();
-    }, [])
+  useEffect(() => {
+    loadSaved();
+  }, []);
+
+  const loadSaved = async () => {
+    const posts = await getSavedArticles();
+    setSavedPosts(posts);
+  };
+
+  const handleRemove = async (id: number) => {
+    await removeArticle(id);
+    setSavedPosts(prev => prev.filter(p => p.id !== id));
+  };
+
+  const renderSavedPost = ({ item }: { item: Post }) => (
+    <View style={styles.postCard}>
+      <Text style={styles.title} numberOfLines={2}>{item.title.rendered}</Text>
+      <TouchableOpacity onPress={() => handleRemove(item.id)} style={styles.removeButton}>
+        <Ionicons name="trash-outline" size={18} color={Colors.primary} />
+      </TouchableOpacity>
+    </View>
   );
 
-  const loadSavedArticles = async () => {
-    try {
-      setError(null);
-      const articles = await savedArticlesService.getSavedArticles();
-      setSavedArticles(articles);
-    } catch (err) {
-      setError('Impossible de charger les articles sauvegardés');
-      console.error('Error loading saved articles:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadSavedArticles();
-  };
-
-  const handleArticlePress = (article: SavedArticle) => {
-    console.log('Open article:', article.article_data.title.rendered);
-  };
-
-  if (loading) {
-    return <LoadingSpinner message="Chargement des articles..." />;
-  }
-
-  if (error) {
-    return <ErrorMessage message={error} onRetry={loadSavedArticles} />;
-  }
-
-  if (savedArticles.length === 0) {
+  if (savedPosts.length === 0) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Articles Sauvegardés</Text>
-        </View>
-        <View style={styles.emptyState}>
-          <View style={styles.emptyIconContainer}>
-            <Ionicons name="bookmark-outline" size={64} color={Colors.textLight} />
-          </View>
-          <Text style={styles.emptyTitle}>Aucun article sauvegardé</Text>
-          <Text style={styles.emptyMessage}>
-            Commencez à sauvegarder vos articles préférés pour les retrouver facilement ici
-          </Text>
-        </View>
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>Aucun article sauvegardé</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Articles Sauvegardés</Text>
-        <View style={styles.countBadge}>
-          <Text style={styles.countText}>{savedArticles.length}</Text>
-        </View>
-      </View>
-
       <FlatList
-        data={savedArticles}
-        renderItem={({ item }) => (
-          <ArticleCard
-            article={item.article_data}
-            onPress={() => handleArticlePress(item)}
-            variant="horizontal"
-          />
-        )}
-        keyExtractor={(item) => item.id}
+        data={savedPosts}
+        renderItem={renderSavedPost}
+        keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={Colors.primary}
-            colors={[Colors.primary]}
-          />
-        }
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
+  container: { flex: 1, backgroundColor: Colors.background, padding: 16 },
+  list: { paddingBottom: 20 },
+  postCard: {
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 10,
+    marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: Colors.backgroundLight,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.text,
-  },
-  countBadge: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  countText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFF',
-  },
-  list: {
-    paddingTop: 16,
-    paddingBottom: 100,
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: Colors.borderLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  emptyTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  emptyMessage: {
-    fontSize: 15,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
+  title: { fontSize: 16, fontWeight: '600', color: Colors.text, flex: 1 },
+  removeButton: { padding: 8 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyText: { fontSize: 16, color: '#666' },
 });
 
 export default SavedScreen;

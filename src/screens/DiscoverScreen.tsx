@@ -60,16 +60,6 @@ const CATEGORY_COLORS = [
     '#A93F55',
     '#A93F55',
 ];
-// const CATEGORY_COLORS = [
-//     '#FF6B9D',
-//     '#C44569',
-//     '#FFA502',
-//     '#4834DF',
-//     '#E74C3C',
-//     '#26DE81',
-//     '#4B7BEC',
-//     '#A55EEA',
-// ];
 
 const DiscoverScreen = () => {
     const navigation = useNavigation<DiscoverScreenNavigationProp>();
@@ -296,27 +286,6 @@ const DiscoverScreen = () => {
                     ))}
                 </View>
 
-                {/* <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Toutes les catégories</Text>
-                    <View style={styles.categoriesGrid}>
-                        {categories.map((category, index) => (
-                            <TouchableOpacity
-                                key={category.id}
-                                style={styles.categoryCard}
-                                activeOpacity={0.8}
-                                onPress={() => handleCategoryPress(category.id, category.name)}
-                            >
-                                <View style={[styles.categoryIconContainer, { backgroundColor: getCategoryColor(index) + '20' }]}>
-                                    <Ionicons name={getCategoryIcon(category.name)} size={28} color={getCategoryColor(index)} />
-                                </View>
-                                <Text style={styles.categoryName} numberOfLines={1}>
-                                    {category.name}
-                                </Text>
-                                <Text style={styles.categoryCount}>{category.count} articles</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View> */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Toutes les catégories</Text>
                     <View style={styles.categoriesGrid}>

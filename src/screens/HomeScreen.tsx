@@ -1,8 +1,22 @@
+// src/screens/HomeScreen.tsx
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, Image } from 'react-native';
+import {
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    RefreshControl,
+    Image,
+    TouchableOpacity,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { getPosts, getPostsByTag, getPostsByCategory } from '../services/api';
+import {
+    getPosts,
+    getPostsByTag,
+    getPostsByCategory,
+    getMedia,
+} from '../services/api';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { ArticleCard } from '../components/ArticleCard';
@@ -12,6 +26,9 @@ import { AdBanner } from '../components/AdBanner';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { RootStackParamList } from '../navigation/RootNavigator';
+import * as Sharing from 'expo-sharing';
+import { saveArticle, isArticleSaved, removeArticle } from '../services/savedArticles';
+import { Ionicons } from '@expo/vector-icons';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -30,10 +47,12 @@ const HomeScreen = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [savedStatus, setSavedStatus] = useState<Record<number, boolean>>({});
 
     useEffect(() => {
         loadAllContent();
     }, []);
+
 
     const loadAllContent = async () => {
         try {
@@ -45,13 +64,13 @@ const HomeScreen = () => {
                 espaceTendresseData,
                 entrepreneuriatData,
                 gastronomieData,
-                latestData
+                latestData,
             ] = await Promise.all([
                 getPostsByTag(SLIDER_TAG_ID, 1, 4).catch(() => []),
                 getPostsByCategory(ESPACE_TENDRESSE_ID, 1, 5).catch(() => []),
                 getPostsByCategory(ENTREPRENEURIAT_ID, 1, 4).catch(() => []),
                 getPostsByCategory(GASTRONOMIE_ID, 1, 4).catch(() => []),
-                getPosts(1, 4).catch(() => [])
+                getPosts(1, 4).catch(() => []),
             ]);
 
             setSliderPosts(sliderData);
@@ -59,6 +78,25 @@ const HomeScreen = () => {
             setEntrepreneuriatPosts(entrepreneuriatData);
             setGastronomiePosts(gastronomieData);
             setLatestPosts(latestData);
+
+            // ✅ Charger l’état des favoris ici, une seule fois
+            const allPosts = [
+                ...sliderData,
+                ...espaceTendresseData,
+                ...entrepreneuriatData,
+                ...gastronomieData,
+                ...latestData,
+            ].filter(post =>
+                post &&
+                typeof post.id === 'number' &&
+                post.title?.rendered
+            );
+
+            const status: Record<number, boolean> = {};
+            for (const post of allPosts) {
+                status[post.id] = await isArticleSaved(post.id);
+            }
+            setSavedStatus(status);
         } catch (err) {
             setError('Impossible de charger le contenu');
             console.error('Error loading content:', err);
@@ -67,6 +105,8 @@ const HomeScreen = () => {
             setRefreshing(false);
         }
     };
+
+
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -78,7 +118,24 @@ const HomeScreen = () => {
     };
 
     const handleSeeAll = (categoryId: number, title: string) => {
-        navigation.navigate('Main' as never);
+        // Pour l'instant, on reste sur l'accueil
+        // À compléter plus tard avec DiscoverScreen
+    };
+
+    const sharePost = async (post: Post) => {
+        const message = `${post.title.rendered}\n\nLire sur Femme d’Afrique : ${post.link}`;
+        await Sharing.shareAsync(message, { dialogTitle: 'Partager' });
+    };
+
+
+    const toggleSave = async (post: Post) => {
+        const isSaved = savedStatus[post.id];
+        if (isSaved) {
+            await removeArticle(post.id);
+        } else {
+            await saveArticle(post);
+        }
+        setSavedStatus((prev) => ({ ...prev, [post.id]: !isSaved }));
     };
 
     if (loading) {
@@ -89,6 +146,29 @@ const HomeScreen = () => {
         return <ErrorMessage message={error} onRetry={loadAllContent} />;
     }
 
+
+
+    // Fonction utilitaire pour afficher les cartes avec actions
+    const renderArticleWithActions = (post: Post, variant: 'horizontal' | 'vertical' = 'horizontal') => (
+        <View style={styles.cardWrapper}>
+            <ArticleCard article={post} onPress={() => handleArticlePress(post)} variant={variant} />
+            <View style={styles.actionsContainer}>
+                {/* Bouton Partager */}
+                <TouchableOpacity style={styles.actionButton} onPress={() => sharePost(post)}>
+                    <Ionicons name="share-social-outline" size={18} color="#666" />
+                </TouchableOpacity>
+                {/* Bouton Favori */}
+                <TouchableOpacity style={styles.actionButton} onPress={() => toggleSave(post)}>
+                    <Ionicons
+                        name={savedStatus[post.id] ? 'heart' : 'heart-outline'}
+                        size={18}
+                        color={savedStatus[post.id] ? Colors.primary : '#666'}
+                    />
+                </TouchableOpacity>
+            </View>
+        </View>
+    );
+
     return (
         <View style={styles.container}>
             <View style={styles.header}>
@@ -97,7 +177,6 @@ const HomeScreen = () => {
                     style={styles.logo}
                     resizeMode="contain"
                 />
-                {/* <Text style={styles.headerTitle}>Femme d'Afrique</Text> */}
             </View>
 
             <ScrollView
@@ -113,30 +192,18 @@ const HomeScreen = () => {
             >
                 {sliderPosts.length > 0 && (
                     <View style={styles.section}>
-                        <SectionHeader
-                            title="À LA UNE"
-                            icon="star"
-                            color={Colors.primary}
-                        />
+                        <SectionHeader title="À LA UNE" icon="star" color={Colors.primary} />
                         <PostSlider posts={sliderPosts} onPress={handleArticlePress} />
                     </View>
                 )}
 
                 {latestPosts.length > 0 && (
                     <View style={styles.section}>
-                        <SectionHeader
-                            title="Derniers articles"
-                            icon="time-outline"
-                            color={Colors.primary}
-                        />
+                        <SectionHeader title="Derniers articles" icon="time-outline" color={Colors.primary} />
                         <View style={styles.latestGrid}>
                             {latestPosts.map((post) => (
                                 <View key={post.id} style={styles.latestCard}>
-                                    <ArticleCard
-                                        article={post}
-                                        onPress={() => handleArticlePress(post)}
-                                        variant="horizontal"
-                                    />
+                                    {renderArticleWithActions(post, 'horizontal')}
                                 </View>
                             ))}
                         </View>
@@ -158,11 +225,7 @@ const HomeScreen = () => {
                         >
                             {espaceTendressePosts.map((post) => (
                                 <View key={post.id} style={styles.horizontalCard}>
-                                    <ArticleCard
-                                        article={post}
-                                        onPress={() => handleArticlePress(post)}
-                                        variant="horizontal"
-                                    />
+                                    {renderArticleWithActions(post, 'horizontal')}
                                 </View>
                             ))}
                         </ScrollView>
@@ -181,12 +244,9 @@ const HomeScreen = () => {
                         />
                         <View style={styles.listSection}>
                             {entrepreneuriatPosts.map((post) => (
-                                <ArticleCard
-                                    key={post.id}
-                                    article={post}
-                                    onPress={() => handleArticlePress(post)}
-                                    variant="horizontal"
-                                />
+                                <View key={post.id} style={styles.listItem}>
+                                    {renderArticleWithActions(post, 'horizontal')}
+                                </View>
                             ))}
                         </View>
                     </View>
@@ -202,12 +262,9 @@ const HomeScreen = () => {
                         />
                         <View style={styles.listSection}>
                             {gastronomiePosts.map((post) => (
-                                <ArticleCard
-                                    key={post.id}
-                                    article={post}
-                                    onPress={() => handleArticlePress(post)}
-                                    variant="horizontal"
-                                />
+                                <View key={post.id} style={styles.listItem}>
+                                    {renderArticleWithActions(post, 'horizontal')}
+                                </View>
                             ))}
                         </View>
                     </View>
@@ -229,7 +286,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 20,
         paddingTop: 60,
-        // paddingBottom: 16,
         paddingBottom: 8,
         backgroundColor: Colors.backgroundLight,
         borderBottomWidth: 1,
@@ -239,12 +295,6 @@ const styles = StyleSheet.create({
         width: 110,
         height: 50,
         marginRight: 12,
-        // resizeMode: 'cover'
-    },
-    headerTitle: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: Colors.text,
     },
     section: {
         marginTop: 24,
@@ -257,7 +307,7 @@ const styles = StyleSheet.create({
     },
     horizontalScroll: {
         paddingLeft: 20,
-        paddingRight: 20,
+        paddingRight: 32,
     },
     horizontalCard: {
         width: 280,
@@ -265,6 +315,32 @@ const styles = StyleSheet.create({
     },
     listSection: {
         paddingHorizontal: 20,
+    },
+    listItem: {
+        marginBottom: 12,
+    },
+    cardWrapper: {
+        position: 'relative',
+    },
+    actionsContainer: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        flexDirection: 'row',
+        gap: 8,
+    },
+    actionButton: {
+        backgroundColor: '#FFF',
+        borderRadius: 16,
+        width: 32,
+        height: 32,
+        justifyContent: 'center',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.15,
+        shadowRadius: 2,
+        elevation: 2,
     },
     bottomPadding: {
         height: 100,

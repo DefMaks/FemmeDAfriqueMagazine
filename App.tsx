@@ -3,8 +3,13 @@ import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import RootNavigator from './src/navigation/RootNavigator';
-import { OneSignal, LogLevel } from 'react-native-onesignal';
+// import { OneSignal, LogLevel } from 'react-native-onesignal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Une seule fois au démarrage (dev only)
+if (__DEV__) {
+  AsyncStorage.removeItem('saved_articles'); // Décommente si tu veux tout effacer
+}
 export default function App() {
   /*
   // Enable verbose logging for debugging (remove in production)
