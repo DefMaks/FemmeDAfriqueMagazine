@@ -1,3 +1,4 @@
+// src/navigation/RootNavigator.tsx
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -61,11 +62,14 @@ function MainTabs() {
                 component={ShopScreen}
                 options={{
                     tabBarIcon: ({ focused }) => (
-                        <Ionicons
-                            name={focused ? 'bag' : 'bag-outline'}
-                            size={26}
-                            color="#FFFFFF"
-                        />
+                        <>
+                            <Ionicons
+                                name={focused ? 'bag' : 'bag-outline'}
+                                size={26}
+                                color="#FFFFFF"
+                            />
+                            <Text>Boutique</Text>
+                        </>
                     ),
                     tabBarLabel: ({ focused }) => (
                         <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF', marginTop: 4 }}>

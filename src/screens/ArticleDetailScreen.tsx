@@ -9,8 +9,14 @@ import axios from 'axios';
 import { CommentsList } from '../components/CommentsList';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
+import RenderHtml from 'react-native-render-html';
+import { WebView } from 'react-native-webview';
+
+
 
 const { width } = Dimensions.get('window');
+const screenWidth = Dimensions.get('window').width;
+const height = Dimensions.get('window').height;
 
 type ArticleDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
 
@@ -24,7 +30,7 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
   const [loadingComments, setLoadingComments] = useState(true);
 
   useEffect(() => {
-    checkIfSaved();
+    // checkIfSaved();
     loadComments();
   }, []);
 
@@ -126,7 +132,46 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
 
           <View style={styles.divider} />
 
-          <Text style={styles.body}>{stripHtml(article.content.rendered)}</Text>
+          {/* <Text style={styles.body}>{stripHtml(article.content.rendered)}</Text> */}
+          {/* <View style={styles.body}> */}
+          <RenderHtml
+            // contentWidth={300} // Largeur du contenu
+            contentWidth={screenWidth - 40} // Padding inclus
+            source={{ html: article.content.rendered }}
+            tagsStyles={{
+              img: { maxWidth: screenWidth - 52, borderRadius: 8, marginVertical: 5, overflow: 'hidden' },
+              figure: { marginVertical: 10, marginHorizontal: 5, width: 400, height: 'auto' },
+              p: { marginBottom: 15, marginTop: 5 },
+              strong: { fontWeight: '700' },
+              h1: { fontSize: 24, fontWeight: '700', marginBottom: 10 },
+              h2: { fontSize: 22, fontWeight: '700', marginBottom: 10 },
+              h3: { fontSize: 20, fontWeight: '700', marginBottom: 10 },
+              h4: { fontSize: 18, fontWeight: '700', marginBottom: 10 },
+              h5: { fontSize: 16, fontWeight: '700', marginBottom: 10 },
+              h6: { fontSize: 14, fontWeight: '700', marginBottom: 10 },
+              em: {
+                fontStyle: 'italic'
+              }
+            }}
+            classesStyles={{
+              'wp-block-image': { backgroundColor: '#f5f5f5' },
+              'body': {
+                // fontSize: 50,
+                // paddingHorizontal: 2,
+              },
+              'MsoNormal': {
+                fontSize: 17,
+                color: Colors.text,
+                // lineHeight: 28,
+              }
+            }}
+          />
+          {/* <WebView
+            originWhitelist={['*']}
+            style={{ height: height - 30, width: width - 40 }}
+            source={{ html: article.content.rendered }}
+          /> */}
+          {/* </View> */}
 
           <View style={styles.commentsSection}>
             <Text style={styles.commentsTitle}>Commentaires ({comments.length})</Text>
@@ -203,9 +248,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   body: {
-    fontSize: 17,
+    fontSize: 18,
     color: Colors.text,
     lineHeight: 28,
+    // paddingHorizontal: 2,
+
   },
   commentsSection: {
     marginTop: 32,

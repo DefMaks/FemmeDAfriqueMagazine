@@ -9,4 +9,5 @@ export interface Post {
   _embedded?: {
     "wp:featuredmedia"?: Array<{ source_url: string }>;
   };
+  dmks_featured_image: any;
 }

@@ -8,6 +8,7 @@ import {
     RefreshControl,
     Image,
     TouchableOpacity,
+    Dimensions,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -29,6 +30,7 @@ import { RootStackParamList } from '../navigation/RootNavigator';
 import * as Sharing from 'expo-sharing';
 import { saveArticle, isArticleSaved, removeArticle } from '../services/savedArticles';
 import { Ionicons } from '@expo/vector-icons';
+import ShopScreen from './ShopScreen';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
@@ -177,6 +179,8 @@ const HomeScreen = () => {
                     style={styles.logo}
                     resizeMode="contain"
                 />
+
+
             </View>
 
             <ScrollView
@@ -196,6 +200,17 @@ const HomeScreen = () => {
                         <PostSlider posts={sliderPosts} onPress={handleArticlePress} />
                     </View>
                 )}
+
+                <View style={styles.bannerWrapper}>
+                    <TouchableOpacity onPress={() => {
+                        navigation.navigate('Boutique');
+                    }}>
+                        <Image
+                            source={require('../../assets/Banniere_FDA.jpg')}
+                            style={styles.banner}
+                            resizeMode="contain" />
+                    </TouchableOpacity>
+                </View>
 
                 {latestPosts.length > 0 && (
                     <View style={styles.section}>
@@ -295,6 +310,24 @@ const styles = StyleSheet.create({
         width: 110,
         height: 50,
         marginRight: 12,
+    },
+    bannerWrapper: {
+        width: Dimensions.get('window').width - 40,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        // marginBottom: 16,
+        borderRadius: 8,
+        overflow: 'hidden',
+        textAlign: 'center',
+        alignSelf: 'center',
+    },
+    banner: {
+        width: '100%',
+        height: 150,
+        // marginVertical: 16,
     },
     section: {
         marginTop: 24,

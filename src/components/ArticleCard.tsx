@@ -16,7 +16,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onPress, vari
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    checkIfSaved();
+    // checkIfSaved();
   }, [article.id]);
 
   const checkIfSaved = async () => {
@@ -70,7 +70,8 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onPress, vari
           </View>
           {article._embedded?.['wp:featuredmedia']?.[0]?.source_url && (
             <Image
-              source={{ uri: article._embedded['wp:featuredmedia'][0].source_url }}
+              source={{ uri: article.dmks_featured_image.medium_large.url }}
+              // source={{ uri: article._embedded['wp:featuredmedia'][0].source_url }}
               style={styles.compactImage}
             />
           )}
@@ -84,7 +85,9 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onPress, vari
       <TouchableOpacity style={styles.verticalCard} activeOpacity={0.8} onPress={onPress}>
         {article._embedded?.['wp:featuredmedia']?.[0]?.source_url && (
           <Image
-            source={{ uri: article._embedded['wp:featuredmedia'][0].source_url }}
+            source={{ uri: article.dmks_featured_image.medium_large.url }}
+
+            // source={{ uri: article._embedded['wp:featuredmedia'][0].source_url }}
             style={styles.verticalImage}
           />
         )}
