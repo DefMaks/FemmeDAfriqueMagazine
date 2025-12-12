@@ -33,7 +33,7 @@ export const twigaPaieService = {
         payload,
         {
           headers: {
-            'X-API-Key': TWIGAPAIE_API_KEY,
+                  'Authorization': 'Bearer ' +TWIGAPAIE_API_KEY || '',
             'Content-Type': 'application/json',
           },
         }
@@ -52,7 +52,7 @@ export const twigaPaieService = {
         { order_id: orderId },
         {
           headers: {
-            'X-API-Key': TWIGAPAIE_API_KEY,
+                  'Authorization': 'Bearer ' +TWIGAPAIE_API_KEY || '',
             'Content-Type': 'application/json',
           },
         }
