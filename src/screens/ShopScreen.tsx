@@ -238,13 +238,20 @@ const ShopScreen = () => {
             const media = await getMedia(selectedMagazine.acf.pdf);
             const pdfUrl = media.source_url;
             const filename = `FDA_N${selectedMagazine.acf.numero}.pdf`;
-            const localUri = `${FileSystem.documentDirectory}${filename}`;
-            await FileSystem.downloadAsync(pdfUrl, localUri);
+            const documentDir = FileSystem.Paths?.document?.uri || FileSystem.cacheDirectory || '';
+            const localUri = `${documentDir}${filename}`;
+            
+            // Télécharger le fichier
+            const downloadResult = await FileSystem.downloadAsync(pdfUrl, localUri);
 
-            if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(localUri);
+            if (downloadResult.status === 200) {
+                if (await Sharing.isAvailableAsync()) {
+                    await Sharing.shareAsync(localUri);
+                } else {
+                    Alert.alert('Succès', `PDF sauvegardé : ${filename}`);
+                }
             } else {
-                Alert.alert('Succès', `PDF sauvegardé : ${filename}`);
+                throw new Error('Téléchargement échoué');
             }
         } catch (error) {
             console.error('Erreur PDF:', error);
