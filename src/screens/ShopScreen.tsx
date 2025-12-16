@@ -11,7 +11,6 @@ import {
     Alert,
     TextInput,
     Keyboard,
-    Linking,
     ActivityIndicator
 } from 'react-native';
 import { getMagazines, getMedia } from '../services/api';
@@ -22,13 +21,15 @@ import {
     checkPaymentStatus,
     initiateCardPayment,
     checkCardPaymentStatus,
-    formatPhoneAndDeduceProvider
+    openCardPaymentPage,
+    formatPhoneAndDeduceProvider,
+    generateOrderId,
+    handlePaymentError,
+    PaymentMethod
 } from '../services/twigaPaie';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
-
-type PaymentMethod = 'emoney' | 'ecard' | null;
 
 const ShopScreen = () => {
     const [magazines, setMagazines] = useState<Magazine[]>([]);
@@ -38,8 +39,10 @@ const ShopScreen = () => {
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [loadingPayment, setLoadingPayment] = useState(false);
     const [showCheckoutModal, setShowCheckoutModal] = useState(false);
-    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
     const [detectedProvider, setDetectedProvider] = useState<string>('');
+    const [showSecurityNotice, setShowSecurityNotice] = useState(false);
+    const [currentOrderNumber, setCurrentOrderNumber] = useState<string>('');
 
     useEffect(() => {
         fetchMagazines();
@@ -63,9 +66,11 @@ const ShopScreen = () => {
     const handleOpenCheckout = (mag: Magazine) => {
         setSelectedMagazine(mag);
         setShowCheckoutModal(true);
+        setShowSecurityNotice(true); // Afficher la notification de sécurité
         setPaymentMethod(null);
         setPhone('243');
         setDetectedProvider('');
+        setCurrentOrderNumber('');
     };
 
     const closeCheckout = () => {
@@ -75,17 +80,16 @@ const ShopScreen = () => {
         setShowCheckoutModal(false);
         setPaymentMethod(null);
         setDetectedProvider('');
+        setShowSecurityNotice(false);
+        setCurrentOrderNumber('');
     };
 
-    // Détection automatique du provider lors de la saisie
     const handlePhoneChange = (text: string) => {
-        // S'assurer que le numéro commence toujours par 243
         if (!text.startsWith('243')) {
             text = '243' + text.replace(/^243/, '');
         }
         setPhone(text);
         
-        // Détecter le provider si le numéro est assez long
         if (text.length >= 5) {
             try {
                 const { providerName } = formatPhoneAndDeduceProvider(text);
@@ -103,7 +107,7 @@ const ShopScreen = () => {
         if (!selectedMagazine) return;
         
         if (phone.length < 12) {
-            Alert.alert('Erreur', 'Veuillez entrer un numéro de téléphone valide');
+            Alert.alert('Erreur', 'Veuillez entrer un numéro de téléphone valide (12 chiffres)');
             return;
         }
 
@@ -111,15 +115,16 @@ const ShopScreen = () => {
         Keyboard.dismiss();
 
         try {
+            const orderId = generateOrderId();
             const result = await initiatePayment(
                 phone,
                 totalPrice.toString(),
-                `MAG-${selectedMagazine.id}-${Date.now()}`
+                orderId
             );
 
             Alert.alert(
-                'Paiement initié',
-                'Veuillez confirmer le paiement sur votre téléphone.',
+                '📱 Paiement initié',
+                'Veuillez confirmer le paiement sur votre téléphone.\nVous recevrez une notification push.',
                 [{ text: 'OK' }]
             );
 
@@ -127,20 +132,42 @@ const ShopScreen = () => {
             setTimeout(async () => {
                 try {
                     const status = await checkPaymentStatus(result.order_id);
-                    if (status.status === 'completed') {
+                    if (status.status === 'success') {
                         setPaymentSuccess(true);
                     } else {
-                        Alert.alert('Paiement en attente', 'Le paiement n\'a pas encore été confirmé. Veuillez réessayer plus tard.');
+                        Alert.alert(
+                            'Paiement en attente', 
+                            'Le paiement n\'a pas encore été confirmé. Réessayez la vérification dans quelques instants.',
+                            [
+                                { text: 'Annuler', style: 'cancel' },
+                                { text: 'Revérifier', onPress: () => recheckPayment(result.order_id) }
+                            ]
+                        );
                     }
                 } catch (err) {
-                    Alert.alert('Erreur', 'Impossible de vérifier le statut du paiement.');
+                    handlePaymentError(err);
                 } finally {
                     setLoadingPayment(false);
                 }
             }, 5000);
         } catch (error: any) {
-            console.error('Paiement échoué:', error);
-            Alert.alert('Erreur', error.message || 'Le paiement a échoué. Veuillez réessayer.');
+            handlePaymentError(error);
+            setLoadingPayment(false);
+        }
+    };
+
+    const recheckPayment = async (orderId: string) => {
+        setLoadingPayment(true);
+        try {
+            const status = await checkPaymentStatus(orderId);
+            if (status.status === 'success') {
+                setPaymentSuccess(true);
+            } else {
+                Alert.alert('En attente', 'Le paiement n\'est pas encore confirmé.');
+            }
+        } catch (err) {
+            handlePaymentError(err);
+        } finally {
             setLoadingPayment(false);
         }
     };
@@ -152,38 +179,32 @@ const ShopScreen = () => {
         setLoadingPayment(true);
 
         try {
+            const orderId = generateOrderId();
             const result = await initiateCardPayment(
                 totalPrice.toFixed(2),
                 'USD',
                 `Magazine FDA N°${selectedMagazine.acf.numero}`,
-                'https://femmedafrique.net/payment/success',
-                'https://femmedafrique.net/payment/cancel',
-                'https://femmedafrique.net/payment/declined'
+                orderId
             );
 
-            if (result.url) {
-                // Ouvrir le lien de paiement dans le navigateur
-                const supported = await Linking.canOpenURL(result.url);
-                if (supported) {
-                    await Linking.openURL(result.url);
-                    Alert.alert(
-                        'Paiement par carte',
-                        'Complétez le paiement dans votre navigateur. Revenez ici une fois terminé.',
-                        [
-                            {
-                                text: 'Vérifier le paiement',
-                                onPress: () => verifyCardPayment(result.orderNumber)
-                            }
-                        ]
-                    );
-                } else {
-                    Alert.alert('Erreur', 'Impossible d\'ouvrir le lien de paiement.');
-                }
+            if (result.redirect_url) {
+                setCurrentOrderNumber(result.orderNumber || orderId);
+                
+                // Ouvrir le navigateur avec expo-web-browser
+                await openCardPaymentPage(result.redirect_url);
+                
+                // Après fermeture du navigateur, demander vérification
+                Alert.alert(
+                    'Vérification du paiement',
+                    'Avez-vous complété le paiement par carte ?',
+                    [
+                        { text: 'Non, annuler', style: 'cancel', onPress: () => setLoadingPayment(false) },
+                        { text: 'Oui, vérifier', onPress: () => verifyCardPayment(result.orderNumber || orderId) }
+                    ]
+                );
             }
         } catch (error: any) {
-            console.error('Paiement carte échoué:', error);
-            Alert.alert('Erreur', error.message || 'Le paiement par carte a échoué.');
-        } finally {
+            handlePaymentError(error);
             setLoadingPayment(false);
         }
     };
@@ -192,13 +213,20 @@ const ShopScreen = () => {
         try {
             setLoadingPayment(true);
             const status = await checkCardPaymentStatus(orderNumber);
-            if (status.data.status === 'success') {
+            if (status.status === 'success') {
                 setPaymentSuccess(true);
             } else {
-                Alert.alert('Paiement en attente', 'Le paiement n\'a pas encore été confirmé.');
+                Alert.alert(
+                    'Paiement en attente', 
+                    'Le paiement n\'a pas encore été confirmé.',
+                    [
+                        { text: 'OK' },
+                        { text: 'Revérifier', onPress: () => verifyCardPayment(orderNumber) }
+                    ]
+                );
             }
         } catch (error) {
-            Alert.alert('Erreur', 'Impossible de vérifier le paiement.');
+            handlePaymentError(error);
         } finally {
             setLoadingPayment(false);
         }
@@ -224,7 +252,6 @@ const ShopScreen = () => {
         }
     };
 
-    // Fonction pour formater la date du magazine
     const formatMagazineDate = (dateString: string) => {
         try {
             const date = new Date(dateString);
@@ -310,6 +337,40 @@ const ShopScreen = () => {
                             </TouchableOpacity>
                         </View>
 
+                        {/* Modal notification sécurité */}
+                        <Modal
+                            visible={showSecurityNotice}
+                            transparent={true}
+                            animationType="fade"
+                        >
+                            <View style={styles.securityOverlay}>
+                                <View style={styles.securityModal}>
+                                    <Image
+                                        source={require('../../assets/twigapaie-logo.png')}
+                                        style={styles.securityLogo}
+                                        resizeMode="contain"
+                                    />
+                                    <Ionicons name="shield-checkmark" size={48} color="#4CAF50" />
+                                    <Text style={styles.securityTitle}>Paiement 100% Sécurisé</Text>
+                                    <Text style={styles.securityText}>
+                                        Votre transaction est sécurisée par TwigaPaie, 
+                                        conformément aux termes établis entre{' '}
+                                        <Text style={styles.boldText}>Femme d'Afrique Magazine</Text> et{' '}
+                                        <Text style={styles.boldText}>DefMaks</Text>.
+                                    </Text>
+                                    <Text style={styles.securitySubtext}>
+                                        Vos données de paiement sont cryptées et ne sont jamais stockées sur nos serveurs.
+                                    </Text>
+                                    <TouchableOpacity 
+                                        style={styles.securityButton}
+                                        onPress={() => setShowSecurityNotice(false)}
+                                    >
+                                        <Text style={styles.securityButtonText}>J'ai compris</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </Modal>
+
                         {selectedMagazine && !paymentSuccess && (
                             <>
                                 {/* Info magazine */}
@@ -359,7 +420,7 @@ const ShopScreen = () => {
                                             </View>
                                             <View style={styles.paymentOptionText}>
                                                 <Text style={styles.paymentOptionTitle}>E-Card</Text>
-                                                <Text style={styles.paymentOptionSubtitle}>Visa, Mastercard</Text>
+                                                <Text style={styles.paymentOptionSubtitle}>Visa, Mastercard via FlexPay</Text>
                                             </View>
                                             <Ionicons name="chevron-forward" size={20} color="#888" />
                                         </TouchableOpacity>
@@ -420,12 +481,12 @@ const ShopScreen = () => {
 
                                         <Text style={styles.sectionTitle}>Paiement par Carte</Text>
                                         <Text style={styles.cardInfo}>
-                                            Vous serez redirigé vers une page de paiement sécurisée FlexPay.
+                                            Vous serez redirigé vers la page de paiement sécurisée FlexPay pour entrer vos informations de carte.
                                         </Text>
 
                                         <View style={styles.cardIcons}>
-                                            <Ionicons name="card" size={32} color="#1A1F71" />
-                                            <Ionicons name="card" size={32} color="#FF5F00" style={{ marginLeft: 12 }} />
+                                            <Ionicons name="card" size={36} color="#1A1F71" />
+                                            <Ionicons name="card" size={36} color="#FF5F00" style={{ marginLeft: 16 }} />
                                         </View>
 
                                         <TouchableOpacity
@@ -504,7 +565,6 @@ const styles = StyleSheet.create({
         color: '#888',
         fontSize: 16,
     },
-    // Carte magazine
     magazineCard: {
         backgroundColor: '#FFF',
         borderRadius: 12,
@@ -566,7 +626,6 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: Colors.primary,
     },
-    // Modal Checkout
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.6)',
@@ -601,6 +660,62 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         color: '#333',
+    },
+    // Notification sécurité
+    securityOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    securityModal: {
+        backgroundColor: '#FFF',
+        borderRadius: 20,
+        padding: 24,
+        alignItems: 'center',
+        width: '100%',
+        maxWidth: 340,
+    },
+    securityLogo: {
+        width: 60,
+        height: 60,
+        marginBottom: 12,
+    },
+    securityTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#333',
+        marginTop: 12,
+        marginBottom: 12,
+    },
+    securityText: {
+        fontSize: 14,
+        color: '#555',
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 8,
+    },
+    boldText: {
+        fontWeight: 'bold',
+        color: Colors.primary,
+    },
+    securitySubtext: {
+        fontSize: 12,
+        color: '#888',
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    securityButton: {
+        backgroundColor: Colors.primary,
+        paddingVertical: 14,
+        paddingHorizontal: 40,
+        borderRadius: 25,
+    },
+    securityButtonText: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '600',
     },
     // Info magazine
     magazineInfo: {
@@ -641,7 +756,6 @@ const styles = StyleSheet.create({
         color: '#888',
         marginTop: 2,
     },
-    // Méthodes de paiement
     paymentMethods: {
         marginBottom: 20,
     },
@@ -683,7 +797,6 @@ const styles = StyleSheet.create({
         color: '#888',
         marginTop: 2,
     },
-    // Formulaire paiement
     paymentForm: {
         paddingTop: 8,
     },
@@ -746,7 +859,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: 'bold',
     },
-    // Succès
     successContainer: {
         alignItems: 'center',
         paddingVertical: 20,
