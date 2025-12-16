@@ -11,7 +11,7 @@ const API_KEY =
 const twigaApi = axios.create({
   baseURL: TWIGA_API_URL,
   headers: {
-    "X-API-Key": API_KEY,
+    "Authorization": `Bearer ${API_KEY}`,
     "Content-Type": "application/json",
   },
 });
