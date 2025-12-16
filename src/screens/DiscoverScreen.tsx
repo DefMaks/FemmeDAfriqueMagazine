@@ -623,6 +623,12 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
         alignItems: 'center',
     },
+    endOfList: {
+        textAlign: 'center',
+        color: Colors.textLight,
+        fontSize: 14,
+        paddingVertical: 20,
+    },
 });
 
 export default DiscoverScreen;
