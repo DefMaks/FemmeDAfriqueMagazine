@@ -42,7 +42,7 @@ const CheckoutModalContent = ({ magazine, onClose }: CheckoutModalContentProps) 
             setTimeout(async () => {
                 try {
                     const status = await checkPaymentStatus(result.order_id);
-                    if (status.status === 'completed') {
+                    if (status.status === 'success') {
                         setPaymentSuccess(true);
                     } else {
                         Alert.alert('Paiement en attente', 'Le paiement est en cours de traitement.');
