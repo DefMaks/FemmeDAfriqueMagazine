@@ -34,11 +34,11 @@ export const twigaPaieService = {
   async initiatePayment(payload: PaymentPayload): Promise<PaymentResponse> {
     try {
       const response = await axios.post(
-        `${TWIGAPAIE_API_URL}/payments/payment-service`,
+        `${TWIGAPAIE_API_URL}/api/payments/payment-service`,
         payload,
         {
           headers: {
-                  'Authorization': 'Bearer ' +TWIGAPAIE_API_KEY || '',
+            'Authorization': `Bearer ${TWIGAPAIE_API_KEY}`,
             'Content-Type': 'application/json',
           },
         }
@@ -53,11 +53,11 @@ export const twigaPaieService = {
   async checkPaymentStatus(orderId: string): Promise<PaymentStatusResponse> {
     try {
       const response = await axios.post(
-        `${TWIGAPAIE_API_URL}/payments/payment-check`,
+        `${TWIGAPAIE_API_URL}/api/payments/payment-check`,
         { order_id: orderId },
         {
           headers: {
-                  'Authorization': 'Bearer ' +TWIGAPAIE_API_KEY || '',
+            'Authorization': `Bearer ${TWIGAPAIE_API_KEY}`,
             'Content-Type': 'application/json',
           },
         }
