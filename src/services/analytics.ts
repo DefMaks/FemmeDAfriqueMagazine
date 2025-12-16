@@ -306,8 +306,9 @@ class AnalyticsService {
       }, {});
 
       // Trier par nombre de vues et limiter
-      return Object.values(viewCounts)
-        .sort((a: any, b: any) => b.view_count - a.view_count)
+      const results = Object.values(viewCounts) as { article_id: string; article_title: string; view_count: number; }[];
+      return results
+        .sort((a, b) => b.view_count - a.view_count)
         .slice(0, limit);
     } catch (error) {
       console.error('Error getting top articles:', error);
