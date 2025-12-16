@@ -156,13 +156,40 @@ const DiscoverScreen = () => {
         setSelectedCategory(categoryId);
         setSelectedCategoryName(categoryName);
         setLoadingCategoryPosts(true);
+        setCategoryPage(1);
+        setCategoryHasMore(true);
+        setCategoryPosts([]);
         try {
             const posts = await getPostsByCategory(categoryId, 1, 10);
             setCategoryPosts(posts);
+            setCategoryHasMore(posts.length >= 10);
         } catch (err) {
             console.error('Error loading category posts:', err);
         } finally {
             setLoadingCategoryPosts(false);
+        }
+    };
+
+    // ⬇️ Fonction pour charger plus d'articles dans une catégorie
+    const loadMoreCategoryPosts = async () => {
+        if (loadingMoreCategory || !categoryHasMore || !selectedCategory) return;
+        
+        setLoadingMoreCategory(true);
+        try {
+            const nextPage = categoryPage + 1;
+            const morePosts = await getPostsByCategory(selectedCategory, nextPage, 10);
+            if (morePosts.length === 0) {
+                setCategoryHasMore(false);
+            } else {
+                setCategoryPosts(prev => [...prev, ...morePosts]);
+                setCategoryPage(nextPage);
+                setCategoryHasMore(morePosts.length >= 10);
+            }
+        } catch (err) {
+            console.error('Error loading more category posts:', err);
+            setCategoryHasMore(false);
+        } finally {
+            setLoadingMoreCategory(false);
         }
     };
 
