@@ -54,6 +54,9 @@ const HomeScreen = () => {
 
     useEffect(() => {
         loadAllContent();
+        
+        // 📊 Track screen view
+        analyticsService.trackScreenView('Home');
     }, []);
 
 
