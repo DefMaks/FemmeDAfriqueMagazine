@@ -1,68 +1,92 @@
 // src/services/twigaPaie.ts
-import axios from "axios";
+import { Alert, Platform } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 
-// 🔑 Configuration API
-const TWIGA_API_URL = process.env.EXPO_PUBLIC_TWIGAPAIE_API_URL || '';
-const API_KEY = process.env.EXPO_PUBLIC_TWIGAPAIE_API_KEY || '';
+// --- Types et Interfaces ---
 
-// 🔧 Instance Axios configurée
-const twigaApi = axios.create({
-  baseURL: TWIGA_API_URL,
-  headers: {
-    "Authorization": `Bearer ${API_KEY}`,
-    "Content-Type": "application/json",
-  },
-});
+export type PaymentStatus = 'pending' | 'success' | 'failed' | 'cancelled' | 'initiated' | 'expired';
+export type PaymentMethod = 'emoney' | 'ecard';
 
-// ============================================
-// 🧾 Types de réponse
-// ============================================
-
-export interface TwigaPaymentInitResponse {
-  status: "success";
-  order_id: string;
-  message: string;
+export interface PaymentRequest {
+  customer_phone: string;
+  amount: string;
+  currency: string;
+  client_order_id: string;
+  description?: string;
+  metadata?: Record<string, any>;
 }
 
-export interface TwigaPaymentStatusResponse {
-  status: "completed" | "pending" | "failed";
+export interface PaymentCardRequest {
+  amount: string;
+  currency: string;
+  description: string;
+}
+
+export interface PaymentResponse {
+  status: PaymentStatus;
+  order_id: string;
+  message: string;
+  provider_id?: string;
+  timestamp?: string;
+}
+
+export interface CardPaymentResponse extends PaymentResponse {
+  redirect_url: string;
+  orderNumber?: string;
+}
+
+export interface PaymentStatusResponse {
+  status: PaymentStatus;
   order_id: string;
   amount: string;
   currency: string;
-  transaction_date?: string;
+  transaction_date: string;
+  provider_id?: string;
 }
 
-// Types pour E-Card (FlexPay)
-export interface TwigaCardPaymentInitResponse {
-  code: string;
-  message: string;
-  orderNumber: string;
-  url: string;
-  gateway_info?: {
-    generated_reference: string;
-    provider: string;
-    payment_type: string;
-  };
+// --- Classe d'Erreur Personnalisée ---
+
+export class PaymentError extends Error {
+  constructor(
+    message: string,
+    public code?: string,
+    public details?: Record<string, any>,
+    public isRetryable: boolean = true
+  ) {
+    super(message);
+    this.name = 'PaymentError';
+  }
 }
 
-export interface TwigaCardPaymentStatusResponse {
-  success: boolean;
-  message: string;
-  data: {
-    reference: string;
-    orderNumber: string;
-    status: "success" | "pending" | "failed";
-    amount: string;
-    amountCustomer: string;
-    currency: string;
-    createdAt: string;
-  };
-  timestamp: string;
-}
+// --- Configuration API ---
 
-// ============================================
-// 📱 Formatage et Détection du Provider
-// ============================================
+const API_URL = process.env.EXPO_PUBLIC_TWIGAPAIE_API_URL || '';
+const API_KEY = process.env.EXPO_PUBLIC_TWIGAPAIE_API_KEY || '';
+
+const headers = {
+  'Authorization': `Bearer ${API_KEY}`,
+  'Content-Type': 'application/json',
+  'Accept': 'application/json',
+};
+
+// --- Utilitaires ---
+
+export const generateOrderId = (): string => {
+  return `CMD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
+
+const normalizeStatus = (status: string | undefined): PaymentStatus => {
+  if (!status) return 'pending';
+  const normalized = status.toLowerCase().trim();
+  if (['success', 'succeeded', 'completed', 'paid'].includes(normalized)) return 'success';
+  if (['failed', 'rejected', 'declined', 'error'].includes(normalized)) return 'failed';
+  if (['cancelled', 'canceled'].includes(normalized)) return 'cancelled';
+  if (['initiated', 'pending', 'processing', 'in_progress'].includes(normalized)) return 'pending';
+  if (['expired'].includes(normalized)) return 'expired';
+  return 'pending';
+};
+
+// --- Formatage et Détection du Provider ---
 
 interface PhoneFormatResult {
   formattedPhone: string;
@@ -76,10 +100,8 @@ interface PhoneFormatResult {
  * @returns Un objet contenant le numéro formaté, l'ID et le nom du fournisseur
  */
 export const formatPhoneAndDeduceProvider = (rawPhone: string): PhoneFormatResult => {
-  // Nettoyer le numéro (retirer espaces, tirets, parenthèses)
-  let phone = rawPhone.replace(/\s|-|\(|\)/g, '');
+  const phone = rawPhone.replace(/\s|-|\(|\)/g, '');
   
-  // Normaliser le numéro - retirer le code pays s'il existe
   let normalizedPhone = phone;
   if (normalizedPhone.startsWith('+243')) {
     normalizedPhone = normalizedPhone.substring(4);
@@ -87,13 +109,12 @@ export const formatPhoneAndDeduceProvider = (rawPhone: string): PhoneFormatResul
     normalizedPhone = normalizedPhone.substring(3);
   }
   
-  // Retirer le 0 initial si présent
   if (normalizedPhone.startsWith('0')) {
     normalizedPhone = normalizedPhone.substring(1);
   }
   
   if (normalizedPhone.length < 8) {
-    throw new Error('Numéro de téléphone trop court.');
+    throw new PaymentError('Numéro de téléphone trop court.', 'FORMAT_ERROR', {}, false);
   }
   
   const prefix = normalizedPhone.substring(0, 2);
@@ -102,17 +123,16 @@ export const formatPhoneAndDeduceProvider = (rawPhone: string): PhoneFormatResul
   let providerId: string;
   let providerName: string;
 
-  // Déduction basée sur les préfixes RDC
   if (['80', '84', '85', '89'].includes(prefix)) {
     // OrangeMoney (ID 10): Format 0XXXXXXXXX
     providerId = '10';
     providerName = 'Orange Money';
     formattedPhone = `0${normalizedPhone}`;
   } else if (['81', '82', '83'].includes(prefix)) {
-    // Vodacom M-Pesa (ID 9): Format +243XXXXXXXXX
+    // Vodacom M-Pesa (ID 9): Format 243XXXXXXXXX
     providerId = '9';
     providerName = 'Vodacom M-Pesa';
-    formattedPhone = `+243${normalizedPhone}`;
+    formattedPhone = `243${normalizedPhone}`;
   } else if (['97', '98', '99'].includes(prefix)) {
     // Airtel Money (ID 17): Format XXXXXXXXX (pas de 0)
     providerId = '17';
@@ -124,152 +144,227 @@ export const formatPhoneAndDeduceProvider = (rawPhone: string): PhoneFormatResul
     providerName = 'Africell';
     formattedPhone = `0${normalizedPhone}`;
   } else {
-    // Par défaut: Vodacom M-Pesa
     console.warn(`⚠️ Préfixe non reconnu: ${prefix}. Utilisation de Vodacom par défaut.`);
     providerId = '9';
     providerName = 'Vodacom M-Pesa';
-    formattedPhone = `+243${normalizedPhone}`;
+    formattedPhone = `243${normalizedPhone}`;
   }
 
   return { formattedPhone, providerId, providerName };
 };
 
-/**
- * Formate un numéro de téléphone pour l'API TwigaPaie (format simple)
- * @param countryCode Le code du pays (ex: '243')
- * @param phoneNumber Le numéro de téléphone (ex: '0810000000')
- * @returns Le numéro formaté (ex: '+243810000000')
- */
-export const formatTwigaPaiePhone = (countryCode: string, phoneNumber: string): string => {
-  const cleanedCountryCode = countryCode.replace(/\D/g, '');
-  let cleanedPhoneNumber = phoneNumber.replace(/\D/g, '');
+// --- Services E-Money ---
 
-  if (cleanedPhoneNumber.startsWith('0')) {
-    cleanedPhoneNumber = cleanedPhoneNumber.substring(1);
-  }
-
-  return `+${cleanedCountryCode}${cleanedPhoneNumber}`;
-};
-
-// ============================================
-// 💳 Services E-Money (Mobile Money)
-// ============================================
-
-/**
- * Lancer un paiement E-Money
- */
 export const initiatePayment = async (
   customer_phone: string,
   amount: string,
   client_order_id: string,
-  currency: string = "USD"
-): Promise<TwigaPaymentInitResponse> => {
+  currency: string = 'USD'
+): Promise<PaymentResponse> => {
   try {
-    // Formatter le numéro automatiquement
-    const { formattedPhone, providerName } = formatPhoneAndDeduceProvider(customer_phone);
+    const { formattedPhone, providerId, providerName } = formatPhoneAndDeduceProvider(customer_phone);
     
     console.log(`📱 Paiement ${providerName} - Numéro formaté: ${formattedPhone}`);
     
-    const response = await twigaApi.post("/payments/payment-service", {
-      customer_phone: formattedPhone,
-      amount,
-      currency,
-      client_order_id,
+    const response = await fetch(`${API_URL}/payments/payment-service`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        customer_phone: formattedPhone,
+        amount,
+        currency,
+        client_order_id,
+        metadata: { provider_id: providerId },
+      }),
     });
-    return response.data;
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new PaymentError(
+        data?.error?.message || 'Erreur lors du paiement',
+        data?.error?.code || 'API_ERROR',
+        data
+      );
+    }
+
+    return {
+      status: normalizeStatus(data.status),
+      order_id: data.order_id || client_order_id,
+      message: data.message || 'Paiement initié',
+      provider_id: providerId,
+      timestamp: new Date().toISOString(),
+    };
   } catch (error: any) {
-    console.error(
-      "Erreur TwigaPaie - initiatePayment:",
-      error.response?.data || error.message
-    );
-    throw new Error(
-      error.response?.data?.error?.message ||
-        "Impossible d'initier le paiement. Veuillez réessayer."
+    console.error('❌ Erreur TwigaPaie - initiatePayment:', error);
+    if (error instanceof PaymentError) throw error;
+    throw new PaymentError(
+      error.message || 'Impossible d\'initier le paiement',
+      'PAYMENT_ERROR',
+      { originalError: error.toString() }
     );
   }
 };
 
-/**
- * Vérifier le statut d'un paiement E-Money
- */
-export const checkPaymentStatus = async (
-  order_id: string
-): Promise<TwigaPaymentStatusResponse> => {
+export const checkPaymentStatus = async (order_id: string): Promise<PaymentStatusResponse> => {
   try {
-    const response = await twigaApi.post("/payments/payment-check", {
-      order_id,
+    const response = await fetch(`${API_URL}/payments/payment-check`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ order_id }),
     });
-    return response.data;
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new PaymentError(
+        data?.error?.message || 'Erreur vérification statut',
+        data?.error?.code || 'API_ERROR'
+      );
+    }
+
+    return {
+      status: normalizeStatus(data.status),
+      order_id: data.order_id || order_id,
+      amount: data.amount || '0',
+      currency: data.currency || 'USD',
+      transaction_date: data.transaction_date || new Date().toISOString(),
+    };
   } catch (error: any) {
-    console.error(
-      "Erreur TwigaPaie - checkPaymentStatus:",
-      error.response?.data || error.message
-    );
-    throw new Error(
-      error.response?.data?.error?.message ||
-        "Impossible de vérifier le statut du paiement."
+    console.error('❌ Erreur TwigaPaie - checkPaymentStatus:', error);
+    if (error instanceof PaymentError) throw error;
+    throw new PaymentError(
+      error.message || 'Impossible de vérifier le statut',
+      'STATUS_CHECK_ERROR'
     );
   }
 };
 
-// ============================================
-// 💳 Services E-Card (Paiement par Carte)
-// ============================================
+// --- Services E-Card (FlexPay) ---
 
-/**
- * Initialiser un paiement par carte (FlexPay)
- */
 export const initiateCardPayment = async (
   amount: string,
-  currency: string = "USD",
+  currency: string = 'USD',
   description: string,
-  approve_url: string,
-  cancel_url: string,
-  decline_url: string,
-  callback_url?: string
-): Promise<TwigaCardPaymentInitResponse> => {
+  client_order_id: string
+): Promise<CardPaymentResponse> => {
   try {
-    const response = await twigaApi.post("/flexpay/payment-service", {
-      amount,
-      currency,
-      description,
-      callback_url: callback_url || approve_url,
-      approve_url,
-      cancel_url,
-      decline_url,
+    const response = await fetch(`${API_URL}/flexpay/payment-service`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        amount,
+        currency,
+        description,
+        client_order_id,
+        callback_url: 'https://femmedafrique.net/payment/callback',
+        approve_url: 'https://femmedafrique.net/payment/success',
+        cancel_url: 'https://femmedafrique.net/payment/cancel',
+        decline_url: 'https://femmedafrique.net/payment/declined',
+      }),
     });
-    return response.data;
+
+    const data = await response.json();
+    
+    if (!response.ok || !data.url) {
+      throw new PaymentError(
+        data?.error?.message || 'Erreur initialisation paiement carte',
+        data?.error?.code || 'API_ERROR',
+        data,
+        false
+      );
+    }
+
+    return {
+      status: 'initiated',
+      order_id: data.orderNumber || client_order_id,
+      orderNumber: data.orderNumber,
+      message: data.message || 'Redirection vers la page de paiement',
+      redirect_url: data.url,
+      timestamp: new Date().toISOString(),
+    };
   } catch (error: any) {
-    console.error(
-      "Erreur TwigaPaie - initiateCardPayment:",
-      error.response?.data || error.message
-    );
-    throw new Error(
-      error.response?.data?.error?.message ||
-        "Impossible d'initier le paiement par carte. Veuillez réessayer."
+    console.error('❌ Erreur TwigaPaie - initiateCardPayment:', error);
+    if (error instanceof PaymentError) throw error;
+    throw new PaymentError(
+      error.message || 'Impossible d\'initier le paiement par carte',
+      'CARD_PAYMENT_ERROR'
     );
   }
 };
 
-/**
- * Vérifier le statut d'un paiement par carte
- */
-export const checkCardPaymentStatus = async (
-  order_number: string
-): Promise<TwigaCardPaymentStatusResponse> => {
+export const checkCardPaymentStatus = async (order_number: string): Promise<PaymentStatusResponse> => {
   try {
-    const response = await twigaApi.get("/flexpay/payment-check", {
-      params: { order_number },
+    const response = await fetch(`${API_URL}/flexpay/payment-check?order_number=${order_number}`, {
+      method: 'GET',
+      headers,
     });
-    return response.data;
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new PaymentError(
+        data?.error?.message || 'Erreur vérification paiement carte',
+        data?.error?.code || 'API_ERROR'
+      );
+    }
+
+    const result = data.data || data;
+    
+    return {
+      status: normalizeStatus(result.status),
+      order_id: result.orderNumber || order_number,
+      amount: result.amount || '0',
+      currency: result.currency || 'USD',
+      transaction_date: result.createdAt || new Date().toISOString(),
+    };
   } catch (error: any) {
-    console.error(
-      "Erreur TwigaPaie - checkCardPaymentStatus:",
-      error.response?.data || error.message
-    );
-    throw new Error(
-      error.response?.data?.error?.message ||
-        "Impossible de vérifier le statut du paiement par carte."
+    console.error('❌ Erreur TwigaPaie - checkCardPaymentStatus:', error);
+    if (error instanceof PaymentError) throw error;
+    throw new PaymentError(
+      error.message || 'Impossible de vérifier le paiement carte',
+      'CARD_STATUS_ERROR'
     );
   }
+};
+
+// --- Ouvrir la page de paiement carte dans le navigateur ---
+
+export const openCardPaymentPage = async (url: string): Promise<WebBrowser.WebBrowserResult> => {
+  try {
+    const result = await WebBrowser.openBrowserAsync(url, {
+      showTitle: true,
+      enableBarCollapsing: true,
+    });
+    return result;
+  } catch (error) {
+    console.error('Erreur ouverture navigateur:', error);
+    throw new PaymentError('Impossible d\'ouvrir la page de paiement', 'BROWSER_ERROR');
+  }
+};
+
+// --- Gestion des erreurs ---
+
+export const handlePaymentError = (error: any): string => {
+  console.error('Payment Error:', error);
+
+  let errorMessage = 'Une erreur inconnue est survenue. Veuillez réessayer.';
+
+  if (error instanceof PaymentError) {
+    errorMessage = error.message;
+    
+    if (error.code === 'TIMEOUT_ERROR') {
+      errorMessage = 'Délai de connexion dépassé. Veuillez réessayer.';
+    } else if (error.code === 'NETWORK_ERROR') {
+      errorMessage = 'Problème de connexion. Vérifiez votre accès internet.';
+    } else if (error.code === 'VALIDATION_ERROR' || error.code === 'FORMAT_ERROR') {
+      errorMessage = error.message;
+    }
+  } else if (error instanceof Error && error.message) {
+    errorMessage = error.message;
+  }
+
+  Alert.alert('❌ Erreur de Paiement', errorMessage);
+  
+  return errorMessage;
 };
