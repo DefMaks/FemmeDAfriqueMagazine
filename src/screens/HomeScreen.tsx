@@ -94,10 +94,16 @@ const HomeScreen = () => {
                 post.title?.rendered
             );
 
+            // ✅ OPTIMIZATION: Use Promise.all for parallel checks instead of sequential
+            const statusChecks = allPosts.map(post => 
+                isArticleSaved(post.id).then(saved => ({ id: post.id, saved }))
+            );
+            const statusResults = await Promise.all(statusChecks);
+            
             const status: Record<number, boolean> = {};
-            for (const post of allPosts) {
-                status[post.id] = await isArticleSaved(post.id);
-            }
+            statusResults.forEach(({ id, saved }) => {
+                status[id] = saved;
+            });
             setSavedStatus(status);
         } catch (err) {
             setError('Impossible de charger le contenu');
