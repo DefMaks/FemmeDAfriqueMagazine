@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { supabase, getDeviceId } from '../lib/supabase';
 
-const TWIGAPAIE_API_URL = 'https://api-gateway-production-9ad5.up.railway.app/api';
+const TWIGAPAIE_API_URL = process.env.EXPO_PUBLIC_TWIGAPAIE_API_URL || 'https://api-gateway-production-9ad5.up.railway.app';
 const TWIGAPAIE_API_KEY = process.env.EXPO_PUBLIC_TWIGAPAIE_API_KEY;
 
 // Validation: Ensure API key is configured
