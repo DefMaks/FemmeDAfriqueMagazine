@@ -1,2 +1,8 @@
-export const SUPABASE_URL = 'https://hfvfljgmgarlctgrknop.supabase.co';
-export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhmdmZsamdtZ2FybGN0Z3Jrbm9wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA3NTcyNzksImV4cCI6MjA3NjMzMzI3OX0.cKkJmobOT42uSCq79GbNMar4lbZ-QZhcK8P1sEAEcTI';
+// Load from environment variables for security
+export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+export const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+
+// Validation: Ensure environment variables are set
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('⚠️ CRITICAL: Supabase credentials are missing! Please check your .env file.');
+}
