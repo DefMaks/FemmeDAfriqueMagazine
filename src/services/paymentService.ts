@@ -5,8 +5,11 @@ import { supabase, getDeviceId } from '../lib/supabase';
 const TWIGAPAIE_API_URL = process.env.EXPO_PUBLIC_TWIGAPAIE_API_URL || '';
 const TWIGAPAIE_API_KEY = process.env.EXPO_PUBLIC_TWIGAPAIE_API_KEY || '';
 
-// Validation: Ensure API key is configured
-if (!TWIGAPAIE_API_KEY || TWIGAPAIE_API_KEY === 'your_api_key_here') {
+// Validation: Ensure API URL and key are configured
+if (!TWIGAPAIE_API_URL) {
+  console.warn('⚠️ WARNING: TwigaPaie API URL is not configured. Payment functionality will not work.');
+}
+if (!TWIGAPAIE_API_KEY) {
   console.warn('⚠️ WARNING: TwigaPaie API key is not configured. Payment functionality will not work.');
 }
 
