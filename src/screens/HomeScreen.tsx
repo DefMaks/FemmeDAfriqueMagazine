@@ -138,6 +138,9 @@ const HomeScreen = () => {
     const sharePost = useCallback(async (post: Post) => {
         const message = `${post.title.rendered}\n\nLire sur Femme d'Afrique : ${post.link}`;
         await Sharing.shareAsync(message, { dialogTitle: 'Partager' });
+        
+        // 📊 Track share event
+        analyticsService.trackShare(post.id.toString(), post.title.rendered, 'native_share');
     }, []);
 
 
