@@ -238,8 +238,8 @@ const ShopScreen = () => {
             const media = await getMedia(selectedMagazine.acf.pdf);
             const pdfUrl = media.source_url;
             const filename = `FDA_N${selectedMagazine.acf.numero}.pdf`;
-            const localUri = `${documentDirectory}${filename}`;
-            await downloadAsync(pdfUrl, localUri);
+            const localUri = `${FileSystem.documentDirectory}${filename}`;
+            await FileSystem.downloadAsync(pdfUrl, localUri);
 
             if (await Sharing.isAvailableAsync()) {
                 await Sharing.shareAsync(localUri);
