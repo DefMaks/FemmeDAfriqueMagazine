@@ -27,7 +27,7 @@ import {
     handlePaymentError,
     PaymentMethod
 } from '../services/twigaPaie';
-import * as FileSystem from 'expo-file-system';
+import { documentDirectory, downloadAsync } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 
