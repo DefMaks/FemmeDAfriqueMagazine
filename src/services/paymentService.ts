@@ -2,7 +2,12 @@ import axios from 'axios';
 import { supabase, getDeviceId } from '../lib/supabase';
 
 const TWIGAPAIE_API_URL = 'https://api-gateway-production-9ad5.up.railway.app/api';
-const TWIGAPAIE_API_KEY = process.env.EXPO_PUBLIC_TWIGAPAIE_API_KEY || 'your_api_key_here';
+const TWIGAPAIE_API_KEY = process.env.EXPO_PUBLIC_TWIGAPAIE_API_KEY;
+
+// Validation: Ensure API key is configured
+if (!TWIGAPAIE_API_KEY || TWIGAPAIE_API_KEY === 'your_api_key_here') {
+  console.warn('⚠️ WARNING: TwigaPaie API key is not configured. Payment functionality will not work.');
+}
 
 export interface PaymentPayload {
   customer_phone: string;
