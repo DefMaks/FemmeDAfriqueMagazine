@@ -18,6 +18,7 @@
     "@react-navigation/stack": "^7.4.10",
     "@supabase/supabase-js": "^2.39.0",
     "axios": "^1.12.2",
+    "dotenv": "^17.2.3",
     "expo": "~54.0.22",
     "expo-blur": "~15.0.7",
     "expo-constants": "~18.0.10",
