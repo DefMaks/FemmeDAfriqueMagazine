@@ -34,13 +34,26 @@ export default {
       edgeToEdgeEnabled: true,
       predictiveBackGestureEnabled: false
     },
-    plugins: [],
+    plugins: [
+      [
+        "onesignal-expo-plugin",
+        {
+          mode: "development",
+          appId: process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID || "e9dda2dd-a0c7-4221-ad6c-71ce91c540ce"
+        }
+      ]
+    ],
     web: {
       favicon: "./assets/favicon.png"
     },
     extra: {
       EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
       EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      EXPO_PUBLIC_TWIGAPAIE_API_URL: process.env.EXPO_PUBLIC_TWIGAPAIE_API_URL,
+      EXPO_PUBLIC_TWIGAPAIE_API_KEY: process.env.EXPO_PUBLIC_TWIGAPAIE_API_KEY,
+      EXPO_PUBLIC_WALLET_ID: process.env.EXPO_PUBLIC_WALLET_ID,
+      EXPO_PUBLIC_WORDPRESS_API_URL: process.env.EXPO_PUBLIC_WORDPRESS_API_URL,
+      EXPO_PUBLIC_ONESIGNAL_APP_ID: process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID,
     }
   }
 };
