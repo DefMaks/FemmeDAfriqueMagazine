@@ -34,7 +34,11 @@ import { Ionicons } from '@expo/vector-icons';
 import ShopScreen from './ShopScreen';
 import { analyticsService } from '../services/analytics';
 
-type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+// Type de navigation composite pour accéder aux tabs et au stack
+type HomeScreenNavigationProp = CompositeNavigationProp<
+    BottomTabNavigationProp<any>,
+    NativeStackNavigationProp<RootStackParamList>
+>;
 
 const SLIDER_TAG_ID = 184;
 const ESPACE_TENDRESSE_ID = 2483;
