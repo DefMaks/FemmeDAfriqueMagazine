@@ -154,17 +154,8 @@ const HomeScreen = () => {
         setSavedStatus((prev) => ({ ...prev, [post.id]: !isSaved }));
     }, [savedStatus]);
 
-    if (loading) {
-        return <LoadingSpinner message="Chargement..." />;
-    }
-
-    if (error) {
-        return <ErrorMessage message={error} onRetry={loadAllContent} />;
-    }
-
-
-
     // ✅ OPTIMIZATION: Memoize render function to prevent unnecessary re-renders
+    // NOTE: Ce hook DOIT être placé AVANT les returns conditionnels pour respecter les règles des Hooks
     const renderArticleWithActions = useCallback((post: Post, variant: 'horizontal' | 'vertical' = 'horizontal') => (
         <View style={styles.cardWrapper}>
             <ArticleCard article={post} onPress={() => handleArticlePress(post)} variant={variant} />
@@ -184,6 +175,15 @@ const HomeScreen = () => {
             </View>
         </View>
     ), [savedStatus, handleArticlePress, sharePost, toggleSave]);
+
+    // États de chargement et d'erreur - APRÈS tous les hooks
+    if (loading) {
+        return <LoadingSpinner message="Chargement..." />;
+    }
+
+    if (error) {
+        return <ErrorMessage message={error} onRetry={loadAllContent} />;
+    }
 
     return (
         <View style={styles.container}>
