@@ -121,9 +121,10 @@ const HomeScreen = () => {
         loadAllContent();
     };
 
-    const handleArticlePress = (article: Post) => {
+    // ✅ OPTIMIZATION: Memoize callbacks to prevent unnecessary re-renders
+    const handleArticlePress = useCallback((article: Post) => {
         navigation.navigate('ArticleDetail', { article });
-    };
+    }, [navigation]);
 
     const handleSeeAll = (categoryId: number, title: string) => {
         // Pour l'instant, on reste sur l'accueil
