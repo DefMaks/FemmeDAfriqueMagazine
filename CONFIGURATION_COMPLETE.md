@@ -45,7 +45,7 @@ EXPO_PUBLIC_WORDPRESS_API_URL=https://femmedafrique.net/wp-json/wp/v2/
 
 ### ✅ 4. OneSignal (Notifications Push)
 ```env
-EXPO_PUBLIC_ONESIGNAL_APP_ID=e9dda2dd-a0c7-4221-ad6c-71ce91c540ce
+EXPO_PUBLIC_ONESIGNAL_APP_ID=env-over-config
 ```
 **Statut**: ✅ Activé dans App.tsx  
 **Fonctionnalités**: 
