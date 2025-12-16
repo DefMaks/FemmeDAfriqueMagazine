@@ -1,5 +1,5 @@
 // src/screens/CheckoutScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -20,6 +20,7 @@ import { getMedia } from '../services/api';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { RootStackParamList } from '../navigation/RootNavigator';
+import { analyticsService } from '../services/analytics';
 
 type CheckoutScreenProps = NativeStackScreenProps<RootStackParamList, 'Checkout'>;
 
