@@ -157,8 +157,8 @@ const HomeScreen = () => {
 
 
 
-    // Fonction utilitaire pour afficher les cartes avec actions
-    const renderArticleWithActions = (post: Post, variant: 'horizontal' | 'vertical' = 'horizontal') => (
+    // ✅ OPTIMIZATION: Memoize render function to prevent unnecessary re-renders
+    const renderArticleWithActions = useCallback((post: Post, variant: 'horizontal' | 'vertical' = 'horizontal') => (
         <View style={styles.cardWrapper}>
             <ArticleCard article={post} onPress={() => handleArticlePress(post)} variant={variant} />
             <View style={styles.actionsContainer}>
@@ -176,7 +176,7 @@ const HomeScreen = () => {
                 </TouchableOpacity>
             </View>
         </View>
-    );
+    ), [savedStatus, handleArticlePress, sharePost, toggleSave]);
 
     return (
         <View style={styles.container}>
