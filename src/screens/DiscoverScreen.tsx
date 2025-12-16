@@ -77,6 +77,9 @@ const DiscoverScreen = () => {
         loadCategories();
         loadFeaturedCategories();
         loadPosts(1); // Chargement initial
+        
+        // 📊 Track screen view
+        analyticsService.trackScreenView('Discover');
     }, []);
 
     // ⬇️ Fonction générique de chargement des posts
