@@ -126,10 +126,10 @@ const HomeScreen = () => {
         navigation.navigate('ArticleDetail', { article });
     }, [navigation]);
 
-    const handleSeeAll = (categoryId: number, title: string) => {
+    const handleSeeAll = useCallback((categoryId: number, title: string) => {
         // Pour l'instant, on reste sur l'accueil
         // À compléter plus tard avec DiscoverScreen
-    };
+    }, []);
 
     const sharePost = async (post: Post) => {
         const message = `${post.title.rendered}\n\nLire sur Femme d’Afrique : ${post.link}`;
