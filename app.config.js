@@ -6,7 +6,7 @@ export default {
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
-    newArchEnabled: true,
+    newArchEnabled: false,
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "contain",
@@ -14,25 +14,14 @@ export default {
     },
     ios: {
       bundleIdentifier: "com.defmaks.fda",
-      supportsTablet: true,
-      infoPlist: {
-        UIBackgroundModes: ["remote-notification"]
-      },
-      entitlements: {
-        "aps-environment": "development",
-        "com.apple.security.application-groups": [
-          "group.${ios.bundleIdentifier}.onesignal"
-        ]
-      }
+      supportsTablet: true
     },
     android: {
       package: "com.defmaks.fda",
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
-      },
-      edgeToEdgeEnabled: true,
-      predictiveBackGestureEnabled: false
+      }
     },
     plugins: [],
     web: {
@@ -41,6 +30,8 @@ export default {
     extra: {
       EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
       EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      EXPO_PUBLIC_WORDPRESS_API_URL: process.env.EXPO_PUBLIC_WORDPRESS_API_URL,
+      EXPO_PUBLIC_TWIGAPAIE_API_KEY: process.env.EXPO_PUBLIC_TWIGAPAIE_API_KEY,
     }
   }
 };

@@ -14,35 +14,15 @@
     },
     "ios": {
       "bundleIdentifier": "com.defmaks.fda",
-      "supportsTablet": true,
-      "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
-      },
-      "entitlements": {
-        "aps-environment": "development",
-        "com.apple.security.application-groups": [
-          "group.${ios.bundleIdentifier}.onesignal"
-        ]
-      }
+      "supportsTablet": true
     },
     "android": {
       "package": "com.defmaks.fda",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      }
     },
-    "plugins": [
-      [
-        "onesignal-expo-plugin",
-        {
-          "mode": "development",
-          "appId": "e9dda2dd-a0c7-4221-ad6c-71ce91c540ce"
-        }
-      ]
-    ],
     "web": {
       "favicon": "./assets/favicon.png"
     }
