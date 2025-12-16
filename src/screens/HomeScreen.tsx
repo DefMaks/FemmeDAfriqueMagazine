@@ -31,6 +31,7 @@ import * as Sharing from 'expo-sharing';
 import { saveArticle, isArticleSaved, removeArticle } from '../services/savedArticles';
 import { Ionicons } from '@expo/vector-icons';
 import ShopScreen from './ShopScreen';
+import { analyticsService } from '../services/analytics';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
