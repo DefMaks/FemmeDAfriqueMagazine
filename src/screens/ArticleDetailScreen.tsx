@@ -33,7 +33,14 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
   useEffect(() => {
     // checkIfSaved();
     loadComments();
-  }, []);
+    
+    // 📊 Track article view
+    analyticsService.trackArticleView(
+      article.id.toString(),
+      article.title.rendered,
+      'article_detail'
+    );
+  }, [article.id, article.title.rendered]);
 
   const loadComments = async () => {
     try {
