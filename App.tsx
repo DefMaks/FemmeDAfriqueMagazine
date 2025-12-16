@@ -4,22 +4,35 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import RootNavigator from './src/navigation/RootNavigator';
 import ErrorBoundary from './src/components/ErrorBoundary';
-import { OneSignal, LogLevel } from 'react-native-onesignal';
+import Constants from 'expo-constants';
 
 export default function App() {
   useEffect(() => {
     // 🔔 OneSignal Push Notifications Configuration
-    if (__DEV__) {
-      OneSignal.Debug.setLogLevel(LogLevel.Verbose);
-    }
-    
-    const appId = process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID;
-    if (appId) {
-      OneSignal.initialize(appId);
-      OneSignal.Notifications.requestPermission(true);
-    } else {
-      console.warn('⚠️ OneSignal App ID not configured in .env');
-    }
+    const initializeOneSignal = async () => {
+      try {
+        const { OneSignal, LogLevel } = await import('react-native-onesignal');
+        
+        if (__DEV__) {
+          OneSignal.Debug.setLogLevel(LogLevel.Verbose);
+        }
+        
+        // @ts-ignore
+        const appId = Constants.expoConfig?.extra?.EXPO_PUBLIC_ONESIGNAL_APP_ID || 
+                     process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID || 
+                     'e9dda2dd-a0c7-4221-ad6c-71ce91c540ce';
+        
+        if (appId) {
+          OneSignal.initialize(appId);
+          OneSignal.Notifications.requestPermission(true);
+          console.log('✅ OneSignal initialized');
+        }
+      } catch (error) {
+        console.log('⚠️ OneSignal not available:', error);
+      }
+    };
+
+    initializeOneSignal();
   }, []);
 
   return (
