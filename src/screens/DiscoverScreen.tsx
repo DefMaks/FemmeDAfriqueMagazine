@@ -346,14 +346,16 @@ const DiscoverScreen = () => {
                         contentContainerStyle={styles.list}
                         showsVerticalScrollIndicator={false}
                         ListFooterComponent={
-                            loadingMore ? (
+                            loadingMoreCategory ? (
                                 <View style={styles.loadingMore}>
                                     <ActivityIndicator size="small" color={Colors.primary} />
                                 </View>
+                            ) : !categoryHasMore && categoryPosts.length > 0 ? (
+                                <Text style={styles.endOfList}>Fin des articles</Text>
                             ) : null
                         }
-                        onEndReached={loadMore}
-                        onEndReachedThreshold={0.5}
+                        onEndReached={loadMoreCategoryPosts}
+                        onEndReachedThreshold={0.3}
                     />
                 )}
             </View>
