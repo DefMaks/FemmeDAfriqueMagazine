@@ -429,18 +429,7 @@ const DiscoverScreen = () => {
                             </View>
                         </View>
 
-                        {/* Section "Derniers articles" */}
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Derniers articles</Text>
-                        </View>
                     </>
-                }
-                ListFooterComponent={
-                    loadingMore ? (
-                        <View style={styles.loadingMore}>
-                            <ActivityIndicator size="small" color={Colors.primary} />
-                        </View>
-                    ) : null
                 }
                 showsVerticalScrollIndicator={false}
             />
