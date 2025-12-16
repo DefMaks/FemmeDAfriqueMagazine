@@ -1,11 +1,15 @@
 // src/services/api.ts
 import axios from "axios";
 
+// Use environment variable for WordPress API URL
+const WORDPRESS_API_URL = process.env.EXPO_PUBLIC_WORDPRESS_API_URL || "https://femmedafrique.net/wp-json/wp/v2/";
+
 const api = axios.create({
-  baseURL: "https://femmedafrique.net/wp-json/wp/v2/", // ← supprime les espaces
+  baseURL: WORDPRESS_API_URL,
   headers: {
     "Content-Type": "application/json",
   },
+  timeout: 15000, // 15 seconds timeout
 });
 
 // Fonction pour récupérer les articles
