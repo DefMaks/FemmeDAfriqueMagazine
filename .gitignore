@@ -52,3 +52,12 @@ yarn-error.*
 # Environment files
 *.env
 *.env.*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+-e 
+# Environment files
+*.env
+*.env.*
