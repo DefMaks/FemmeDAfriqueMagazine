@@ -116,22 +116,40 @@ const ShopScreen = () => {
         }
     };
 
+    // Fonction pour formater la date du magazine
+    const formatMagazineDate = (dateString: string) => {
+        try {
+            const date = new Date(dateString);
+            const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+            return `${months[date.getMonth()]} ${date.getFullYear()}`;
+        } catch {
+            return '';
+        }
+    };
+
     const renderMagazine = ({ item }: { item: Magazine }) => (
         <TouchableOpacity
             style={styles.magazineCard}
             onPress={() => handleOpenCheckout(item)}
         >
-            <Image
-                source={{
-                    uri: item.better_featured_image?.source_url || item.dmks_featured_image?.src,
-                }}
-                style={styles.coverMagImage}
-            />
+            {/* Container image avec badge date */}
+            <View style={styles.imageContainer}>
+                <Image
+                    source={{
+                        uri: item.better_featured_image?.source_url || item.dmks_featured_image?.src,
+                    }}
+                    style={styles.coverMagImage}
+                />
+                {/* Badge date en haut à droite */}
+                <View style={styles.dateBadge}>
+                    <Text style={styles.dateBadgeText}>{formatMagazineDate(item.date)}</Text>
+                </View>
+            </View>
+            
+            {/* Infos magazine */}
             <View style={styles.magazineCardInfo}>
                 <Text style={styles.title}>N°{item.acf.numero}</Text>
-                {/* <Text style={styles.title}>{item.title.rendered}</Text> */}
                 <Text style={styles.info}>{item.acf.pages} pages</Text>
-                {/* <Text style={styles.info}>N°{item.acf.numero} • {item.acf.pages} pages</Text> */}
                 <Text style={styles.price}>${(item.acf.prix_mag + item.acf.tva).toFixed(2)} TTC*</Text>
             </View>
         </TouchableOpacity>
