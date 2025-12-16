@@ -238,8 +238,8 @@ const ShopScreen = () => {
             const media = await getMedia(selectedMagazine.acf.pdf);
             const pdfUrl = media.source_url;
             const filename = `FDA_N${selectedMagazine.acf.numero}.pdf`;
-            const documentDir = FileSystem.Paths?.document?.uri || FileSystem.cacheDirectory || '';
-            const localUri = `${documentDir}${filename}`;
+            const documentDir = FileSystem.Paths?.document?.uri || FileSystem.Paths?.cache?.uri || '';
+            const localUri = `${documentDir}/${filename}`;
             
             // Télécharger le fichier
             const downloadResult = await FileSystem.downloadAsync(pdfUrl, localUri);
