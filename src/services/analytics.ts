@@ -68,19 +68,29 @@ class AnalyticsService {
         console.log('📊 Analytics Event:', eventData);
       }
 
-      // Envoyer à Supabase pour stockage
-      const { error } = await supabase
-        .from('analytics_events')
-        .insert(eventData);
+      // Envoyer à Supabase pour stockage (silencieux en cas d'erreur réseau)
+      try {
+        const { error } = await supabase
+          .from('analytics_events')
+          .insert(eventData);
 
-      if (error && error.code !== '42P01') { // Ignore si la table n'existe pas encore
-        console.error('Analytics error:', error);
-        return false;
+        // Ignorer les erreurs communes (table inexistante, réseau)
+        if (error && error.code !== '42P01') {
+          // Log uniquement en dev, silencieux en production
+          if (__DEV__) {
+            console.log('Analytics warning (non-blocking):', error.message);
+          }
+        }
+      } catch (networkError) {
+        // Ignorer silencieusement les erreurs réseau - analytics ne doit pas bloquer l'app
+        if (__DEV__) {
+          console.log('Analytics network issue (non-blocking)');
+        }
       }
 
       return true;
     } catch (error) {
-      console.error('Error tracking event:', error);
+      // Erreur silencieuse - analytics ne doit jamais crasher l'app
       return false;
     }
   }
