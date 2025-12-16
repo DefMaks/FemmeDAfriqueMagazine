@@ -131,10 +131,10 @@ const HomeScreen = () => {
         // À compléter plus tard avec DiscoverScreen
     }, []);
 
-    const sharePost = async (post: Post) => {
-        const message = `${post.title.rendered}\n\nLire sur Femme d’Afrique : ${post.link}`;
+    const sharePost = useCallback(async (post: Post) => {
+        const message = `${post.title.rendered}\n\nLire sur Femme d'Afrique : ${post.link}`;
         await Sharing.shareAsync(message, { dialogTitle: 'Partager' });
-    };
+    }, []);
 
 
     const toggleSave = useCallback(async (post: Post) => {
