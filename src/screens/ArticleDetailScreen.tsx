@@ -11,6 +11,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import RenderHtml from 'react-native-render-html';
 import { WebView } from 'react-native-webview';
+import { analyticsService } from '../services/analytics';
 
 
 
