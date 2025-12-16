@@ -181,6 +181,9 @@ const DiscoverScreen = () => {
         try {
             const results = await searchPosts(trimmed);
             setSearchResults(results);
+            
+            // 📊 Track search event
+            analyticsService.trackSearch(trimmed, results.length);
         } catch (err) {
             console.error('Error searching:', err);
         } finally {
