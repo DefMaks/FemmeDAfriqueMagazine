@@ -8,7 +8,7 @@ export const SUPABASE_ANON_KEY = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABA
 
 // Validation: Ensure environment variables are set
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error('⚠️ CRITICAL: Supabase credentials are missing! Please check your .env file.');
+  console.error('❌ CRITICAL: Supabase credentials are missing!');
 } else {
-  console.log('✅ Supabase configured:', SUPABASE_URL);
+  console.log('✅ Supabase configured:', SUPABASE_URL.substring(0, 30) + '...');
 }
