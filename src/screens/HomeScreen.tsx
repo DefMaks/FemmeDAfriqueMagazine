@@ -137,7 +137,7 @@ const HomeScreen = () => {
     };
 
 
-    const toggleSave = async (post: Post) => {
+    const toggleSave = useCallback(async (post: Post) => {
         const isSaved = savedStatus[post.id];
         if (isSaved) {
             await removeArticle(post.id);
@@ -145,7 +145,7 @@ const HomeScreen = () => {
             await saveArticle(post);
         }
         setSavedStatus((prev) => ({ ...prev, [post.id]: !isSaved }));
-    };
+    }, [savedStatus]);
 
     if (loading) {
         return <LoadingSpinner message="Chargement..." />;
