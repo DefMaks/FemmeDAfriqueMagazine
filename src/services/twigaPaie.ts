@@ -2,10 +2,10 @@
 import axios from "axios";
 
 // 🔑 Configuration API
-const TWIGA_API_URL = "https://api-gateway-production-9ad5.up.railway.app/api";
+const TWIGA_API_URL = process.env.EXPO_PUBLIC_TWIGAPAIE_API_URL;
 // ⚠️ Remplace ceci par ta vraie clé API (en production, utilise un backend sécurisé !)
 const API_KEY =
-  "e50a2ac295a93b465266ae176ba462c272a3072eff7cea910219cccf88e716c6";
+  process.env.EXPO_PUBLIC_TWIGAPAIE_API_KEY || '';
 
 // 🔧 Instance Axios configurée
 const twigaApi = axios.create({
