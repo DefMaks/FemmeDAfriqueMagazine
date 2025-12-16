@@ -38,6 +38,11 @@ const CheckoutScreen = ({ route }: CheckoutScreenProps) => {
     // Calcul du prix TTC
     const totalPrice = magazine.acf.prix_mag + magazine.acf.tva;
 
+    // 📊 Track checkout screen view
+    useEffect(() => {
+        analyticsService.trackScreenView('Checkout');
+    }, []);
+
     const handlePayment = async () => {
         if (!phone.trim().startsWith('243')) {
             Alert.alert('Erreur', 'Veuillez entrer un numéro de téléphone valide commençant par 243');
