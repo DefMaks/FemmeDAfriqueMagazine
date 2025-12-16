@@ -101,6 +101,14 @@ const CheckoutScreen = ({ route }: CheckoutScreenProps) => {
             const transactionId = wallet.id;
             await walletService.purchaseMagazine(profile.id, magazine.id.toString(), transactionId);
             setHasPurchased(true);
+
+            // 📊 Track purchase event
+            analyticsService.trackPurchase(
+                magazine.id.toString(),
+                magazine.title.rendered,
+                amount,
+                'USD'
+            );
         } catch (error) {
             console.error('Error recording purchase:', error);
         }
