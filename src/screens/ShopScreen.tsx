@@ -85,10 +85,21 @@ const ShopScreen = () => {
     const handleOpenCheckout = (mag: Magazine) => {
         setSelectedMagazine(mag);
         setShowCheckoutModal(true);
-        setShowSecurityNotice(true); // Afficher la notification de sécurité
+        setShowSecurityNotice(true);
         setPaymentMethod(null);
-        setPhone('243');
-        setDetectedProvider('');
+        // Charger le numéro par défaut du profil
+        setPhone(defaultPhone || '243');
+        // Détecter le provider si numéro existant
+        if (defaultPhone && defaultPhone.length >= 5) {
+            try {
+                const { providerName } = formatPhoneAndDeduceProvider(defaultPhone);
+                setDetectedProvider(providerName);
+            } catch {
+                setDetectedProvider('');
+            }
+        } else {
+            setDetectedProvider('');
+        }
         setCurrentOrderNumber('');
     };
 
