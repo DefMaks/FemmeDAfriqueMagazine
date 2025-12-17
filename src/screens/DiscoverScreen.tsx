@@ -430,9 +430,8 @@ const DiscoverScreen = () => {
                                             horizontal
                                             showsHorizontalScrollIndicator={false}
                                             data={featuredPosts[name]}
-                                            renderItem={({ item }) => (
+                                            renderItem={({ item, index }) => (
                                                 <TouchableOpacity
-                                                    key={item.id}
                                                     style={styles.featuredPostCard}
                                                     onPress={() => handleArticlePress(item)}
                                                 >
@@ -441,7 +440,7 @@ const DiscoverScreen = () => {
                                                     </Text>
                                                 </TouchableOpacity>
                                             )}
-                                            keyExtractor={(item) => item.id.toString()}
+                                            keyExtractor={(item, index) => `featured_${name}_${item.id}_${index}`}
                                             contentContainerStyle={styles.featuredPostsScroll}
                                         />
                                     )}
