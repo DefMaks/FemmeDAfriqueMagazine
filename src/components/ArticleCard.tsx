@@ -105,11 +105,9 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onPress, vari
   if (variant === 'vertical') {
     return (
       <TouchableOpacity style={styles.verticalCard} activeOpacity={0.8} onPress={onPress}>
-        {article._embedded?.['wp:featuredmedia']?.[0]?.source_url && (
+        {imageUrl && (
           <Image
-            source={{ uri: article.dmks_featured_image.medium_large.url }}
-
-            // source={{ uri: article._embedded['wp:featuredmedia'][0].source_url }}
+            source={{ uri: imageUrl }}
             style={styles.verticalImage}
           />
         )}
