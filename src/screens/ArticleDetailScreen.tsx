@@ -163,7 +163,7 @@ AppStore : Bientôt disponible`;
         )}
 
         <View style={styles.content}>
-          <Text style={styles.title}>{article.title.rendered}</Text>
+          <Text style={styles.title} selectable>{decodeHtmlEntities(article.title.rendered)}</Text>
 
           <View style={styles.meta}>
             <View style={styles.metaItem}>
