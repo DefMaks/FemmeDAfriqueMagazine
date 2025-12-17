@@ -299,10 +299,10 @@ export const initiateCardPayment = async (
 
     return {
       status: 'initiated',
-      order_id: data.orderNumber || client_order_id,
-      orderNumber: data.orderNumber,
+      order_id: orderNumber,
+      orderNumber: orderNumber,
       message: data.message || 'Redirection vers la page de paiement',
-      redirect_url: data.url,
+      redirect_url: redirectUrl,
       timestamp: new Date().toISOString(),
     };
   } catch (error: any) {
