@@ -249,29 +249,51 @@ export const initiateCardPayment = async (
   client_order_id: string
 ): Promise<CardPaymentResponse> => {
   try {
+    console.log('🔄 Initiating card payment:', { amount, currency, description, client_order_id });
+    
+    const requestBody = {
+      amount,
+      currency,
+      description,
+      callback_url: 'https://femmedafrique.net/payment/callback',
+      approve_url: 'https://femmedafrique.net/payment/success',
+      cancel_url: 'https://femmedafrique.net/payment/cancel',
+      decline_url: 'https://femmedafrique.net/payment/declined',
+    };
+    
+    console.log('📤 Request body:', requestBody);
+    console.log('📤 API URL:', `${API_URL}/flexpay/payment-service`);
+    
     const response = await fetch(`${API_URL}/flexpay/payment-service`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        amount,
-        currency,
-        description,
-        client_order_id,
-        callback_url: 'https://femmedafrique.net/payment/callback',
-        approve_url: 'https://femmedafrique.net/payment/success',
-        cancel_url: 'https://femmedafrique.net/payment/cancel',
-        decline_url: 'https://femmedafrique.net/payment/declined',
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     const data = await response.json();
+    console.log('📥 Response:', data);
     
-    if (!response.ok || !data.url) {
+    // La réponse peut avoir différentes structures selon l'API
+    const redirectUrl = data.url || data.redirect_url || data.data?.url;
+    const orderNumber = data.orderNumber || data.order_number || data.data?.orderNumber || client_order_id;
+    
+    if (!response.ok) {
+      console.error('❌ API Error:', data);
       throw new PaymentError(
-        data?.error?.message || 'Erreur initialisation paiement carte',
-        data?.error?.code || 'API_ERROR',
+        data?.message || data?.error?.message || 'Erreur initialisation paiement carte',
+        data?.code || data?.error?.code || 'API_ERROR',
         data,
         false
+      );
+    }
+    
+    if (!redirectUrl) {
+      console.error('❌ No redirect URL in response:', data);
+      throw new PaymentError(
+        'Aucune URL de paiement reçue. Veuillez réessayer.',
+        'NO_REDIRECT_URL',
+        data,
+        true
       );
     }
 
