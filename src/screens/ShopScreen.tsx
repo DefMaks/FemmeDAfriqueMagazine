@@ -11,8 +11,11 @@ import {
     Alert,
     TextInput,
     Keyboard,
-    ActivityIndicator
+    ActivityIndicator,
+    Platform,
+    ScrollView,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getMagazines, getMedia } from '../services/api';
 import { Magazine } from '../models/Magazine';
 import { Colors } from '../theme/colors';
@@ -31,11 +34,14 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 
+const STORAGE_KEY_PHONE = '@fda_user_phone';
+
 const ShopScreen = () => {
     const [magazines, setMagazines] = useState<Magazine[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedMagazine, setSelectedMagazine] = useState<Magazine | null>(null);
     const [phone, setPhone] = useState('243');
+    const [defaultPhone, setDefaultPhone] = useState('243');
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [loadingPayment, setLoadingPayment] = useState(false);
     const [showCheckoutModal, setShowCheckoutModal] = useState(false);
@@ -46,7 +52,20 @@ const ShopScreen = () => {
 
     useEffect(() => {
         fetchMagazines();
+        loadDefaultPhone();
     }, []);
+
+    // Charger le numéro par défaut du profil
+    const loadDefaultPhone = async () => {
+        try {
+            const savedPhone = await AsyncStorage.getItem(STORAGE_KEY_PHONE);
+            if (savedPhone && savedPhone.length >= 5) {
+                setDefaultPhone(savedPhone);
+            }
+        } catch (error) {
+            console.log('Erreur chargement numéro par défaut');
+        }
+    };
 
     const fetchMagazines = async () => {
         try {
