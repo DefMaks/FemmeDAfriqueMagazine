@@ -98,7 +98,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onPress, vari
         )}
         <View style={styles.verticalContent}>
           <Text style={styles.verticalTitle} numberOfLines={2}>
-            {article.title.rendered}
+            {formatTitle(article.title.rendered)}
           </Text>
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
