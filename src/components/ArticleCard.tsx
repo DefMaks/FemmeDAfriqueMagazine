@@ -123,7 +123,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onPress, vari
       <View style={styles.horizontalContent}>
         <View style={styles.textContainer}>
           <Text style={styles.horizontalTitle} numberOfLines={3}>
-            {article.title.rendered}
+            {formatTitle(article.title.rendered)}
           </Text>
           <Text style={styles.excerpt} numberOfLines={2}>
             {stripHtml(article.excerpt.rendered)}
