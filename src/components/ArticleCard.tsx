@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { savedArticlesService } from '../services/supabaseService';
+import { decodeHtmlEntities } from '../utils/textUtils';
 
 interface ArticleCardProps {
   article: Post;
@@ -38,8 +39,12 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onPress, vari
   };
 
   const stripHtml = (html: string) => {
-    return html.replace(/<[^>]*>/g, '').substring(0, 100) + '...';
+    const text = html.replace(/<[^>]*>/g, '');
+    return decodeHtmlEntities(text).substring(0, 100) + '...';
   };
+
+  // Formater le titre
+  const formatTitle = (title: string) => decodeHtmlEntities(title);
 
   const toggleSave = async () => {
     setIsLoading(true);
