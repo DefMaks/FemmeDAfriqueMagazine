@@ -37,7 +37,7 @@ export const PostSlider: React.FC<PostSliderProps> = ({ posts, onPress }) => {
       >
         {posts.map((post, index) => (
           <TouchableOpacity
-            key={post.id}
+            key={`slider_${post.id}_${index}`}
             style={styles.slide}
             activeOpacity={0.9}
             onPress={() => onPress(post)}
