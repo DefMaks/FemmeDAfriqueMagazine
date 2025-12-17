@@ -1,5 +1,5 @@
 // src/screens/HomeScreen.tsx
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
     View,
     Text,
@@ -9,6 +9,8 @@ import {
     Image,
     TouchableOpacity,
     Dimensions,
+    Share,
+    Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,22 +18,21 @@ import {
     getPosts,
     getPostsByTag,
     getPostsByCategory,
-    getMedia,
 } from '../services/api';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { ArticleCard } from '../components/ArticleCard';
 import { PostSlider } from '../components/PostSlider';
 import { SectionHeader } from '../components/SectionHeader';
-import { AdBanner } from '../components/AdBanner';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { RootStackParamList } from '../navigation/RootNavigator';
-import * as Sharing from 'expo-sharing';
 import { saveArticle, isArticleSaved, removeArticle } from '../services/savedArticles';
 import { Ionicons } from '@expo/vector-icons';
-import ShopScreen from './ShopScreen';
 import { analyticsService } from '../services/analytics';
+import { getFDAAdvertisements, Advertisement } from '../services/adsService';
+import { AdsSlider } from '../components/AdsSlider';
+import { getShareMessage, formatArticleTitle } from '../utils/textUtils';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList> & {
     navigate: (screen: string) => void;
@@ -53,14 +54,22 @@ const HomeScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [savedStatus, setSavedStatus] = useState<Record<number, boolean>>({});
+    const [advertisements, setAdvertisements] = useState<Advertisement[]>([]);
 
     useEffect(() => {
         loadAllContent();
-        
-        // 📊 Track screen view
+        loadAdvertisements();
         analyticsService.trackScreenView('Home');
     }, []);
 
+    const loadAdvertisements = async () => {
+        try {
+            const ads = await getFDAAdvertisements();
+            setAdvertisements(ads);
+        } catch (error) {
+            console.log('Erreur chargement publicités:', error);
+        }
+    };
 
     const loadAllContent = async () => {
         try {
@@ -87,7 +96,6 @@ const HomeScreen = () => {
             setGastronomiePosts(gastronomieData);
             setLatestPosts(latestData);
 
-            // ✅ Charger l’état des favoris ici, une seule fois
             const allPosts = [
                 ...sliderData,
                 ...espaceTendresseData,
@@ -100,7 +108,6 @@ const HomeScreen = () => {
                 post.title?.rendered
             );
 
-            // ✅ OPTIMIZATION: Use Promise.all for parallel checks instead of sequential
             const statusChecks = allPosts.map(post => 
                 isArticleSaved(post.id).then(saved => ({ id: post.id, saved }))
             );
@@ -120,31 +127,32 @@ const HomeScreen = () => {
         }
     };
 
-
-
     const onRefresh = () => {
         setRefreshing(true);
         loadAllContent();
+        loadAdvertisements();
     };
 
-    // ✅ OPTIMIZATION: Memoize callbacks to prevent unnecessary re-renders
     const handleArticlePress = useCallback((article: Post) => {
         navigation.navigate('ArticleDetail', { article });
     }, [navigation]);
 
     const handleSeeAll = useCallback((categoryId: number, title: string) => {
-        // Pour l'instant, on reste sur l'accueil
-        // À compléter plus tard avec DiscoverScreen
+        // Navigation vers Découvrir
     }, []);
 
     const sharePost = useCallback(async (post: Post) => {
-        const message = `${post.title.rendered}\n\nLire sur Femme d'Afrique : ${post.link}`;
-        await Sharing.shareAsync(message, { dialogTitle: 'Partager' });
-        
-        // 📊 Track share event
-        analyticsService.trackShare(post.id.toString(), post.title.rendered, 'native_share');
+        try {
+            const message = getShareMessage(post.title.rendered, post.link);
+            await Share.share({
+                message,
+                ...(Platform.OS === 'ios' && { url: post.link }),
+            });
+            analyticsService.trackShare(post.id.toString(), post.title.rendered, 'native_share');
+        } catch (error) {
+            console.error('Erreur partage:', error);
+        }
     }, []);
-
 
     const toggleSave = useCallback(async (post: Post) => {
         const isSaved = savedStatus[post.id];
@@ -156,17 +164,13 @@ const HomeScreen = () => {
         setSavedStatus((prev) => ({ ...prev, [post.id]: !isSaved }));
     }, [savedStatus]);
 
-    // ✅ OPTIMIZATION: Memoize render function to prevent unnecessary re-renders
-    // NOTE: Ce hook DOIT être placé AVANT les returns conditionnels pour respecter les règles des Hooks
     const renderArticleWithActions = useCallback((post: Post, variant: 'horizontal' | 'vertical' = 'horizontal') => (
-        <View style={styles.cardWrapper}>
+        <View key={`article_${post.id}_${variant}`} style={styles.cardWrapper}>
             <ArticleCard article={post} onPress={() => handleArticlePress(post)} variant={variant} />
             <View style={styles.actionsContainer}>
-                {/* Bouton Partager */}
                 <TouchableOpacity style={styles.actionButton} onPress={() => sharePost(post)}>
                     <Ionicons name="share-social-outline" size={18} color="#666" />
                 </TouchableOpacity>
-                {/* Bouton Favori */}
                 <TouchableOpacity style={styles.actionButton} onPress={() => toggleSave(post)}>
                     <Ionicons
                         name={savedStatus[post.id] ? 'heart' : 'heart-outline'}
@@ -178,7 +182,6 @@ const HomeScreen = () => {
         </View>
     ), [savedStatus, handleArticlePress, sharePost, toggleSave]);
 
-    // États de chargement et d'erreur - APRÈS tous les hooks
     if (loading) {
         return <LoadingSpinner message="Chargement..." />;
     }
@@ -188,122 +191,120 @@ const HomeScreen = () => {
     }
 
     return (
-        <View style={styles.container}>
+        <ScrollView
+            style={styles.container}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+            }
+        >
             <View style={styles.header}>
                 <Image
-                    source={require('../../assets/fda.png')}
+                    source={require('../../assets/Logo_FDA_Black.png')}
                     style={styles.logo}
                     resizeMode="contain"
                 />
-
-
             </View>
 
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        tintColor={Colors.primary}
-                        colors={[Colors.primary]}
+            {sliderPosts.length > 0 && (
+                <View style={styles.section}>
+                    <PostSlider 
+                        posts={sliderPosts} 
+                        onPostPress={handleArticlePress}
                     />
-                }
-            >
-                {sliderPosts.length > 0 && (
-                    <View style={styles.section}>
-                        <SectionHeader title="À LA UNE" icon="star" color={Colors.primary} />
-                        <PostSlider posts={sliderPosts} onPress={handleArticlePress} />
-                    </View>
-                )}
-
-                <View style={styles.bannerWrapper}>
-                    <TouchableOpacity onPress={() => {
-                        navigation.navigate('Boutique');
-                    }}>
-                        <Image
-                            source={require('../../assets/Banniere_FDA.jpg')}
-                            style={styles.banner}
-                            resizeMode="contain" />
-                    </TouchableOpacity>
                 </View>
+            )}
 
-                {latestPosts.length > 0 && (
-                    <View style={styles.section}>
-                        <SectionHeader title="Derniers articles" icon="time-outline" color={Colors.primary} />
-                        <View style={styles.latestGrid}>
-                            {latestPosts.map((post) => (
-                                <View key={post.id} style={styles.latestCard}>
-                                    {renderArticleWithActions(post, 'horizontal')}
-                                </View>
-                            ))}
+            {espaceTendressePosts.length > 0 && (
+                <View style={styles.section}>
+                    <SectionHeader
+                        title="Espace Tendresse"
+                        onSeeAll={() => handleSeeAll(ESPACE_TENDRESSE_ID, 'Espace Tendresse')}
+                    />
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.horizontalList}
+                    >
+                        {espaceTendressePosts.map((post, index) => (
+                            <View key={`espace_${post.id}_${index}`} style={styles.horizontalCard}>
+                                {renderArticleWithActions(post, 'vertical')}
+                            </View>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
+
+            {/* Bloc Publicités FDA */}
+            {advertisements.length > 0 && (
+                <View style={styles.adsSection}>
+                    <AdsSlider ads={advertisements} zone="home" />
+                </View>
+            )}
+
+            <View style={styles.bannerWrapper}>
+                <TouchableOpacity onPress={() => navigation.navigate('Boutique')}>
+                    <Image
+                        source={require('../../assets/Banniere_FDA.jpg')}
+                        style={styles.banner}
+                        resizeMode="contain" 
+                    />
+                </TouchableOpacity>
+            </View>
+
+            {latestPosts.length > 0 && (
+                <View style={styles.section}>
+                    <SectionHeader title="Derniers articles" onSeeAll={() => {}} />
+                    {latestPosts.map((post, index) => (
+                        <View key={`latest_${post.id}_${index}`}>
+                            {renderArticleWithActions(post, 'horizontal')}
                         </View>
-                    </View>
-                )}
+                    ))}
+                </View>
+            )}
 
-                {espaceTendressePosts.length > 0 && (
-                    <View style={styles.section}>
-                        <SectionHeader
-                            title="Espace Tendresse"
-                            icon="heart"
-                            color="#FF6B9D"
-                            onSeeAll={() => handleSeeAll(ESPACE_TENDRESSE_ID, 'Espace Tendresse')}
-                        />
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.horizontalScroll}
-                        >
-                            {espaceTendressePosts.map((post) => (
-                                <View key={post.id} style={styles.horizontalCard}>
-                                    {renderArticleWithActions(post, 'horizontal')}
-                                </View>
-                            ))}
-                        </ScrollView>
-                    </View>
-                )}
+            {entrepreneuriatPosts.length > 0 && (
+                <View style={styles.section}>
+                    <SectionHeader
+                        title="Entrepreneuriat"
+                        onSeeAll={() => handleSeeAll(ENTREPRENEURIAT_ID, 'Entrepreneuriat')}
+                    />
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.horizontalList}
+                    >
+                        {entrepreneuriatPosts.map((post, index) => (
+                            <View key={`entrepreneur_${post.id}_${index}`} style={styles.horizontalCard}>
+                                {renderArticleWithActions(post, 'vertical')}
+                            </View>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
 
-                <AdBanner zone="home" />
+            {gastronomiePosts.length > 0 && (
+                <View style={styles.section}>
+                    <SectionHeader
+                        title="Gastronomie"
+                        onSeeAll={() => handleSeeAll(GASTRONOMIE_ID, 'Gastronomie')}
+                    />
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.horizontalList}
+                    >
+                        {gastronomiePosts.map((post, index) => (
+                            <View key={`gastro_${post.id}_${index}`} style={styles.horizontalCard}>
+                                {renderArticleWithActions(post, 'vertical')}
+                            </View>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
 
-                {entrepreneuriatPosts.length > 0 && (
-                    <View style={styles.section}>
-                        <SectionHeader
-                            title="Entrepreneuriat"
-                            icon="briefcase"
-                            color="#4834DF"
-                            onSeeAll={() => handleSeeAll(ENTREPRENEURIAT_ID, 'Entrepreneuriat')}
-                        />
-                        <View style={styles.listSection}>
-                            {entrepreneuriatPosts.map((post) => (
-                                <View key={post.id} style={styles.listItem}>
-                                    {renderArticleWithActions(post, 'horizontal')}
-                                </View>
-                            ))}
-                        </View>
-                    </View>
-                )}
-
-                {gastronomiePosts.length > 0 && (
-                    <View style={styles.section}>
-                        <SectionHeader
-                            title="Gastronomie"
-                            icon="restaurant"
-                            color="#26DE81"
-                            onSeeAll={() => handleSeeAll(GASTRONOMIE_ID, 'Gastronomie')}
-                        />
-                        <View style={styles.listSection}>
-                            {gastronomiePosts.map((post) => (
-                                <View key={post.id} style={styles.listItem}>
-                                    {renderArticleWithActions(post, 'horizontal')}
-                                </View>
-                            ))}
-                        </View>
-                    </View>
-                )}
-
-                <View style={styles.bottomPadding} />
-            </ScrollView>
-        </View>
+            <View style={styles.footer} />
+        </ScrollView>
     );
 };
 
@@ -313,85 +314,67 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.background,
     },
     header: {
-        flexDirection: 'row',
+        paddingTop: Platform.OS === 'ios' ? 60 : 50,
+        paddingBottom: 16,
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingTop: 60,
-        paddingBottom: 8,
         backgroundColor: Colors.backgroundLight,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.borderLight,
     },
     logo: {
-        width: 110,
+        width: 180,
         height: 50,
-        marginRight: 12,
+    },
+    section: {
+        marginBottom: 24,
+    },
+    adsSection: {
+        marginBottom: 16,
+    },
+    horizontalList: {
+        paddingHorizontal: 16,
+    },
+    horizontalCard: {
+        width: 200,
+        marginRight: 16,
+    },
+    cardWrapper: {
+        marginBottom: 8,
+    },
+    actionsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        gap: 12,
+    },
+    actionButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: Colors.backgroundLight,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.1,
+                shadowRadius: 2,
+            },
+            android: {
+                elevation: 2,
+            },
+        }),
     },
     bannerWrapper: {
-        width: Dimensions.get('window').width - 40,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        // marginBottom: 16,
-        borderRadius: 8,
-        overflow: 'hidden',
-        textAlign: 'center',
-        alignSelf: 'center',
+        paddingHorizontal: 16,
+        marginBottom: 24,
     },
     banner: {
         width: '100%',
-        height: 150,
-        // marginVertical: 16,
+        height: 100,
+        borderRadius: 12,
     },
-    section: {
-        marginTop: 24,
-    },
-    latestGrid: {
-        paddingHorizontal: 20,
-    },
-    latestCard: {
-        marginBottom: 12,
-    },
-    horizontalScroll: {
-        paddingLeft: 20,
-        paddingRight: 32,
-    },
-    horizontalCard: {
-        width: 280,
-        marginRight: 16,
-    },
-    listSection: {
-        paddingHorizontal: 20,
-    },
-    listItem: {
-        marginBottom: 12,
-    },
-    cardWrapper: {
-        position: 'relative',
-    },
-    actionsContainer: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        flexDirection: 'row',
-        gap: 8,
-    },
-    actionButton: {
-        backgroundColor: '#FFF',
-        borderRadius: 16,
-        width: 32,
-        height: 32,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.15,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    bottomPadding: {
+    footer: {
         height: 100,
     },
 });
