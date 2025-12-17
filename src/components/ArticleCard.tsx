@@ -46,6 +46,24 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onPress, vari
   // Formater le titre
   const formatTitle = (title: string) => decodeHtmlEntities(title);
 
+  // Récupérer l'URL de l'image de manière sécurisée
+  const getImageUrl = (): string | null => {
+    // Essayer dmks_featured_image d'abord
+    if (article.dmks_featured_image?.medium_large?.url) {
+      return article.dmks_featured_image.medium_large.url;
+    }
+    if (article.dmks_featured_image?.src) {
+      return article.dmks_featured_image.src;
+    }
+    // Fallback vers wp:featuredmedia
+    if (article._embedded?.['wp:featuredmedia']?.[0]?.source_url) {
+      return article._embedded['wp:featuredmedia'][0].source_url;
+    }
+    return null;
+  };
+
+  const imageUrl = getImageUrl();
+
   const toggleSave = async () => {
     setIsLoading(true);
     if (isSaved) {
