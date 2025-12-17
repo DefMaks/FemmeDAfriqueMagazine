@@ -74,13 +74,47 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
 
   const handleShare = async () => {
     try {
+      const shareMessage = `${decodeHtmlEntities(article.title.rendered)}
+
+Lire sur Femme d'Afrique : ${article.link}
+
+Téléchargez notre application sur
+Playstore: https://bit.ly/461FINi
+AppStore : Bientôt disponible`;
+
       await Share.share({
-        message: `${article.title.rendered}\n\nLire sur Femme d'Afrique : ${article.link}`,
+        message: shareMessage,
         url: article.link,
       });
     } catch (error) {
       console.error('Error sharing:', error);
     }
+  };
+
+  // Fonction de décodage des entités HTML
+  const decodeHtmlEntities = (text: string): string => {
+    if (!text) return '';
+    return text
+      .replace(/&rsquo;/g, "'")
+      .replace(/&lsquo;/g, "'")
+      .replace(/&#039;/g, "'")
+      .replace(/&#8217;/g, "'")
+      .replace(/&ldquo;/g, '"')
+      .replace(/&rdquo;/g, '"')
+      .replace(/&quot;/g, '"')
+      .replace(/&eacute;/g, 'é')
+      .replace(/&egrave;/g, 'è')
+      .replace(/&ecirc;/g, 'ê')
+      .replace(/&agrave;/g, 'à')
+      .replace(/&acirc;/g, 'â')
+      .replace(/&ocirc;/g, 'ô')
+      .replace(/&ucirc;/g, 'û')
+      .replace(/&ccedil;/g, 'ç')
+      .replace(/&amp;/g, '&')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&ndash;/g, '–')
+      .replace(/&mdash;/g, '—')
+      .replace(/&hellip;/g, '…');
   };
 
   const formatDate = (dateString: string) => {
