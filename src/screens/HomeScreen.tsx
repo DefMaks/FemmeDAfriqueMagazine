@@ -206,6 +206,7 @@ const HomeScreen = () => {
                 />
             </View>
 
+            {/* Slider principal */}
             {sliderPosts.length > 0 && (
                 <View style={styles.section}>
                     <PostSlider 
@@ -215,6 +216,19 @@ const HomeScreen = () => {
                 </View>
             )}
 
+            {/* Derniers articles */}
+            {latestPosts.length > 0 && (
+                <View style={styles.section}>
+                    <SectionHeader title="Derniers articles" onSeeAll={() => {}} />
+                    {latestPosts.map((post, index) => (
+                        <View key={`latest_${post.id}_${index}`}>
+                            {renderArticleWithActions(post, 'horizontal')}
+                        </View>
+                    ))}
+                </View>
+            )}
+
+            {/* Espace Tendresse */}
             {espaceTendressePosts.length > 0 && (
                 <View style={styles.section}>
                     <SectionHeader
@@ -235,34 +249,14 @@ const HomeScreen = () => {
                 </View>
             )}
 
-            {/* Bloc Publicités FDA */}
+            {/* Bloc Publicités FDA - Entre Espace Tendresse et Entrepreneuriat */}
             {advertisements.length > 0 && (
                 <View style={styles.adsSection}>
                     <AdsSlider ads={advertisements} zone="home" />
                 </View>
             )}
 
-            <View style={styles.bannerWrapper}>
-                <TouchableOpacity onPress={() => navigation.navigate('Boutique')}>
-                    <Image
-                        source={require('../../assets/Banniere_FDA.jpg')}
-                        style={styles.banner}
-                        resizeMode="contain" 
-                    />
-                </TouchableOpacity>
-            </View>
-
-            {latestPosts.length > 0 && (
-                <View style={styles.section}>
-                    <SectionHeader title="Derniers articles" onSeeAll={() => {}} />
-                    {latestPosts.map((post, index) => (
-                        <View key={`latest_${post.id}_${index}`}>
-                            {renderArticleWithActions(post, 'horizontal')}
-                        </View>
-                    ))}
-                </View>
-            )}
-
+            {/* Entrepreneuriat */}
             {entrepreneuriatPosts.length > 0 && (
                 <View style={styles.section}>
                     <SectionHeader
@@ -283,6 +277,7 @@ const HomeScreen = () => {
                 </View>
             )}
 
+            {/* Gastronomie */}
             {gastronomiePosts.length > 0 && (
                 <View style={styles.section}>
                     <SectionHeader
@@ -302,6 +297,17 @@ const HomeScreen = () => {
                     </ScrollView>
                 </View>
             )}
+
+            {/* Banner Boutique */}
+            <View style={styles.bannerWrapper}>
+                <TouchableOpacity onPress={() => navigation.navigate('Boutique')}>
+                    <Image
+                        source={require('../../assets/Banniere_FDA.jpg')}
+                        style={styles.banner}
+                        resizeMode="contain" 
+                    />
+                </TouchableOpacity>
+            </View>
 
             <View style={styles.footer} />
         </ScrollView>
