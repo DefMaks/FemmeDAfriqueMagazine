@@ -157,9 +157,9 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onPress, vari
             </TouchableOpacity>
           </View>
         </View>
-        {article._embedded?.['wp:featuredmedia']?.[0]?.source_url && (
+        {imageUrl && (
           <Image
-            source={{ uri: article._embedded['wp:featuredmedia'][0].source_url }}
+            source={{ uri: imageUrl }}
             style={styles.horizontalImage}
           />
         )}
