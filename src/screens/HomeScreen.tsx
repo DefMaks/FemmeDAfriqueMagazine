@@ -200,7 +200,7 @@ const HomeScreen = () => {
         >
             <View style={styles.header}>
                 <Image
-                    source={require('../../assets/Logo_FDA_Black.png')}
+                    source={require('../../assets/logo.png')}
                     style={styles.logo}
                     resizeMode="contain"
                 />
