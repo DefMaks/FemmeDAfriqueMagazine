@@ -50,11 +50,14 @@ export const getFDAAdvertisements = async (): Promise<Advertisement[]> => {
 
 /**
  * Enregistre une vue de publicité
+ * NOTE: Insertions suspendues temporairement
  */
 export const trackAdView = async (adId: number, zone: string = 'home'): Promise<void> => {
+  // Tracking suspendu temporairement
+  console.log(`👁️ Ad view (tracking suspendu): ${adId}, zone: ${zone}`);
+  
+  /* INSERTIONS SUSPENDUES
   try {
-    const userId = await getDeviceId();
-    
     await supabase
       .from('ad_views')
       .insert({
@@ -65,18 +68,21 @@ export const trackAdView = async (adId: number, zone: string = 'home'): Promise<
       
     console.log(`👁️ Ad view tracked: ${adId}`);
   } catch (error) {
-    // Silencieux - ne pas bloquer l'app pour les analytics
     console.log('Ad view tracking skipped');
   }
+  */
 };
 
 /**
  * Enregistre un clic sur une publicité
+ * NOTE: Insertions suspendues temporairement
  */
 export const trackAdClick = async (adId: number, zone: string = 'home'): Promise<void> => {
+  // Tracking suspendu temporairement
+  console.log(`👆 Ad click (tracking suspendu): ${adId}, zone: ${zone}`);
+  
+  /* INSERTIONS SUSPENDUES
   try {
-    const userId = await getDeviceId();
-    
     await supabase
       .from('ad_clicks')
       .insert({
@@ -87,7 +93,7 @@ export const trackAdClick = async (adId: number, zone: string = 'home'): Promise
       
     console.log(`👆 Ad click tracked: ${adId}`);
   } catch (error) {
-    // Silencieux - ne pas bloquer l'app pour les analytics
     console.log('Ad click tracking skipped');
   }
+  */
 };
