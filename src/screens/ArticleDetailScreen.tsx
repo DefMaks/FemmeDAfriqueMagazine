@@ -177,35 +177,46 @@ AppStore : Bientôt disponible`;
           {/* <Text style={styles.body}>{stripHtml(article.content.rendered)}</Text> */}
           {/* <View style={styles.body}> */}
           <RenderHtml
-            // contentWidth={300} // Largeur du contenu
-            contentWidth={screenWidth - 40} // Padding inclus
+            contentWidth={screenWidth - 40}
             source={{ html: article.content.rendered }}
+            defaultTextProps={{
+              selectable: true, // Activer la sélection de texte
+            }}
+            baseStyle={{
+              fontSize: 17,
+              lineHeight: 28,
+              color: Colors.text,
+            }}
             tagsStyles={{
               img: { maxWidth: screenWidth - 52, borderRadius: 8, marginVertical: 5, overflow: 'hidden' },
-              figure: { marginVertical: 10, marginHorizontal: 5, width: 400, height: 'auto' },
-              p: { marginBottom: 15, marginTop: 5 },
+              figure: { marginVertical: 10, marginHorizontal: 5, width: screenWidth - 52, height: 'auto' },
+              p: { marginBottom: 15, marginTop: 5, fontSize: 17, lineHeight: 28 },
               strong: { fontWeight: '700' },
-              h1: { fontSize: 24, fontWeight: '700', marginBottom: 10 },
-              h2: { fontSize: 22, fontWeight: '700', marginBottom: 10 },
-              h3: { fontSize: 20, fontWeight: '700', marginBottom: 10 },
-              h4: { fontSize: 18, fontWeight: '700', marginBottom: 10 },
+              h1: { fontSize: 24, fontWeight: '700', marginBottom: 10, marginTop: 20 },
+              h2: { fontSize: 22, fontWeight: '700', marginBottom: 10, marginTop: 18 },
+              h3: { fontSize: 20, fontWeight: '700', marginBottom: 10, marginTop: 16 },
+              h4: { fontSize: 18, fontWeight: '700', marginBottom: 10, marginTop: 14 },
               h5: { fontSize: 16, fontWeight: '700', marginBottom: 10 },
               h6: { fontSize: 14, fontWeight: '700', marginBottom: 10 },
-              em: {
-                fontStyle: 'italic'
-              }
+              em: { fontStyle: 'italic' },
+              a: { color: Colors.primary, textDecorationLine: 'underline' },
+              blockquote: { 
+                borderLeftWidth: 4, 
+                borderLeftColor: Colors.primary, 
+                paddingLeft: 16, 
+                marginVertical: 16,
+                fontStyle: 'italic',
+                backgroundColor: '#f5f5f5',
+                padding: 12,
+                borderRadius: 8,
+              },
+              ul: { marginVertical: 10 },
+              ol: { marginVertical: 10 },
+              li: { marginBottom: 8 },
             }}
             classesStyles={{
-              'wp-block-image': { backgroundColor: '#f5f5f5' },
-              'body': {
-                // fontSize: 50,
-                // paddingHorizontal: 2,
-              },
-              'MsoNormal': {
-                fontSize: 17,
-                color: Colors.text,
-                // lineHeight: 28,
-              }
+              'wp-block-image': { backgroundColor: '#f5f5f5', borderRadius: 8 },
+              'MsoNormal': { fontSize: 17, color: Colors.text, lineHeight: 28 },
             }}
           />
           {/* <WebView
