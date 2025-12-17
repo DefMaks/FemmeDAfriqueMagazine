@@ -210,7 +210,7 @@ const HomeScreen = () => {
                 <View style={styles.section}>
                     <PostSlider 
                         posts={sliderPosts} 
-                        onPostPress={handleArticlePress}
+                        onPress={handleArticlePress}
                     />
                 </View>
             )}
