@@ -1,7 +1,8 @@
 import React, { useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
+import { decodeHtmlEntities } from '../utils/textUtils';
 
 const { width } = Dimensions.get('window');
 const SLIDER_WIDTH = width - 40;
@@ -20,7 +21,7 @@ export const PostSlider: React.FC<PostSliderProps> = ({ posts, onPress }) => {
   };
 
   const stripHtml = (html: string) => {
-    return html.replace(/<[^>]*>/g, '');
+    return decodeHtmlEntities(html.replace(/<[^>]*>/g, ''));
   };
 
   return (
