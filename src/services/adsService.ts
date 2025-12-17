@@ -22,6 +22,12 @@ const SUPABASE_STORAGE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
  */
 export const getFDAAdvertisements = async (): Promise<Advertisement[]> => {
   try {
+    // Vérifier que Supabase est configuré
+    if (!SUPABASE_STORAGE_URL) {
+      console.log('Supabase URL non configurée, pas de publicités');
+      return [];
+    }
+
     const { data, error } = await supabase
       .from('advertisements')
       .select('*')
@@ -31,19 +37,26 @@ export const getFDAAdvertisements = async (): Promise<Advertisement[]> => {
       .lte('start_date', new Date().toISOString());
 
     if (error) {
-      console.error('Erreur récupération publicités:', error);
+      console.log('Publicités non disponibles:', error.message);
       return [];
     }
 
-    // Transformer les URLs d'images
-    return (data || []).map(ad => ({
+    if (!data || data.length === 0) {
+      console.log('Aucune publicité FDA active');
+      return [];
+    }
+
+    // Transformer les URLs d'images de manière sécurisée
+    return data.map(ad => ({
       ...ad,
-      image_url: ad.image_url.startsWith('http') 
-        ? ad.image_url 
-        : `${SUPABASE_STORAGE_URL}/storage/v1/object/public/${ad.image_url}`
-    }));
+      image_url: ad.image_url 
+        ? (ad.image_url.startsWith('http') 
+            ? ad.image_url 
+            : `${SUPABASE_STORAGE_URL}/storage/v1/object/public/${ad.image_url}`)
+        : ''
+    })).filter(ad => ad.image_url); // Filtrer les pubs sans image
   } catch (error) {
-    console.error('Erreur getFDAAdvertisements:', error);
+    console.log('Erreur getFDAAdvertisements (silencieux):', error);
     return [];
   }
 };
