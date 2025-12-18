@@ -226,15 +226,12 @@ AppStore : Bientôt disponible`;
           /> */}
           {/* </View> */}
 
-          <View style={styles.commentsSection}>
-            <Text style={styles.commentsTitle}>Commentaires ({comments.length})</Text>
-            {loadingComments ? (
-              <Text style={styles.loadingText}>Chargement des commentaires...</Text>
-            ) : (
-              <CommentsList comments={comments} />
-            )}
-          </View>
         </View>
+
+        {/* Section Commentaires */}
+        <CommentsSection postId={article.id} />
+        
+        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
