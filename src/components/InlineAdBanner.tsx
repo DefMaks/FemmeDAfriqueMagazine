@@ -44,6 +44,25 @@ export const InlineAdBanner: React.FC<InlineAdBannerProps> = ({ ad, onPress }) =
             || null;
     };
 
+    const imageUrl = getImageUrl();
+
+    // Charger les dimensions de l'image pour calculer le ratio
+    React.useEffect(() => {
+        if (imageUrl) {
+            Image.getSize(
+                imageUrl,
+                (width, height) => {
+                    if (height > 0) {
+                        setAspectRatio(width / height);
+                    }
+                },
+                (error) => {
+                    console.log('Erreur chargement dimensions image pub:', error);
+                }
+            );
+        }
+    }, [imageUrl]);
+
     const handlePress = async () => {
         if (onPress) {
             onPress();
@@ -63,21 +82,7 @@ export const InlineAdBanner: React.FC<InlineAdBannerProps> = ({ ad, onPress }) =
         }
     };
 
-    const imageUrl = getImageUrl();
     if (!imageUrl) return null;
-
-    // Charger les dimensions de l'image pour calculer le ratio
-    Image.getSize(
-        imageUrl,
-        (width, height) => {
-            if (height > 0) {
-                setAspectRatio(width / height);
-            }
-        },
-        (error) => {
-            console.log('Erreur chargement dimensions image pub:', error);
-        }
-    );
 
     return (
         <TouchableOpacity
