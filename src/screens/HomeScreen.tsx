@@ -79,6 +79,16 @@ const HomeScreen = () => {
         }
     };
 
+    // Récupérer l'URL de l'image de la bannière pub
+    const getAdBannerImageUrl = (): string | null => {
+        if (!homeBannerAd) return null;
+        // Essayer différentes sources d'image
+        return homeBannerAd.better_featured_image?.source_url 
+            || homeBannerAd.dmks_featured_image?.src
+            || homeBannerAd.dmks_featured_image?.sizes?.large?.url
+            || null;
+    };
+
     const loadAllContent = async () => {
         try {
             setError(null);
