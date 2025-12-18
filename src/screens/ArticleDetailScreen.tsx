@@ -233,18 +233,13 @@ AppStore : Bientôt disponible`;
 
         </View>
 
-        {/* Pub après le contenu */}
+        {/* Pub après le contenu (utilise la 2ème pub si disponible, sinon la 1ère) */}
         {inReadAds.length > 0 && (
-          <InlineAdBanner ad={inReadAds[0]} />
+          <InlineAdBanner ad={inReadAds.length > 1 ? inReadAds[1] : inReadAds[0]} />
         )}
 
         {/* Section Commentaires */}
         <CommentsSection postId={article.id} />
-        
-        {/* Pub après les commentaires (si 2ème pub disponible) */}
-        {inReadAds.length > 1 && (
-          <InlineAdBanner ad={inReadAds[1]} />
-        )}
         
         <View style={{ height: 40 }} />
       </ScrollView>
