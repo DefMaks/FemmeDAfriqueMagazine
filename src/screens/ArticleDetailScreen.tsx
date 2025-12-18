@@ -172,6 +172,13 @@ AppStore : Bientôt disponible`;
 
           <View style={styles.divider} />
 
+          {/* Pub avant le contenu */}
+          {inReadAds.length > 0 && (
+            <View style={styles.inContentAd}>
+              <InlineAdBanner ad={inReadAds[0]} />
+            </View>
+          )}
+
           {/* <Text style={styles.body}>{stripHtml(article.content.rendered)}</Text> */}
           {/* <View style={styles.body}> */}
           <RenderHtml
