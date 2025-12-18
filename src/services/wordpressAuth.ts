@@ -2,8 +2,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-const WP_API_URL = process.env.EXPO_PUBLIC_WORDPRESS_API_URL || 'https://femmedafrique.net/wp-json';
-const JWT_AUTH_URL = `${WP_API_URL.replace('/wp/v2/', '')}/jwt-auth/v1`;
+const WP_API_URL = (process.env.EXPO_PUBLIC_WORDPRESS_API_URL || 'https://femmedafrique.net/wp-json/wp/v2').replace(/\/$/, '');
+const JWT_AUTH_URL = WP_API_URL.replace('/wp/v2', '/jwt-auth/v1');
 
 const STORAGE_KEYS = {
   JWT_TOKEN: '@fda_jwt_token',
