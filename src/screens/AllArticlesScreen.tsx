@@ -12,17 +12,26 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { getPosts } from '../services/api';
+import { getPosts, getAdsByZoneId } from '../services/api';
 import { Post } from '../models/Post';
 import { ArticleCard } from '../components/ArticleCard';
+import { InlineAdBanner, AppAd } from '../components/InlineAdBanner';
 import { Colors } from '../theme/colors';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
+// Zone ID pour les pubs dans la liste d'articles
+const IN_LIST_AD_ZONE_ID = 14742;
+const AD_INTERVAL = 5; // Afficher une pub tous les 5 articles
+
+// Type mixte pour la liste (article ou pub)
+type ListItem = { type: 'article'; data: Post } | { type: 'ad'; data: AppAd; index: number };
+
 const AllArticlesScreen = () => {
     const navigation = useNavigation<NavigationProp>();
     const [posts, setPosts] = useState<Post[]>([]);
+    const [inListAds, setInListAds] = useState<AppAd[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [page, setPage] = useState(1);
@@ -30,7 +39,17 @@ const AllArticlesScreen = () => {
 
     useEffect(() => {
         loadPosts();
+        loadInListAds();
     }, []);
+
+    const loadInListAds = async () => {
+        try {
+            const ads = await getAdsByZoneId(IN_LIST_AD_ZONE_ID);
+            setInListAds(ads);
+        } catch (error) {
+            console.log('Erreur chargement pubs in-list:', error);
+        }
+    };
 
     const loadPosts = async () => {
         try {
@@ -72,13 +91,44 @@ const AllArticlesScreen = () => {
         navigation.navigate('ArticleDetail', { article });
     }, [navigation]);
 
-    const renderArticle = ({ item }: { item: Post }) => (
-        <ArticleCard
-            article={item}
-            onPress={() => handleArticlePress(item)}
-            variant="horizontal"
-        />
-    );
+    // Créer une liste mixte avec articles et pubs intercalées
+    const getMixedList = (): ListItem[] => {
+        const mixedList: ListItem[] = [];
+        let adIndex = 0;
+
+        posts.forEach((post, index) => {
+            mixedList.push({ type: 'article', data: post });
+
+            // Après chaque 5 articles, insérer une pub
+            if ((index + 1) % AD_INTERVAL === 0 && inListAds.length > 0) {
+                const ad = inListAds[adIndex % inListAds.length];
+                mixedList.push({ type: 'ad', data: ad, index: adIndex });
+                adIndex++;
+            }
+        });
+
+        return mixedList;
+    };
+
+    const renderItem = ({ item }: { item: ListItem }) => {
+        if (item.type === 'ad') {
+            return <InlineAdBanner ad={item.data} />;
+        }
+        return (
+            <ArticleCard
+                article={item.data}
+                onPress={() => handleArticlePress(item.data)}
+                variant="horizontal"
+            />
+        );
+    };
+
+    const getItemKey = (item: ListItem, index: number): string => {
+        if (item.type === 'ad') {
+            return `ad_${item.data.id}_${item.index}`;
+        }
+        return `article_${item.data.id}_${index}`;
+    };
 
     if (loading) {
         return (
@@ -87,6 +137,8 @@ const AllArticlesScreen = () => {
             </View>
         );
     }
+
+    const mixedData = getMixedList();
 
     return (
         <View style={styles.container}>
@@ -102,9 +154,9 @@ const AllArticlesScreen = () => {
             </View>
 
             <FlatList
-                data={posts}
-                renderItem={renderArticle}
-                keyExtractor={(item, index) => `all_${item.id}_${index}`}
+                data={mixedData}
+                renderItem={renderItem}
+                keyExtractor={getItemKey}
                 contentContainerStyle={styles.list}
                 showsVerticalScrollIndicator={false}
                 onEndReached={loadMorePosts}
@@ -160,7 +212,7 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.background,
     },
     list: {
-        padding: 16,
+        paddingVertical: 16,
     },
     footerLoader: {
         paddingVertical: 20,
