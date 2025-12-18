@@ -292,7 +292,7 @@ const HomeScreen = () => {
                 <View style={styles.section}>
                     <SectionHeader
                         title="Entrepreneuriat"
-                        onSeeAll={() => handleSeeAll(ENTREPRENEURIAT_ID, 'Entrepreneuriat')}
+                        onSeeAll={() => handleSeeAllCategory(ENTREPRENEURIAT_ID, 'Entrepreneuriat')}
                     />
                     <ScrollView
                         horizontal
