@@ -332,6 +332,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     padding: 20,
   },
+  inContentAd: {
+    marginHorizontal: -20, // Compenser le padding du content pour avoir 100% width
+    marginBottom: 16,
+  },
 });
 
 export default ArticleDetailScreen;
