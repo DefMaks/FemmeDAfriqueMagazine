@@ -166,6 +166,33 @@ export const getAds = async () => {
   }
 };
 
+// Fonction pour récupérer une pub par ID
+export const getAdById = async (id: number) => {
+  try {
+    const response = await api.get(`app-ad/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération de la pub:", error);
+    return null;
+  }
+};
+
+// Fonction pour récupérer les pubs par zone
+export const getAdsByZone = async (zoneSlug: string) => {
+  try {
+    const response = await api.get("app-ad", {
+      params: {
+        per_page: 10,
+      },
+    });
+    // Filtrer par zone si nécessaire
+    return response.data;
+  } catch (error) {
+    console.error("Erreur lors de la récupération des pubs par zone:", error);
+    return [];
+  }
+};
+
 // Fonction pour récupérer les ad zones
 export const getAdZones = async () => {
   try {
