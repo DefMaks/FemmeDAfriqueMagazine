@@ -155,9 +155,13 @@ const HomeScreen = () => {
         navigation.navigate('ArticleDetail', { article });
     }, [navigation]);
 
-    const handleSeeAll = useCallback((categoryId: number, title: string) => {
-        // Navigation vers Découvrir
-    }, []);
+    const handleSeeAllArticles = useCallback(() => {
+        navigation.navigate('AllArticles');
+    }, [navigation]);
+
+    const handleSeeAllCategory = useCallback((categoryId: number, categoryName: string) => {
+        navigation.navigate('CategoryArticles', { categoryId, categoryName });
+    }, [navigation]);
 
     const sharePost = useCallback(async (post: Post) => {
         try {
