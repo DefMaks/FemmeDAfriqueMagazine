@@ -9,7 +9,7 @@ import {
     FlatList,
     ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +29,10 @@ import CategoryCard from '../components/CategoryCard';
 import { analyticsService } from '../services/analytics';
 
 type DiscoverScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type DiscoverScreenRouteProps = {
+    categoryId?: number;
+    categoryName?: string;
+};
 
 const FEATURED_CATEGORIES = {
     'Communiqués': 3038,
