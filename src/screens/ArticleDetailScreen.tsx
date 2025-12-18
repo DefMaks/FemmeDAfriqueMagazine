@@ -28,6 +28,7 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
   const { article } = route.params;
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [inReadAds, setInReadAds] = useState<AppAd[]>([]);
 
   useEffect(() => {
     // 📊 Track article view
@@ -36,7 +37,19 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
       article.title.rendered,
       'article_detail'
     );
+    
+    // Charger les pubs pour la zone de lecture
+    loadInReadAds();
   }, [article.id, article.title.rendered]);
+
+  const loadInReadAds = async () => {
+    try {
+      const ads = await getAdsByZoneId(IN_READ_AD_ZONE_ID);
+      setInReadAds(ads);
+    } catch (error) {
+      console.log('Erreur chargement pubs in-read:', error);
+    }
+  };
 
   // Les commentaires sont maintenant gérés par CommentsSection
 
