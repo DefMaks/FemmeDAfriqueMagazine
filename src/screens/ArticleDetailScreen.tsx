@@ -37,15 +37,7 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
     );
   }, [article.id, article.title.rendered]);
 
-  const loadComments = async () => {
-    // Les commentaires sont maintenant gérés par CommentsSection
-    try {
-    } catch (error) {
-      console.error('Error loading comments:', error);
-    } finally {
-      setLoadingComments(false);
-    }
-  };
+  // Les commentaires sont maintenant gérés par CommentsSection
 
   const checkIfSaved = async () => {
     const saved = await savedArticlesService.isArticleSaved(article.id.toString());
