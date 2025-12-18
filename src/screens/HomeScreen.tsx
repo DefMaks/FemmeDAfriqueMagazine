@@ -341,35 +341,6 @@ const styles = StyleSheet.create({
         width: 200,
         marginRight: 16,
     },
-    cardWrapper: {
-        marginBottom: 8,
-    },
-    actionsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'flex-end',
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-        gap: 12,
-    },
-    actionButton: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: Colors.backgroundLight,
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.1,
-                shadowRadius: 2,
-            },
-            android: {
-                elevation: 2,
-            },
-        }),
-    },
     footer: {
         height: 100,
     },
