@@ -269,7 +269,11 @@ const HomeScreen = () => {
                     >
                         {entrepreneuriatPosts.map((post, index) => (
                             <View key={`entrepreneur_${post.id}_${index}`} style={styles.horizontalCard}>
-                                {renderArticleWithActions(post, 'vertical')}
+                                <ArticleCard 
+                                    article={post} 
+                                    onPress={() => handleArticlePress(post)} 
+                                    variant="vertical" 
+                                />
                             </View>
                         ))}
                     </ScrollView>
