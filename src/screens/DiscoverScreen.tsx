@@ -58,6 +58,9 @@ const CATEGORY_ICONS: { [key: string]: string } = {
 
 const DiscoverScreen = () => {
     const navigation = useNavigation<DiscoverScreenNavigationProp>();
+    const route = useRoute();
+    const params = route.params as DiscoverScreenRouteProps | undefined;
+    
     const [searchQuery, setSearchQuery] = useState('');
     const [categories, setCategories] = useState<Category[]>([]);
     const [featuredPosts, setFeaturedPosts] = useState<{ [key: string]: Post[] }>({});
