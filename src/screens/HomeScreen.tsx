@@ -59,20 +59,23 @@ const HomeScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [savedStatus, setSavedStatus] = useState<Record<number, boolean>>({});
-    const [advertisements, setAdvertisements] = useState<Advertisement[]>([]);
+    const [homeBannerAd, setHomeBannerAd] = useState<any>(null);
 
     useEffect(() => {
         loadAllContent();
-        loadAdvertisements();
+        loadHomeBannerAd();
         analyticsService.trackScreenView('Home');
     }, []);
 
-    const loadAdvertisements = async () => {
+    // Charger la publicité WordPress pour la zone sous le slider
+    const loadHomeBannerAd = async () => {
         try {
-            const ads = await getFDAAdvertisements();
-            setAdvertisements(ads);
+            const ad = await getAdById(HOME_AD_ID);
+            if (ad) {
+                setHomeBannerAd(ad);
+            }
         } catch (error) {
-            console.log('Erreur chargement publicités:', error);
+            console.log('Erreur chargement bannière pub:', error);
         }
     };
 
