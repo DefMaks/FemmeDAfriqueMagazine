@@ -18,6 +18,7 @@ import {
     getPosts,
     getPostsByTag,
     getPostsByCategory,
+    getAdById,
 } from '../services/api';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
@@ -30,9 +31,13 @@ import { RootStackParamList } from '../navigation/RootNavigator';
 import { saveArticle, isArticleSaved, removeArticle } from '../services/savedArticles';
 import { Ionicons } from '@expo/vector-icons';
 import { analyticsService } from '../services/analytics';
-import { getFDAAdvertisements, Advertisement } from '../services/adsService';
-import { AdsSlider } from '../components/AdsSlider';
 import { getShareMessage, formatArticleTitle } from '../utils/textUtils';
+
+const { width: screenWidth } = Dimensions.get('window');
+const AD_BANNER_HEIGHT = ((screenWidth - 32) * 406) / 1300; // Ratio 1300x406
+
+// ID de la publicité WordPress pour la zone sous le slider
+const HOME_AD_ID = 21755;
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList> & {
     navigate: (screen: string) => void;
