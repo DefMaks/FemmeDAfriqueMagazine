@@ -27,13 +27,8 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
   const { article } = route.params;
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [comments, setComments] = useState<any[]>([]);
-  const [loadingComments, setLoadingComments] = useState(true);
 
   useEffect(() => {
-    // checkIfSaved();
-    loadComments();
-    
     // 📊 Track article view
     analyticsService.trackArticleView(
       article.id.toString(),
@@ -43,11 +38,8 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
   }, [article.id, article.title.rendered]);
 
   const loadComments = async () => {
+    // Les commentaires sont maintenant gérés par CommentsSection
     try {
-      const response = await axios.get(
-        `https://femmedafrique.net/wp-json/wp/v2/comments?post=${article.id}`
-      );
-      setComments(response.data);
     } catch (error) {
       console.error('Error loading comments:', error);
     } finally {
