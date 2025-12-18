@@ -177,7 +177,23 @@ export const getAdById = async (id: number) => {
   }
 };
 
-// Fonction pour récupérer les pubs par zone
+// Fonction pour récupérer les pubs par zone ID
+export const getAdsByZoneId = async (zoneId: number) => {
+  try {
+    const response = await api.get("app-ad", {
+      params: {
+        app_ad_zone: zoneId,
+        per_page: 10,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Erreur récupération pubs par zone:", error);
+    return [];
+  }
+};
+
+// Fonction pour récupérer les pubs par zone slug
 export const getAdsByZone = async (zoneSlug: string) => {
   try {
     const response = await api.get("app-ad", {
@@ -185,10 +201,9 @@ export const getAdsByZone = async (zoneSlug: string) => {
         per_page: 10,
       },
     });
-    // Filtrer par zone si nécessaire
     return response.data;
   } catch (error) {
-    console.error("Erreur lors de la récupération des pubs par zone:", error);
+    console.error("Erreur récupération pubs par zone:", error);
     return [];
   }
 };
