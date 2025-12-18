@@ -2,14 +2,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
     View,
-    Text,
     StyleSheet,
     ScrollView,
     RefreshControl,
     Image,
     TouchableOpacity,
     Dimensions,
-    Share,
     Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -28,10 +26,8 @@ import { SectionHeader } from '../components/SectionHeader';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { RootStackParamList } from '../navigation/RootNavigator';
-import { saveArticle, isArticleSaved, removeArticle } from '../services/savedArticles';
-import { Ionicons } from '@expo/vector-icons';
+import { isArticleSaved } from '../services/savedArticles';
 import { analyticsService } from '../services/analytics';
-import { getShareMessage, formatArticleTitle } from '../utils/textUtils';
 
 const { width: screenWidth } = Dimensions.get('window');
 const AD_BANNER_HEIGHT = ((screenWidth - 32) * 406) / 1300; // Ratio 1300x406
