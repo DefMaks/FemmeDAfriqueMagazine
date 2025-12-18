@@ -1,18 +1,12 @@
 // src/components/InlineAdBanner.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import {
-    View,
     Image,
     StyleSheet,
     TouchableOpacity,
-    Dimensions,
     Linking,
     Platform,
 } from 'react-native';
-
-const { width: screenWidth } = Dimensions.get('window');
-const AD_WIDTH = screenWidth - 32;
-const AD_HEIGHT = (AD_WIDTH * 406) / 1300; // Ratio 1300x406
 
 export interface AppAd {
     id: number;
@@ -41,6 +35,8 @@ interface InlineAdBannerProps {
 }
 
 export const InlineAdBanner: React.FC<InlineAdBannerProps> = ({ ad, onPress }) => {
+    const [aspectRatio, setAspectRatio] = useState(3); // Default aspect ratio (width/height)
+
     const getImageUrl = (): string | null => {
         return ad.better_featured_image?.source_url 
             || ad.dmks_featured_image?.src
@@ -70,6 +66,19 @@ export const InlineAdBanner: React.FC<InlineAdBannerProps> = ({ ad, onPress }) =
     const imageUrl = getImageUrl();
     if (!imageUrl) return null;
 
+    // Charger les dimensions de l'image pour calculer le ratio
+    Image.getSize(
+        imageUrl,
+        (width, height) => {
+            if (height > 0) {
+                setAspectRatio(width / height);
+            }
+        },
+        (error) => {
+            console.log('Erreur chargement dimensions image pub:', error);
+        }
+    );
+
     return (
         <TouchableOpacity
             style={styles.container}
@@ -78,8 +87,8 @@ export const InlineAdBanner: React.FC<InlineAdBannerProps> = ({ ad, onPress }) =
         >
             <Image
                 source={{ uri: imageUrl }}
-                style={styles.image}
-                resizeMode="cover"
+                style={[styles.image, { aspectRatio }]}
+                resizeMode="contain"
             />
         </TouchableOpacity>
     );
@@ -105,8 +114,8 @@ const styles = StyleSheet.create({
         }),
     },
     image: {
-        width: AD_WIDTH,
-        height: AD_HEIGHT,
+        width: '100%',
+        height: undefined, // Auto height based on aspectRatio
     },
 });
 
