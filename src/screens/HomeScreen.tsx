@@ -234,6 +234,22 @@ const HomeScreen = () => {
                 </View>
             )}
 
+            {/* Bannière publicitaire - Entre le slider et les derniers articles */}
+            {getAdBannerImageUrl() && (
+                <View style={styles.adBannerSection}>
+                    <TouchableOpacity 
+                        onPress={() => navigation.navigate('Boutique')}
+                        activeOpacity={0.9}
+                    >
+                        <Image
+                            source={{ uri: getAdBannerImageUrl()! }}
+                            style={styles.adBannerImage}
+                            resizeMode="cover"
+                        />
+                    </TouchableOpacity>
+                </View>
+            )}
+
             {/* Derniers articles */}
             {latestPosts.length > 0 && (
                 <View style={styles.section}>
@@ -264,13 +280,6 @@ const HomeScreen = () => {
                             </View>
                         ))}
                     </ScrollView>
-                </View>
-            )}
-
-            {/* Bloc Publicités FDA - Entre Espace Tendresse et Entrepreneuriat */}
-            {advertisements.length > 0 && (
-                <View style={styles.adsSection}>
-                    <AdsSlider ads={advertisements} zone="home" />
                 </View>
             )}
 
