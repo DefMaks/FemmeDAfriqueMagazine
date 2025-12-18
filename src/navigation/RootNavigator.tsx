@@ -121,6 +121,8 @@ export default function RootNavigator() {
                 <Stack.Screen name="Main" component={MainTabs} />
                 <Stack.Screen name="ArticleDetail" component={ArticleDetailScreen} />
                 <Stack.Screen name="Checkout" component={CheckoutScreen} />
+                <Stack.Screen name="AllArticles" component={AllArticlesScreen} />
+                <Stack.Screen name="CategoryArticles" component={DiscoverScreen} />
             </Stack.Navigator>
         </NavigationContainer>
     );
