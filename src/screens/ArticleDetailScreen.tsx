@@ -6,7 +6,7 @@ import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { savedArticlesService } from '../services/supabaseService';
 import axios from 'axios';
-import { CommentsList } from '../components/CommentsList';
+import { CommentsSection } from '../components/CommentsSection';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import RenderHtml from 'react-native-render-html';
