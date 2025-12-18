@@ -163,46 +163,7 @@ const HomeScreen = () => {
         navigation.navigate('CategoryArticles', { categoryId, categoryName });
     }, [navigation]);
 
-    const sharePost = useCallback(async (post: Post) => {
-        try {
-            const message = getShareMessage(post.title.rendered, post.link);
-            await Share.share({
-                message,
-                ...(Platform.OS === 'ios' && { url: post.link }),
-            });
-            analyticsService.trackShare(post.id.toString(), post.title.rendered, 'native_share');
-        } catch (error) {
-            console.error('Erreur partage:', error);
-        }
-    }, []);
-
-    const toggleSave = useCallback(async (post: Post) => {
-        const isSaved = savedStatus[post.id];
-        if (isSaved) {
-            await removeArticle(post.id);
-        } else {
-            await saveArticle(post);
-        }
-        setSavedStatus((prev) => ({ ...prev, [post.id]: !isSaved }));
-    }, [savedStatus]);
-
-    const renderArticleWithActions = useCallback((post: Post, variant: 'horizontal' | 'vertical' = 'horizontal') => (
-        <View key={`article_${post.id}_${variant}`} style={styles.cardWrapper}>
-            <ArticleCard article={post} onPress={() => handleArticlePress(post)} variant={variant} />
-            <View style={styles.actionsContainer}>
-                <TouchableOpacity style={styles.actionButton} onPress={() => sharePost(post)}>
-                    <Ionicons name="share-social-outline" size={18} color="#666" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton} onPress={() => toggleSave(post)}>
-                    <Ionicons
-                        name={savedStatus[post.id] ? 'heart' : 'heart-outline'}
-                        size={18}
-                        color={savedStatus[post.id] ? Colors.primary : '#666'}
-                    />
-                </TouchableOpacity>
-            </View>
-        </View>
-    ), [savedStatus, handleArticlePress, sharePost, toggleSave]);
+    // Les boutons sont maintenant intégrés dans ArticleCard
 
     if (loading) {
         return <LoadingSpinner message="Chargement..." />;
