@@ -277,11 +277,18 @@ export const initiateCardPayment = async (
     const redirectUrl = data.url || data.redirect_url || data.data?.url;
     const orderNumber = data.orderNumber || data.order_number || data.data?.orderNumber || client_order_id;
     
-    if (!response.ok) {
+    if (!response.ok || data.success === false) {
       console.error('❌ API Error:', data);
+      const errorMessage = data?.message || data?.error?.message || 'Erreur initialisation paiement carte';
+      
+      // Message personnalisé pour l'erreur FlexPay
+      const userFriendlyMessage = data?.error === 'FLEXPAY_ERROR' 
+        ? 'Le service de paiement par carte est temporairement indisponible. Veuillez utiliser le paiement mobile money ou réessayer plus tard.'
+        : errorMessage;
+        
       throw new PaymentError(
-        data?.message || data?.error?.message || 'Erreur initialisation paiement carte',
-        data?.code || data?.error?.code || 'API_ERROR',
+        userFriendlyMessage,
+        data?.code || data?.error?.code || data?.error || 'API_ERROR',
         data,
         false
       );
