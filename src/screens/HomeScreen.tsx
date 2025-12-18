@@ -348,8 +348,15 @@ const styles = StyleSheet.create({
     section: {
         marginBottom: 24,
     },
-    adsSection: {
-        marginBottom: 16,
+    adBannerSection: {
+        paddingHorizontal: 16,
+        marginBottom: 20,
+    },
+    adBannerImage: {
+        width: '100%',
+        height: AD_BANNER_HEIGHT,
+        borderRadius: 12,
+        backgroundColor: '#f0f0f0',
     },
     horizontalList: {
         paddingHorizontal: 16,
