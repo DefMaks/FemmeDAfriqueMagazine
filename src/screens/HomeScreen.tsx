@@ -220,9 +220,12 @@ const HomeScreen = () => {
                 <View style={styles.section}>
                     <SectionHeader title="Derniers articles" onSeeAll={handleSeeAllArticles} />
                     {latestPosts.map((post, index) => (
-                        <View key={`latest_${post.id}_${index}`}>
-                            {renderArticleWithActions(post, 'horizontal')}
-                        </View>
+                        <ArticleCard 
+                            key={`latest_${post.id}_${index}`}
+                            article={post} 
+                            onPress={() => handleArticlePress(post)} 
+                            variant="horizontal" 
+                        />
                     ))}
                 </View>
             )}
