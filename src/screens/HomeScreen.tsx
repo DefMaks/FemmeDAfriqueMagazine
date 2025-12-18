@@ -148,7 +148,7 @@ const HomeScreen = () => {
     const onRefresh = () => {
         setRefreshing(true);
         loadAllContent();
-        loadAdvertisements();
+        loadHomeBannerAd();
     };
 
     const handleArticlePress = useCallback((article: Post) => {
