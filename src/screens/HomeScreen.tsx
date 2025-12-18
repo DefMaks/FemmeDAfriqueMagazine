@@ -257,7 +257,7 @@ const HomeScreen = () => {
             {/* Derniers articles */}
             {latestPosts.length > 0 && (
                 <View style={styles.section}>
-                    <SectionHeader title="Derniers articles" onSeeAll={() => {}} />
+                    <SectionHeader title="Derniers articles" onSeeAll={handleSeeAllArticles} />
                     {latestPosts.map((post, index) => (
                         <View key={`latest_${post.id}_${index}`}>
                             {renderArticleWithActions(post, 'horizontal')}
