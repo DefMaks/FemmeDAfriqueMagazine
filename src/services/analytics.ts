@@ -68,24 +68,19 @@ class AnalyticsService {
         console.log('📊 Analytics Event:', eventData);
       }
 
-      // Envoyer à Supabase pour stockage (silencieux en cas d'erreur réseau)
-      try {
-        const { error } = await supabase
-          .from('analytics_events')
-          .insert(eventData);
+      // Envoyer à Supabase pour stockage (silencieux en cas d'erreur)
+      // Utiliser un timeout court pour ne pas bloquer l'app
+      const analyticsTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Analytics timeout')), 5000)
+      );
 
-        // Ignorer les erreurs communes (table inexistante, réseau)
-        if (error && error.code !== '42P01') {
-          // Log uniquement en dev, silencieux en production
-          if (__DEV__) {
-            console.log('Analytics warning (non-blocking):', error.message);
-          }
-        }
-      } catch (networkError) {
-        // Ignorer silencieusement les erreurs réseau - analytics ne doit pas bloquer l'app
-        if (__DEV__) {
-          console.log('Analytics network issue (non-blocking)');
-        }
+      try {
+        await Promise.race([
+          supabase.from('analytics_events').insert(eventData),
+          analyticsTimeout
+        ]);
+      } catch {
+        // Ignorer silencieusement toutes les erreurs analytics
       }
 
       return true;
