@@ -111,25 +111,24 @@ class AnalyticsService {
       }
 
       // Enregistrer la vue dans Supabase (silencieux en cas d'erreur)
+      // Utiliser un timeout court pour ne pas bloquer l'app
+      const viewTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('View tracking timeout')), 5000)
+      );
+
       try {
-        const { error } = await supabase
-          .from('article_views')
-          .insert({
+        await Promise.race([
+          supabase.from('article_views').insert({
             article_id: viewData.article_id,
             article_title: viewData.article_title,
             user_id: viewData.user_id,
             source: viewData.source,
             viewed_at: viewData.timestamp,
-          });
-
-        if (error && error.code !== '42P01' && __DEV__) {
-          console.log('Article view tracking warning (non-blocking):', error.message);
-        }
-      } catch (networkError) {
-        // Ignorer silencieusement les erreurs réseau
-        if (__DEV__) {
-          console.log('Article view network issue (non-blocking)');
-        }
+          }),
+          viewTimeout
+        ]);
+      } catch {
+        // Ignorer silencieusement toutes les erreurs
       }
 
       // Track également comme événement générique
