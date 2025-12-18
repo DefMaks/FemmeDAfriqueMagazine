@@ -325,17 +325,6 @@ const HomeScreen = () => {
                 </View>
             )}
 
-            {/* Banner Boutique */}
-            <View style={styles.bannerWrapper}>
-                <TouchableOpacity onPress={() => navigation.navigate('Boutique')}>
-                    <Image
-                        source={require('../../assets/Banniere_FDA.jpg')}
-                        style={styles.banner}
-                        resizeMode="contain" 
-                    />
-                </TouchableOpacity>
-            </View>
-
             <View style={styles.footer} />
         </ScrollView>
     );
