@@ -394,15 +394,6 @@ const styles = StyleSheet.create({
             },
         }),
     },
-    bannerWrapper: {
-        paddingHorizontal: 16,
-        marginBottom: 24,
-    },
-    banner: {
-        width: '100%',
-        height: 100,
-        borderRadius: 12,
-    },
     footer: {
         height: 100,
     },
