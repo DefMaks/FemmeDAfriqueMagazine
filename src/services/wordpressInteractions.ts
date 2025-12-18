@@ -2,7 +2,8 @@
 import axios from 'axios';
 import { getToken, getAuthHeaders, isLoggedIn } from './wordpressAuth';
 
-const WP_API_URL = process.env.EXPO_PUBLIC_WORDPRESS_API_URL || 'https://femmedafrique.net/wp-json/wp/v2';
+// Nettoyer l'URL (enlever le / final si présent)
+const WP_API_URL = (process.env.EXPO_PUBLIC_WORDPRESS_API_URL || 'https://femmedafrique.net/wp-json/wp/v2').replace(/\/$/, '');
 
 // ============================================
 // 💬 COMMENTAIRES
