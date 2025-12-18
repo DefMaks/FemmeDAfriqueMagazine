@@ -88,11 +88,17 @@ const DiscoverScreen = () => {
     useEffect(() => {
         loadCategories();
         loadFeaturedCategories();
-        loadPosts(1); // Chargement initial
+        loadPosts(1);
         
-        // 📊 Track screen view
         analyticsService.trackScreenView('Discover');
     }, []);
+
+    // Gérer la navigation avec paramètre de catégorie
+    useEffect(() => {
+        if (params?.categoryId && params?.categoryName) {
+            handleCategoryPress(params.categoryId, params.categoryName);
+        }
+    }, [params?.categoryId, params?.categoryName]);
 
     // ⬇️ Fonction générique de chargement des posts
     const loadPosts = async (pageNum: number, loadMore = false) => {
