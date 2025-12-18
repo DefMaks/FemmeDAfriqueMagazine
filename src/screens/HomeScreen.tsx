@@ -271,7 +271,7 @@ const HomeScreen = () => {
                 <View style={styles.section}>
                     <SectionHeader
                         title="Espace Tendresse"
-                        onSeeAll={() => handleSeeAll(ESPACE_TENDRESSE_ID, 'Espace Tendresse')}
+                        onSeeAll={() => handleSeeAllCategory(ESPACE_TENDRESSE_ID, 'Espace Tendresse')}
                     />
                     <ScrollView
                         horizontal
