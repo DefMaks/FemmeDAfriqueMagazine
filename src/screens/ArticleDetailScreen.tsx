@@ -5,19 +5,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { savedArticlesService } from '../services/supabaseService';
-import axios from 'axios';
 import { CommentsSection } from '../components/CommentsSection';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import RenderHtml from 'react-native-render-html';
-import { WebView } from 'react-native-webview';
 import { analyticsService } from '../services/analytics';
-
-
+import { getAdsByZoneId } from '../services/api';
+import { InlineAdBanner, AppAd } from '../components/InlineAdBanner';
 
 const { width } = Dimensions.get('window');
 const screenWidth = Dimensions.get('window').width;
 const height = Dimensions.get('window').height;
+
+// Zone ID pour les pubs dans l'écran de lecture
+const IN_READ_AD_ZONE_ID = 18751;
 
 type ArticleDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
 
