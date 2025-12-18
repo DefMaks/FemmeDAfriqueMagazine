@@ -156,7 +156,11 @@ const HomeScreen = () => {
     }, [navigation]);
 
     const handleSeeAllCategory = useCallback((categoryId: number, categoryName: string) => {
-        navigation.navigate('CategoryArticles', { categoryId, categoryName });
+        // Naviguer vers l'onglet Découvrir avec la catégorie pré-sélectionnée
+        navigation.navigate('Main', {
+            screen: 'Découvrir',
+            params: { categoryId, categoryName },
+        } as any);
     }, [navigation]);
 
     // Les boutons sont maintenant intégrés dans ArticleCard
