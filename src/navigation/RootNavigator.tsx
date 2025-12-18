@@ -12,6 +12,7 @@ import ShopScreen from '../screens/ShopScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
 import ArticleDetailScreen from '../screens/ArticleDetailScreen';
+import AllArticlesScreen from '../screens/AllArticlesScreen';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { Magazine } from '../models/Magazine';
@@ -21,6 +22,8 @@ export type RootStackParamList = {
     Main: undefined;
     Checkout: { magazine: Magazine };
     ArticleDetail: { article: Post };
+    AllArticles: undefined;
+    CategoryArticles: { categoryId: number; categoryName: string };
 };
 
 const Tab = createBottomTabNavigator();
