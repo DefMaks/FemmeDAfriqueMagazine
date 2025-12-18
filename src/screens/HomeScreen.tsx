@@ -244,7 +244,11 @@ const HomeScreen = () => {
                     >
                         {espaceTendressePosts.map((post, index) => (
                             <View key={`espace_${post.id}_${index}`} style={styles.horizontalCard}>
-                                {renderArticleWithActions(post, 'vertical')}
+                                <ArticleCard 
+                                    article={post} 
+                                    onPress={() => handleArticlePress(post)} 
+                                    variant="vertical" 
+                                />
                             </View>
                         ))}
                     </ScrollView>
