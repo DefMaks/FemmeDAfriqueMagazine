@@ -121,6 +121,7 @@ const ShopScreen = () => {
         setDetectedProvider('');
         setShowSecurityNotice(false);
         setCurrentOrderNumber('');
+        setShowDownloadPopup(false);
     };
 
     const handlePhoneChange = (text: string) => {
