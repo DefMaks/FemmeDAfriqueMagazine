@@ -203,6 +203,7 @@ const ShopScreen = () => {
             const status = await checkPaymentStatus(orderId);
             if (status.status === 'success') {
                 setPaymentSuccess(true);
+                setShowDownloadPopup(true);
             } else {
                 Alert.alert('En attente', 'Le paiement n\'est pas encore confirmé.');
             }
