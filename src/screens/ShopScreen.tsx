@@ -149,7 +149,7 @@ const ShopScreen = () => {
         }
     };
 
-    // Paiement E-Money
+    // Paiement E-Money avec polling optimisé
     const handleEmoneyPayment = async () => {
         if (!selectedMagazine) return;
         
@@ -159,10 +159,13 @@ const ShopScreen = () => {
         }
 
         setLoadingPayment(true);
+        setPaymentStatusMessage('Initialisation du paiement...');
         Keyboard.dismiss();
 
         try {
             const orderId = generateOrderId();
+            setCurrentOrderNumber(orderId);
+            
             const result = await initiatePayment(
                 phone,
                 totalPrice.toString(),
@@ -170,49 +173,204 @@ const ShopScreen = () => {
                 currency  // CDF en mode test, USD sinon
             );
 
+            setPaymentStatusMessage('📱 Veuillez confirmer sur votre téléphone...');
+            
             Alert.alert(
                 '📱 Paiement initié',
-                'Veuillez confirmer le paiement sur votre téléphone.\nVous recevrez une notification push.',
-                [{ text: 'OK' }]
+                `Veuillez confirmer le paiement de ${totalPrice} ${currency} sur votre téléphone.\n\nVous recevrez une notification push de votre opérateur mobile.`,
+                [{ text: 'OK, je confirme' }]
             );
 
-            // Vérifier le statut après un délai
-            setTimeout(async () => {
-                try {
-                    const status = await checkPaymentStatus(result.order_id);
-                    if (status.status === 'success') {
-                        setPaymentSuccess(true);
-                        setShowDownloadPopup(true);
-                    } else {
-                        Alert.alert(
-                            'Paiement en attente', 
-                            'Le paiement n\'a pas encore été confirmé. Réessayez la vérification dans quelques instants.',
-                            [
-                                { text: 'Annuler', style: 'cancel' },
-                                { text: 'Revérifier', onPress: () => recheckPayment(result.order_id) }
-                            ]
-                        );
+            // Polling avec mise à jour du statut
+            setPaymentStatusMessage('🔄 Vérification en cours...');
+            
+            const finalStatus = await pollPaymentStatus(
+                result.order_id,
+                8,  // 8 tentatives
+                4000,  // 4 secondes entre chaque
+                (status: PaymentStatusResponse) => {
+                    console.log('📊 Statut mis à jour:', status.status);
+                    if (status.status === 'pending') {
+                        setPaymentStatusMessage('⏳ En attente de confirmation...');
                     }
-                } catch (err) {
-                    handlePaymentError(err);
-                } finally {
-                    setLoadingPayment(false);
                 }
-            }, 5000);
+            );
+
+            if (isPaymentSuccessful(finalStatus.status)) {
+                setPaymentStatusMessage('✅ Paiement confirmé !');
+                setPaymentSuccess(true);
+                setShowDownloadPopup(true);
+            } else if (isPaymentFailed(finalStatus.status)) {
+                setPaymentStatusMessage('');
+                Alert.alert(
+                    '❌ Paiement échoué',
+                    `Le paiement a échoué (${finalStatus.rawStatus || finalStatus.status}). Veuillez réessayer.`,
+                    [{ text: 'OK' }]
+                );
+            } else {
+                // Toujours en attente après le polling
+                setPaymentStatusMessage('');
+                Alert.alert(
+                    '⏳ Paiement en attente', 
+                    'Le paiement n\'a pas encore été confirmé.\n\nVeuillez vérifier si vous avez reçu une demande de confirmation sur votre téléphone.',
+                    [
+                        { text: 'Annuler', style: 'cancel' },
+                        { text: 'Revérifier', onPress: () => recheckPayment(result.order_id) }
+                    ]
+                );
+            }
         } catch (error: any) {
+            setPaymentStatusMessage('');
             handlePaymentError(error);
+        } finally {
             setLoadingPayment(false);
         }
     };
 
     const recheckPayment = async (orderId: string) => {
         setLoadingPayment(true);
+        setPaymentStatusMessage('🔄 Vérification en cours...');
+        
         try {
-            const status = await checkPaymentStatus(orderId);
-            if (status.status === 'success') {
+            const status = await pollPaymentStatus(orderId, 3, 3000);
+            
+            if (isPaymentSuccessful(status.status)) {
+                setPaymentStatusMessage('✅ Paiement confirmé !');
                 setPaymentSuccess(true);
                 setShowDownloadPopup(true);
+            } else if (isPaymentFailed(status.status)) {
+                setPaymentStatusMessage('');
+                Alert.alert('❌ Échec', `Le paiement a échoué: ${status.rawStatus || status.status}`);
             } else {
+                setPaymentStatusMessage('');
+                Alert.alert(
+                    '⏳ En attente', 
+                    'Le paiement n\'est pas encore confirmé.\n\nAssurez-vous d\'avoir validé la demande sur votre téléphone.',
+                    [
+                        { text: 'OK' },
+                        { text: 'Réessayer', onPress: () => recheckPayment(orderId) }
+                    ]
+                );
+            }
+        } catch (err) {
+            setPaymentStatusMessage('');
+            handlePaymentError(err);
+        } finally {
+            setLoadingPayment(false);
+        }
+    };
+
+    // Paiement E-Card avec in-app browser
+    const handleCardPayment = async () => {
+        if (!selectedMagazine) return;
+
+        setLoadingPayment(true);
+        setPaymentStatusMessage('Initialisation du paiement par carte...');
+
+        try {
+            const orderId = generateOrderId();
+            const result = await initiateCardPayment(
+                totalPrice.toString(),
+                currency,  // CDF en mode test, USD sinon
+                `Magazine FDA N°${selectedMagazine.acf.numero}`,
+                orderId
+            );
+
+            if (result.redirect_url) {
+                setCurrentOrderNumber(result.orderNumber || orderId);
+                setPaymentStatusMessage('🌐 Ouverture de la page de paiement...');
+                
+                // Ouvrir le navigateur in-app
+                const browserResult = await openCardPaymentPageSimple(result.redirect_url);
+                
+                console.log('📱 Navigateur fermé, résultat:', browserResult);
+                
+                // Après fermeture du navigateur, vérifier le statut
+                setPaymentStatusMessage('🔄 Vérification du paiement...');
+                
+                // Polling pour vérifier le statut
+                const finalStatus = await pollCardPaymentStatus(
+                    result.orderNumber || orderId,
+                    5,  // 5 tentatives
+                    3000,  // 3 secondes entre chaque
+                    (status: PaymentStatusResponse) => {
+                        console.log('📊 Statut carte mis à jour:', status.status);
+                    }
+                );
+
+                if (isPaymentSuccessful(finalStatus.status)) {
+                    setPaymentStatusMessage('✅ Paiement confirmé !');
+                    setPaymentSuccess(true);
+                    setShowDownloadPopup(true);
+                } else if (isPaymentFailed(finalStatus.status)) {
+                    setPaymentStatusMessage('');
+                    Alert.alert(
+                        '❌ Paiement échoué',
+                        `Le paiement par carte a échoué (${finalStatus.rawStatus || finalStatus.status}).`,
+                        [{ text: 'OK' }]
+                    );
+                } else {
+                    // Toujours en attente - demander à l'utilisateur
+                    setPaymentStatusMessage('');
+                    Alert.alert(
+                        '🔍 Vérification du paiement',
+                        'Avez-vous complété le paiement par carte ?',
+                        [
+                            { 
+                                text: 'Non, annuler', 
+                                style: 'cancel',
+                            },
+                            { 
+                                text: 'Oui, vérifier', 
+                                onPress: () => verifyCardPayment(result.orderNumber || orderId) 
+                            }
+                        ]
+                    );
+                }
+            }
+        } catch (error: any) {
+            setPaymentStatusMessage('');
+            handlePaymentError(error);
+        } finally {
+            setLoadingPayment(false);
+        }
+    };
+
+    const verifyCardPayment = async (orderNumber: string) => {
+        setLoadingPayment(true);
+        setPaymentStatusMessage('🔄 Vérification en cours...');
+        
+        try {
+            const status = await pollCardPaymentStatus(orderNumber, 3, 3000);
+            
+            if (isPaymentSuccessful(status.status)) {
+                setPaymentStatusMessage('✅ Paiement confirmé !');
+                setPaymentSuccess(true);
+                setShowDownloadPopup(true);
+            } else if (isPaymentFailed(status.status)) {
+                setPaymentStatusMessage('');
+                Alert.alert(
+                    '❌ Paiement échoué', 
+                    `Le paiement a échoué: ${status.rawStatus || status.status}`
+                );
+            } else {
+                setPaymentStatusMessage('');
+                Alert.alert(
+                    '⏳ Paiement en attente', 
+                    'Le paiement n\'a pas encore été confirmé.',
+                    [
+                        { text: 'OK' },
+                        { text: 'Revérifier', onPress: () => verifyCardPayment(orderNumber) }
+                    ]
+                );
+            }
+        } catch (error) {
+            setPaymentStatusMessage('');
+            handlePaymentError(error);
+        } finally {
+            setLoadingPayment(false);
+        }
+    };
                 Alert.alert('En attente', 'Le paiement n\'est pas encore confirmé.');
             }
         } catch (err) {
