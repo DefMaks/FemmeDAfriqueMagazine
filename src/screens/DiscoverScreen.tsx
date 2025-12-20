@@ -409,14 +409,14 @@ const DiscoverScreen = () => {
             {/* ✅ FlatList avec Infinite Scroll */}
             <FlatList
                 data={posts}
-                renderItem={({ item }) => (
+                renderItem={({ item, index }) => (
                     <ArticleCard
                         article={item}
                         onPress={() => handleArticlePress(item)}
                         variant="horizontal"
                     />
                 )}
-                keyExtractor={(item) => item.id.toString()}
+                keyExtractor={(item, index) => `post_${item.id}_${index}`}
                 onEndReached={loadMore}
                 onEndReachedThreshold={0.5}
                 contentContainerStyle={styles.content}
