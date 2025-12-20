@@ -83,9 +83,13 @@ const ShopScreen = () => {
         }
     };
 
-    const totalPrice = selectedMagazine
-        ? selectedMagazine.acf.prix_mag + selectedMagazine.acf.tva
-        : 0;
+    // Prix total : en mode test = 100 CDF, sinon prix normal en USD
+    const totalPrice = isTest 
+        ? TEST_PRICE_CDF 
+        : (selectedMagazine ? selectedMagazine.acf.prix_mag + selectedMagazine.acf.tva : 0);
+    
+    // Devise selon le mode
+    const currency = isTest ? 'CDF' : 'USD';
 
     const handleOpenCheckout = (mag: Magazine) => {
         setSelectedMagazine(mag);
