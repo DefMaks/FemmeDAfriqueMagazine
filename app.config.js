@@ -14,10 +14,12 @@ export default {
     },
     ios: {
       bundleIdentifier: "com.defmaks.fda",
-      supportsTablet: true
+      supportsTablet: true,
+      buildNumber: "14.0"  // Ajouté pour la version iOS
     },
     android: {
       package: "com.defmaks.fda",
+      versionCode: 14,  // Ajouté pour la version Android
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
@@ -28,6 +30,10 @@ export default {
       favicon: "./assets/favicon.png"
     },
     extra: {
+      // EAS Project ID - AJOUTÉ
+      eas: {
+        projectId: "2226573c-1349-4d26-953b-92f717a4efb5"
+      },
       // Supabase Configuration
       EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
       EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
