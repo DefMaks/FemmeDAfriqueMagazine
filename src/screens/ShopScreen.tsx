@@ -24,11 +24,16 @@ import {
     checkPaymentStatus,
     initiateCardPayment,
     checkCardPaymentStatus,
-    openCardPaymentPage,
+    openCardPaymentPageSimple,
     formatPhoneAndDeduceProvider,
     generateOrderId,
     handlePaymentError,
-    PaymentMethod
+    pollPaymentStatus,
+    pollCardPaymentStatus,
+    isPaymentSuccessful,
+    isPaymentFailed,
+    PaymentMethod,
+    PaymentStatusResponse
 } from '../services/twigaPaie';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -53,6 +58,7 @@ const ShopScreen = () => {
     const [detectedProvider, setDetectedProvider] = useState<string>('');
     const [showSecurityNotice, setShowSecurityNotice] = useState(false);
     const [currentOrderNumber, setCurrentOrderNumber] = useState<string>('');
+    const [paymentStatusMessage, setPaymentStatusMessage] = useState<string>('');
     const [showDownloadPopup, setShowDownloadPopup] = useState(false);
 
     useEffect(() => {
