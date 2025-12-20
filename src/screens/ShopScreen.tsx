@@ -604,6 +604,42 @@ const ShopScreen = () => {
                     </View>
                 </TouchableOpacity>
             </Modal>
+
+            {/* Modal notification sécurité TwigaPaie - Placé en dernier pour être au premier plan sur Android */}
+            <Modal
+                visible={showSecurityNotice}
+                transparent={true}
+                animationType="fade"
+                statusBarTranslucent={true}
+                hardwareAccelerated={true}
+            >
+                <View style={styles.securityOverlay}>
+                    <View style={styles.securityModal}>
+                        <Image
+                            source={require('../../assets/twigapaie-logo.png')}
+                            style={styles.securityLogo}
+                            resizeMode="contain"
+                        />
+                        <Ionicons name="shield-checkmark" size={48} color="#4CAF50" />
+                        <Text style={styles.securityTitle}>Paiement 100% Sécurisé</Text>
+                        <Text style={styles.securityText}>
+                            Votre transaction est sécurisée par TwigaPaie, 
+                            conformément aux termes établis entre{' '}
+                            <Text style={styles.boldText}>Femme d'Afrique Magazine</Text> et{' '}
+                            <Text style={styles.boldText}>DefMaks</Text>.
+                        </Text>
+                        <Text style={styles.securitySubtext}>
+                            Vos données de paiement sont cryptées et ne sont jamais stockées sur nos serveurs.
+                        </Text>
+                        <TouchableOpacity 
+                            style={styles.securityButton}
+                            onPress={() => setShowSecurityNotice(false)}
+                        >
+                            <Text style={styles.securityButtonText}>J'ai compris</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
