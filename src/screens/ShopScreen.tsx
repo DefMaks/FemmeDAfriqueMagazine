@@ -159,7 +159,8 @@ const ShopScreen = () => {
             const result = await initiatePayment(
                 phone,
                 totalPrice.toString(),
-                orderId
+                orderId,
+                currency  // CDF en mode test, USD sinon
             );
 
             Alert.alert(
