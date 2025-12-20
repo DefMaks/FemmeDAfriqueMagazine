@@ -128,6 +128,7 @@ const ShopScreen = () => {
         setShowSecurityNotice(false);
         setCurrentOrderNumber('');
         setShowDownloadPopup(false);
+        setPaymentStatusMessage('');
     };
 
     const handlePhoneChange = (text: string) => {
