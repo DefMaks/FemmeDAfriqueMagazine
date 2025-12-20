@@ -448,8 +448,15 @@ const ShopScreen = () => {
                                         <Text style={styles.magazineSubtitle}>
                                             N°{selectedMagazine.acf.numero} • {selectedMagazine.acf.pages} pages
                                         </Text>
-                                        <Text style={styles.totalPrice}>${totalPrice.toFixed(2)} TTC</Text>
-                                        <Text style={styles.fees}>*Inclus {selectedMagazine.acf.tva}$ de frais</Text>
+                                        <Text style={styles.totalPrice}>
+                                            {isTest ? `${totalPrice} CDF` : `$${totalPrice.toFixed(2)}`} TTC
+                                        </Text>
+                                        {!isTest && (
+                                            <Text style={styles.fees}>*Inclus {selectedMagazine.acf.tva}$ de frais</Text>
+                                        )}
+                                        {isTest && (
+                                            <Text style={styles.testModeLabel}>🧪 Mode Test</Text>
+                                        )}
                                     </View>
                                 </View>
 
