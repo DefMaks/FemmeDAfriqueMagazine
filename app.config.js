@@ -15,9 +15,11 @@ export default {
     ios: {
       bundleIdentifier: "com.defmaks.fda",
       supportsTablet: true,
-      "ITSAppUsesNonExemptEncryption": false,
-      NSLocationWhenInUseUsageDescription: "Cette application n'utilise pas votre position. Certaines bibliothèques externes peuvent y faire référence, mais aucune donnée de localisation n'est collectée ni utilisée.",
-      buildNumber: "14.0"  // Ajouté pour la version iOS
+      buildNumber: "14.0",  // Ajouté pour la version iOS
+      infoPlist: {
+        NSLocationWhenInUseUsageDescription: "Cette application n'utilise pas votre position. Certaines bibliothèques externes peuvent y faire référence, mais aucune donnée de localisation n'est collectée ni utilisée.",
+        ITSAppUsesNonExemptEncryption: false
+      }
     },
     android: {
       package: "com.defmaks.fda",
