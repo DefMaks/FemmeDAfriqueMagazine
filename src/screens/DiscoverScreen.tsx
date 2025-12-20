@@ -85,6 +85,12 @@ const DiscoverScreen = () => {
     const [categoryHasMore, setCategoryHasMore] = useState(true);
     const [loadingMoreCategory, setLoadingMoreCategory] = useState(false);
 
+    // ⬇️ États pour le scroll infini dans la recherche
+    const [searchPage, setSearchPage] = useState(1);
+    const [searchHasMore, setSearchHasMore] = useState(true);
+    const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
+    const [currentSearchQuery, setCurrentSearchQuery] = useState('');
+
     useEffect(() => {
         loadCategories();
         loadFeaturedCategories();
