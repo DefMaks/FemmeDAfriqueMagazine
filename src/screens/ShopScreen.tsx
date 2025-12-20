@@ -224,8 +224,8 @@ const ShopScreen = () => {
         try {
             const orderId = generateOrderId();
             const result = await initiateCardPayment(
-                totalPrice.toFixed(2),
-                'USD',
+                totalPrice.toString(),
+                currency,  // CDF en mode test, USD sinon
                 `Magazine FDA N°${selectedMagazine.acf.numero}`,
                 orderId
             );
