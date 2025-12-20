@@ -235,6 +235,10 @@ const ShopScreen = () => {
 
             if (isPaymentSuccessful(finalStatus.status)) {
                 setPaymentStatusMessage('✅ Paiement confirmé !');
+                
+                // Enregistrer l'achat sur DefMaks
+                await recordSuccessfulPurchase(result.order_id, 'emoney', detectedProvider);
+                
                 setPaymentSuccess(true);
                 setShowDownloadPopup(true);
             } else if (isPaymentFailed(finalStatus.status)) {
