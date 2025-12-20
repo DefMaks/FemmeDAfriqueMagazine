@@ -222,16 +222,21 @@ const DiscoverScreen = () => {
             setIsSearching(false);
             setSearchResults([]);
             setSearchLoading(false);
+            setCurrentSearchQuery('');
             return;
         }
 
         setIsSearching(true);
         setSearchLoading(true);
         setSearchResults([]);
+        setSearchPage(1);
+        setSearchHasMore(true);
+        setCurrentSearchQuery(trimmed);
 
         try {
-            const results = await searchPosts(trimmed);
+            const results = await searchPosts(trimmed, 1, 10);
             setSearchResults(results);
+            setSearchHasMore(results.length >= 10);
             
             // 📊 Track search event
             analyticsService.trackSearch(trimmed, results.length);
@@ -239,6 +244,29 @@ const DiscoverScreen = () => {
             console.error('Error searching:', err);
         } finally {
             setSearchLoading(false);
+        }
+    };
+
+    // ⬇️ Fonction pour charger plus de résultats de recherche
+    const loadMoreSearchResults = async () => {
+        if (loadingMoreSearch || !searchHasMore || !currentSearchQuery) return;
+        
+        setLoadingMoreSearch(true);
+        try {
+            const nextPage = searchPage + 1;
+            const moreResults = await searchPosts(currentSearchQuery, nextPage, 10);
+            if (moreResults.length === 0) {
+                setSearchHasMore(false);
+            } else {
+                setSearchResults(prev => [...prev, ...moreResults]);
+                setSearchPage(nextPage);
+                setSearchHasMore(moreResults.length >= 10);
+            }
+        } catch (err) {
+            console.error('Error loading more search results:', err);
+            setSearchHasMore(false);
+        } finally {
+            setLoadingMoreSearch(false);
         }
     };
 
