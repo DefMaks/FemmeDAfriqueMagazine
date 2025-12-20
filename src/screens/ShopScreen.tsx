@@ -598,6 +598,13 @@ const ShopScreen = () => {
                                                 </Text>
                                             )}
                                         </TouchableOpacity>
+                                        
+                                        {/* Message de statut du paiement */}
+                                        {paymentStatusMessage ? (
+                                            <View style={styles.statusMessageContainer}>
+                                                <Text style={styles.statusMessageText}>{paymentStatusMessage}</Text>
+                                            </View>
+                                        ) : null}
                                     </View>
                                 )}
 
