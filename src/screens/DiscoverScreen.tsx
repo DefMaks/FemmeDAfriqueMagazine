@@ -355,7 +355,7 @@ const DiscoverScreen = () => {
                                 variant="horizontal"
                             />
                         )}
-                        keyExtractor={(item) => item.id.toString()}
+                        keyExtractor={(item, index) => `category_post_${item.id}_${index}`}
                         contentContainerStyle={styles.list}
                         showsVerticalScrollIndicator={false}
                         ListFooterComponent={
