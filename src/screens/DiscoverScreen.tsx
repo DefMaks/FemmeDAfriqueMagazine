@@ -338,14 +338,16 @@ const DiscoverScreen = () => {
                             </View>
                         }
                         ListFooterComponent={
-                            loadingMore ? (
+                            loadingMoreSearch ? (
                                 <View style={styles.loadingMore}>
                                     <ActivityIndicator size="small" color={Colors.primary} />
                                 </View>
+                            ) : !searchHasMore && searchResults.length > 0 ? (
+                                <Text style={styles.endOfList}>Fin des résultats</Text>
                             ) : null
                         }
-                        onEndReached={loadMore}
-                        onEndReachedThreshold={0.5}
+                        onEndReached={loadMoreSearchResults}
+                        onEndReachedThreshold={0.3}
                         showsVerticalScrollIndicator={false}
                     />
                 )}
