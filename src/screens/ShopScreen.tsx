@@ -35,6 +35,7 @@ import {
     PaymentMethod,
     PaymentStatusResponse
 } from '../services/twigaPaie';
+import { recordMagazinePurchase } from '../services/defmaksApi';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
