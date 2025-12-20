@@ -345,6 +345,10 @@ const ShopScreen = () => {
 
                 if (isPaymentSuccessful(finalStatus.status)) {
                     setPaymentStatusMessage('✅ Paiement confirmé !');
+                    
+                    // Enregistrer l'achat sur DefMaks
+                    await recordSuccessfulPurchase(result.orderNumber || orderId, 'ecard', 'FlexPay');
+                    
                     setPaymentSuccess(true);
                     setShowDownloadPopup(true);
                 } else if (isPaymentFailed(finalStatus.status)) {
@@ -390,6 +394,10 @@ const ShopScreen = () => {
             
             if (isPaymentSuccessful(status.status)) {
                 setPaymentStatusMessage('✅ Paiement confirmé !');
+                
+                // Enregistrer l'achat sur DefMaks
+                await recordSuccessfulPurchase(orderNumber, 'ecard', 'FlexPay');
+                
                 setPaymentSuccess(true);
                 setShowDownloadPopup(true);
             } else if (isPaymentFailed(status.status)) {
