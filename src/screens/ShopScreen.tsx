@@ -398,40 +398,6 @@ const ShopScreen = () => {
                             </TouchableOpacity>
                         </View>
 
-                        {/* Modal notification sécurité */}
-                        <Modal
-                            visible={showSecurityNotice}
-                            transparent={true}
-                            animationType="fade"
-                        >
-                            <View style={styles.securityOverlay}>
-                                <View style={styles.securityModal}>
-                                    <Image
-                                        source={require('../../assets/twigapaie-logo.png')}
-                                        style={styles.securityLogo}
-                                        resizeMode="contain"
-                                    />
-                                    <Ionicons name="shield-checkmark" size={48} color="#4CAF50" />
-                                    <Text style={styles.securityTitle}>Paiement 100% Sécurisé</Text>
-                                    <Text style={styles.securityText}>
-                                        Votre transaction est sécurisée par TwigaPaie, 
-                                        conformément aux termes établis entre{' '}
-                                        <Text style={styles.boldText}>Femme d'Afrique Magazine</Text> et{' '}
-                                        <Text style={styles.boldText}>DefMaks</Text>.
-                                    </Text>
-                                    <Text style={styles.securitySubtext}>
-                                        Vos données de paiement sont cryptées et ne sont jamais stockées sur nos serveurs.
-                                    </Text>
-                                    <TouchableOpacity 
-                                        style={styles.securityButton}
-                                        onPress={() => setShowSecurityNotice(false)}
-                                    >
-                                        <Text style={styles.securityButtonText}>J'ai compris</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-                        </Modal>
-
                         {selectedMagazine && !paymentSuccess && (
                             <>
                                 {/* Info magazine */}
