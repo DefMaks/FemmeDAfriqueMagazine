@@ -312,30 +312,41 @@ const ShopScreen = () => {
         }
     };
 
-    const renderMagazine = ({ item }: { item: Magazine }) => (
-        <TouchableOpacity
-            style={styles.magazineCard}
-            onPress={() => handleOpenCheckout(item)}
-        >
-            <View style={styles.imageContainer}>
-                <Image
-                    source={{
-                        uri: item.better_featured_image?.source_url || item.dmks_featured_image?.src,
-                    }}
-                    style={styles.coverMagImage}
-                />
-                <View style={styles.dateBadge}>
-                    <Text style={styles.dateBadgeText}>{formatMagazineDate(item.date)}</Text>
+    const renderMagazine = ({ item }: { item: Magazine }) => {
+        const displayPrice = isTest 
+            ? `${TEST_PRICE_CDF} CDF TTC` 
+            : `$${(item.acf.prix_mag + item.acf.tva).toFixed(2)} TTC*`;
+        
+        return (
+            <TouchableOpacity
+                style={styles.magazineCard}
+                onPress={() => handleOpenCheckout(item)}
+            >
+                <View style={styles.imageContainer}>
+                    <Image
+                        source={{
+                            uri: item.better_featured_image?.source_url || item.dmks_featured_image?.src,
+                        }}
+                        style={styles.coverMagImage}
+                    />
+                    <View style={styles.dateBadge}>
+                        <Text style={styles.dateBadgeText}>{formatMagazineDate(item.date)}</Text>
+                    </View>
+                    {isTest && (
+                        <View style={styles.testBadge}>
+                            <Text style={styles.testBadgeText}>TEST</Text>
+                        </View>
+                    )}
                 </View>
-            </View>
-            
-            <View style={styles.magazineCardInfo}>
-                <Text style={styles.title}>N°{item.acf.numero}</Text>
-                <Text style={styles.info}>{item.acf.pages} pages</Text>
-                <Text style={styles.price}>${(item.acf.prix_mag + item.acf.tva).toFixed(2)} TTC*</Text>
-            </View>
-        </TouchableOpacity>
-    );
+                
+                <View style={styles.magazineCardInfo}>
+                    <Text style={styles.title}>N°{item.acf.numero}</Text>
+                    <Text style={styles.info}>{item.acf.pages} pages</Text>
+                    <Text style={styles.price}>{displayPrice}</Text>
+                </View>
+            </TouchableOpacity>
+        );
+    };
 
     if (loading) {
         return (
