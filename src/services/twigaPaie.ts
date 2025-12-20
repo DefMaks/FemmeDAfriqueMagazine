@@ -140,61 +140,63 @@ interface PhoneFormatResult {
 
 /**
  * Formate un numéro de téléphone pour l'API TwigaPaie et déduit le provider
- * Format attendu par TwigaPaie: +<CodePays><NuméroSansZeroInitial>
+ * Chaque opérateur a son propre format attendu par TwigaPaie
  * @param rawPhone Le numéro de téléphone saisi (commence par 243)
  * @returns Un objet contenant le numéro formaté, l'ID et le nom du fournisseur
  */
 export const formatPhoneAndDeduceProvider = (rawPhone: string): PhoneFormatResult => {
-  // Nettoyer le numéro de tous les caractères non numériques
-  let phone = rawPhone.replace(/[^0-9]/g, '');
+  // Nettoyer le numéro (espaces, tirets, parenthèses)
+  const phone = rawPhone.replace(/\s|-|\(|\)/g, '');
   
-  // Extraire le numéro local (sans code pays)
-  let localNumber = phone;
-  if (localNumber.startsWith('243')) {
-    localNumber = localNumber.substring(3);
+  // Normaliser le numéro (enlever le préfixe pays)
+  let normalizedPhone = phone;
+  if (normalizedPhone.startsWith('+243')) {
+    normalizedPhone = normalizedPhone.substring(4);
+  } else if (normalizedPhone.startsWith('243')) {
+    normalizedPhone = normalizedPhone.substring(3);
   }
   
   // Supprimer le zéro initial s'il existe
-  if (localNumber.startsWith('0')) {
-    localNumber = localNumber.substring(1);
+  if (normalizedPhone.startsWith('0')) {
+    normalizedPhone = normalizedPhone.substring(1);
   }
   
-  if (localNumber.length < 8) {
+  if (normalizedPhone.length < 8) {
     throw new PaymentError('Numéro de téléphone trop court.', 'FORMAT_ERROR', {}, false);
   }
   
-  const prefix = localNumber.substring(0, 2);
+  const prefix = normalizedPhone.substring(0, 2);
   
   let formattedPhone: string;
   let providerId: string;
   let providerName: string;
 
-  // Format selon la documentation TwigaPaie: +243XXXXXXXXX
+  // Format spécifique pour chaque opérateur selon TwigaPaie
   if (['80', '84', '85', '89'].includes(prefix)) {
-    // OrangeMoney (ID 10)
+    // OrangeMoney (ID 10): Format 0XXXXXXXXX
     providerId = '10';
     providerName = 'Orange Money';
-    formattedPhone = `+243${localNumber}`;
+    formattedPhone = `0${normalizedPhone}`;
   } else if (['81', '82', '83'].includes(prefix)) {
-    // Vodacom M-Pesa (ID 9)
+    // Vodacom M-Pesa (ID 9): Format 243XXXXXXXXX
     providerId = '9';
     providerName = 'Vodacom M-Pesa';
-    formattedPhone = `+243${localNumber}`;
+    formattedPhone = `243${normalizedPhone}`;
   } else if (['97', '98', '99'].includes(prefix)) {
-    // Airtel Money (ID 17)
+    // Airtel Money (ID 17): Format XXXXXXXXX (pas de préfixe)
     providerId = '17';
     providerName = 'Airtel Money';
-    formattedPhone = `+243${localNumber}`;
+    formattedPhone = normalizedPhone;
   } else if (['90'].includes(prefix)) {
-    // Africell (ID 19)
+    // Africell (ID 19): Format 0XXXXXXXXX
     providerId = '19';
     providerName = 'Africell';
-    formattedPhone = `+243${localNumber}`;
+    formattedPhone = `0${normalizedPhone}`;
   } else {
     console.warn(`⚠️ Préfixe non reconnu: ${prefix}. Utilisation de Vodacom par défaut.`);
     providerId = '9';
     providerName = 'Vodacom M-Pesa';
-    formattedPhone = `+243${localNumber}`;
+    formattedPhone = `243${normalizedPhone}`;
   }
 
   console.log(`📱 Formatage téléphone: ${rawPhone} -> ${formattedPhone} (${providerName})`);
