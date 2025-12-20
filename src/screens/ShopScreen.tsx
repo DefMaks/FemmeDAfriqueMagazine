@@ -37,7 +37,7 @@ import { Ionicons } from '@expo/vector-icons';
 const STORAGE_KEY_PHONE = '@fda_user_phone';
 
 // 🧪 Mode test : si true, le prix est de 100 CDF TTC
-const isTest = false;
+const isTest = true;
 const TEST_PRICE_CDF = 100;
 
 const ShopScreen = () => {
