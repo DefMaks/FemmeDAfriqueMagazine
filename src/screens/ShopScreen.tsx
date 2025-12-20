@@ -1050,6 +1050,20 @@ const styles = StyleSheet.create({
         color: '#4CAF50',
         marginBottom: 16,
     },
+    // Style pour le message de statut du paiement
+    statusMessageContainer: {
+        marginTop: 16,
+        padding: 12,
+        backgroundColor: '#F0F7FF',
+        borderRadius: 8,
+        borderLeftWidth: 3,
+        borderLeftColor: Colors.primary,
+    },
+    statusMessageText: {
+        fontSize: 14,
+        color: '#333',
+        textAlign: 'center',
+    },
     cardInfo: {
         fontSize: 14,
         color: '#666',
