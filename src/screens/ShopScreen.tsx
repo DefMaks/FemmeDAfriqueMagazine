@@ -570,7 +570,7 @@ const ShopScreen = () => {
                                                 <>
                                                     <Ionicons name="lock-closed" size={18} color="#FFF" />
                                                     <Text style={[styles.payButtonText, { marginLeft: 8 }]}>
-                                                        Payer ${totalPrice.toFixed(2)}
+                                                        Payer {isTest ? `${totalPrice} CDF` : `$${totalPrice.toFixed(2)}`}
                                                     </Text>
                                                 </>
                                             )}
@@ -597,6 +597,44 @@ const ShopScreen = () => {
                                 </TouchableOpacity>
                             </View>
                         )}
+
+                        {/* Pop-up de téléchargement */}
+                        <Modal
+                            visible={showDownloadPopup}
+                            transparent={true}
+                            animationType="fade"
+                        >
+                            <View style={styles.downloadPopupOverlay}>
+                                <View style={styles.downloadPopupModal}>
+                                    <View style={styles.downloadPopupIconContainer}>
+                                        <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
+                                    </View>
+                                    <Text style={styles.downloadPopupTitle}>🎉 Paiement réussi !</Text>
+                                    <Text style={styles.downloadPopupSubtitle}>
+                                        Votre magazine N°{selectedMagazine?.acf.numero} est prêt !
+                                    </Text>
+                                    <Text style={styles.downloadPopupText}>
+                                        Téléchargez dès maintenant votre magazine en PDF pour le lire hors-ligne.
+                                    </Text>
+                                    <TouchableOpacity 
+                                        style={styles.downloadPopupButton}
+                                        onPress={() => {
+                                            setShowDownloadPopup(false);
+                                            downloadPdf();
+                                        }}
+                                    >
+                                        <Ionicons name="download-outline" size={22} color="#FFF" />
+                                        <Text style={styles.downloadPopupButtonText}>Télécharger le PDF</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity 
+                                        style={styles.downloadPopupLaterButton}
+                                        onPress={() => setShowDownloadPopup(false)}
+                                    >
+                                        <Text style={styles.downloadPopupLaterText}>Plus tard</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </Modal>
                     </View>
                 </TouchableOpacity>
             </Modal>
