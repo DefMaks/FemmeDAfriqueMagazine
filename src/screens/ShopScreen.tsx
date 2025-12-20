@@ -150,6 +150,42 @@ const ShopScreen = () => {
         }
     };
 
+    // Fonction pour enregistrer l'achat sur DefMaks après succès
+    const recordSuccessfulPurchase = async (
+        orderId: string,
+        paymentMethodUsed: 'emoney' | 'ecard',
+        providerName?: string
+    ) => {
+        if (!selectedMagazine) return;
+        
+        try {
+            console.log('📝 Enregistrement de l\'achat sur DefMaks...');
+            
+            const result = await recordMagazinePurchase(
+                orderId,
+                phone,
+                {
+                    id: selectedMagazine.id,
+                    numero: selectedMagazine.acf.numero,
+                    title: selectedMagazine.title.rendered,
+                },
+                totalPrice.toString(),
+                currency,
+                paymentMethodUsed,
+                providerName
+            );
+            
+            if (result.success) {
+                console.log('✅ Achat enregistré sur DefMaks:', result.purchase_id);
+            } else {
+                console.warn('⚠️ Échec enregistrement DefMaks:', result.message);
+            }
+        } catch (error) {
+            console.error('❌ Erreur enregistrement DefMaks:', error);
+            // Ne pas bloquer le flux principal
+        }
+    };
+
     // Paiement E-Money avec polling optimisé
     const handleEmoneyPayment = async () => {
         if (!selectedMagazine) return;
