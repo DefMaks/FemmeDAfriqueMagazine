@@ -530,7 +530,9 @@ const ShopScreen = () => {
                                             {loadingPayment ? (
                                                 <ActivityIndicator color="#FFF" />
                                             ) : (
-                                                <Text style={styles.payButtonText}>Payer ${totalPrice.toFixed(2)}</Text>
+                                                <Text style={styles.payButtonText}>
+                                                    Payer {isTest ? `${totalPrice} CDF` : `$${totalPrice.toFixed(2)}`}
+                                                </Text>
                                             )}
                                         </TouchableOpacity>
                                     </View>
