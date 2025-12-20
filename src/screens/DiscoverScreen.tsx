@@ -296,7 +296,7 @@ const DiscoverScreen = () => {
                                 variant="horizontal"
                             />
                         )}
-                        keyExtractor={(item) => item.id.toString()}
+                        keyExtractor={(item, index) => `search_result_${item.id}_${index}`}
                         contentContainerStyle={styles.list}
                         ListEmptyComponent={
                             <View style={styles.emptyState}>
