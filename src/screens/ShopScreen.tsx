@@ -257,6 +257,7 @@ const ShopScreen = () => {
             const status = await checkCardPaymentStatus(orderNumber);
             if (status.status === 'success') {
                 setPaymentSuccess(true);
+                setShowDownloadPopup(true);
             } else {
                 Alert.alert(
                     'Paiement en attente', 
