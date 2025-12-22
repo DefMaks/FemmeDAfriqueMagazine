@@ -190,17 +190,27 @@ const HomeScreen = () => {
                 />
             </View>
 
-            {/* Slider principal */}
+            {/* Slider principal avec autoplay */}
             {sliderPosts.length > 0 && (
                 <View style={styles.section}>
                     <PostSlider 
                         posts={sliderPosts} 
                         onPress={handleArticlePress}
+                        autoPlay={true}
+                        autoPlayInterval={5000}
                     />
                 </View>
             )}
 
-            {/* Bannière publicitaire - Entre le slider et les derniers articles */}
+            {/* Encart publicitaire DefMaks - Zone Home */}
+            <DmksEncart 
+                zone="home" 
+                autoPlay={true}
+                autoPlayInterval={6000}
+                height={160}
+            />
+
+            {/* Bannière publicitaire WordPress (fallback) */}
             {getAdBannerImageUrl() && (
                 <View style={styles.adBannerSection}>
                     <TouchableOpacity 
