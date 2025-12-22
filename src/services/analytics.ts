@@ -68,19 +68,24 @@ class AnalyticsService {
         console.log('📊 Analytics Event:', eventData);
       }
 
-      // Envoyer à Supabase pour stockage
-      const { error } = await supabase
-        .from('analytics_events')
-        .insert(eventData);
+      // Envoyer à Supabase pour stockage (silencieux en cas d'erreur)
+      // Utiliser un timeout court pour ne pas bloquer l'app
+      const analyticsTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Analytics timeout')), 5000)
+      );
 
-      if (error && error.code !== '42P01') { // Ignore si la table n'existe pas encore
-        console.error('Analytics error:', error);
-        return false;
+      try {
+        await Promise.race([
+          supabase.from('analytics_events').insert(eventData),
+          analyticsTimeout
+        ]);
+      } catch {
+        // Ignorer silencieusement toutes les erreurs analytics
       }
 
       return true;
     } catch (error) {
-      console.error('Error tracking event:', error);
+      // Erreur silencieuse - analytics ne doit jamais crasher l'app
       return false;
     }
   }
@@ -105,19 +110,25 @@ class AnalyticsService {
         console.log('👁️ Article View:', viewData);
       }
 
-      // Enregistrer la vue dans Supabase
-      const { error } = await supabase
-        .from('article_views')
-        .insert({
-          article_id: viewData.article_id,
-          article_title: viewData.article_title,
-          user_id: viewData.user_id,
-          source: viewData.source,
-          viewed_at: viewData.timestamp,
-        });
+      // Enregistrer la vue dans Supabase (silencieux en cas d'erreur)
+      // Utiliser un timeout court pour ne pas bloquer l'app
+      const viewTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('View tracking timeout')), 5000)
+      );
 
-      if (error && error.code !== '42P01') { // Ignore si la table n'existe pas encore
-        console.error('Article view tracking error:', error);
+      try {
+        await Promise.race([
+          supabase.from('article_views').insert({
+            article_id: viewData.article_id,
+            article_title: viewData.article_title,
+            user_id: viewData.user_id,
+            source: viewData.source,
+            viewed_at: viewData.timestamp,
+          }),
+          viewTimeout
+        ]);
+      } catch {
+        // Ignorer silencieusement toutes les erreurs
       }
 
       // Track également comme événement générique
@@ -134,7 +145,7 @@ class AnalyticsService {
 
       return true;
     } catch (error) {
-      console.error('Error tracking article view:', error);
+      // Erreur silencieuse
       return false;
     }
   }
@@ -289,8 +300,9 @@ class AnalyticsService {
       }, {});
 
       // Trier par nombre de vues et limiter
-      return Object.values(viewCounts)
-        .sort((a: any, b: any) => b.view_count - a.view_count)
+      const results = Object.values(viewCounts) as { article_id: string; article_title: string; view_count: number; }[];
+      return results
+        .sort((a, b) => b.view_count - a.view_count)
         .slice(0, limit);
     } catch (error) {
       console.error('Error getting top articles:', error);

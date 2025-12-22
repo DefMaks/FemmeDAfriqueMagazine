@@ -1,25 +1,167 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+// src/screens/ProfileScreen.tsx
+import React, { useState, useEffect } from 'react';
+import { 
+    View, 
+    Text, 
+    StyleSheet, 
+    ScrollView, 
+    TouchableOpacity, 
+    Switch,
+    Modal,
+    TextInput,
+    Alert,
+    Linking
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as WebBrowser from 'expo-web-browser';
 import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 
+const STORAGE_KEYS = {
+    NOTIFICATIONS: '@fda_notifications',
+    USER_EMAIL: '@fda_user_email',
+    USER_PHONE: '@fda_user_phone',
+    SOCIAL_X: '@fda_social_x',
+    SOCIAL_FB: '@fda_social_fb',
+};
+
 const ProfileScreen = () => {
+    const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+    const [showEditModal, setShowEditModal] = useState(false);
+    
+    // États du formulaire
+    const [userEmail, setUserEmail] = useState('');
+    const [userPhone, setUserPhone] = useState('243');
+    const [socialX, setSocialX] = useState('');
+    const [socialFB, setSocialFB] = useState('');
+
+    // Charger les préférences au démarrage
+    useEffect(() => {
+        loadUserPreferences();
+    }, []);
+
+    const loadUserPreferences = async () => {
+        try {
+            const [notifications, email, phone, x, fb] = await Promise.all([
+                AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS),
+                AsyncStorage.getItem(STORAGE_KEYS.USER_EMAIL),
+                AsyncStorage.getItem(STORAGE_KEYS.USER_PHONE),
+                AsyncStorage.getItem(STORAGE_KEYS.SOCIAL_X),
+                AsyncStorage.getItem(STORAGE_KEYS.SOCIAL_FB),
+            ]);
+            
+            setNotificationsEnabled(notifications !== 'false');
+            if (email) setUserEmail(email);
+            if (phone) setUserPhone(phone);
+            if (x) setSocialX(x);
+            if (fb) setSocialFB(fb);
+        } catch (error) {
+            console.error('Erreur chargement préférences:', error);
+        }
+    };
+
+    const handleToggleNotifications = async (value: boolean) => {
+        setNotificationsEnabled(value);
+        try {
+            await AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, value.toString());
+            // Ici on pourrait aussi activer/désactiver OneSignal
+            console.log(`📱 Notifications ${value ? 'activées' : 'désactivées'}`);
+        } catch (error) {
+            console.error('Erreur sauvegarde notifications:', error);
+        }
+    };
+
+    const handleSaveProfile = async () => {
+        try {
+            await Promise.all([
+                AsyncStorage.setItem(STORAGE_KEYS.USER_EMAIL, userEmail),
+                AsyncStorage.setItem(STORAGE_KEYS.USER_PHONE, userPhone),
+                AsyncStorage.setItem(STORAGE_KEYS.SOCIAL_X, socialX),
+                AsyncStorage.setItem(STORAGE_KEYS.SOCIAL_FB, socialFB),
+            ]);
+            setShowEditModal(false);
+            Alert.alert('✅ Succès', 'Votre profil a été mis à jour.');
+        } catch (error) {
+            console.error('Erreur sauvegarde profil:', error);
+            Alert.alert('Erreur', 'Impossible de sauvegarder vos informations.');
+        }
+    };
+
+    const openAboutPage = async () => {
+        try {
+            await WebBrowser.openBrowserAsync('https://femmedafrique.net/a-propos/', {
+                showTitle: true,
+                enableBarCollapsing: true,
+            });
+        } catch (error) {
+            console.error('Erreur ouverture page:', error);
+        }
+    };
+
+    const openReclamationsPage = async () => {
+        try {
+            await WebBrowser.openBrowserAsync('https://femmedafrique.net/procedure-de-reclamation-des-lecteurs-et-abonnes/', {
+                showTitle: true,
+                enableBarCollapsing: true,
+            });
+        } catch (error) {
+            console.error('Erreur ouverture page:', error);
+        }
+    };
+
+    const openSupportEmail = () => {
+        Linking.openURL('mailto:support@defmaks.com?subject=Support FDA App');
+    };
+
     const menuItems = [
-        { id: '1', icon: 'person-outline', title: 'Modifier le profil', subtitle: 'Informations personnelles' },
-        { id: '2', icon: 'notifications-outline', title: 'Notifications', subtitle: 'Gérer vos préférences' },
-        { id: '3', icon: 'bookmark-outline', title: 'Mes favoris', subtitle: 'Articles sauvegardés' },
-        { id: '4', icon: 'card-outline', title: 'Abonnement', subtitle: 'Gérer votre abonnement' },
-        { id: '5', icon: 'help-circle-outline', title: 'Aide & Support', subtitle: 'FAQ et assistance' },
-        { id: '6', icon: 'settings-outline', title: 'Paramètres', subtitle: 'Préférences de l\'application' },
+        { 
+            id: '1', 
+            icon: 'person-outline', 
+            title: 'Modifier le profil', 
+            subtitle: 'Email, téléphone, réseaux sociaux',
+            action: () => setShowEditModal(true)
+        },
+        { 
+            id: '2', 
+            icon: 'notifications-outline', 
+            title: 'Notifications', 
+            subtitle: notificationsEnabled ? 'Activées' : 'Désactivées',
+            isToggle: true
+        },
+        { 
+            id: '3', 
+            icon: 'bookmark-outline', 
+            title: 'Mes favoris', 
+            subtitle: 'Articles sauvegardés',
+            action: () => {} // Navigation vers les favoris
+        },
+        { 
+            id: '4', 
+            icon: 'information-circle-outline', 
+            title: 'À Propos', 
+            subtitle: 'En savoir plus sur FDA',
+            action: openAboutPage
+        },
+        { 
+            id: '5', 
+            icon: 'chatbubble-ellipses-outline', 
+            title: 'Réclamations', 
+            subtitle: 'Procédure de réclamation',
+            action: openReclamationsPage
+        },
+        { 
+            id: '6', 
+            icon: 'help-circle-outline', 
+            title: 'Aide & Support', 
+            subtitle: 'Contactez-nous par email',
+            action: openSupportEmail
+        },
     ];
 
     return (
         <View style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>Profil</Text>
-                <TouchableOpacity style={styles.settingsButton}>
-                    <Ionicons name="settings-outline" size={24} color={Colors.text} />
-                </TouchableOpacity>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
@@ -32,12 +174,12 @@ const ProfileScreen = () => {
                             <Ionicons name="camera" size={16} color="#FFF" />
                         </TouchableOpacity>
                     </View>
-                    <Text style={styles.userName}>Utilisateur</Text>
-                    <Text style={styles.userEmail}>utilisateur@exemple.com</Text>
-                    <TouchableOpacity style={styles.premiumBadge} activeOpacity={0.8}>
-                        <Ionicons name="star" size={16} color="#FFD700" />
-                        <Text style={styles.premiumText}>Passer à Premium</Text>
-                    </TouchableOpacity>
+                    <Text style={styles.userName}>
+                        {userEmail || 'Utilisateur'}
+                    </Text>
+                    <Text style={styles.userEmail}>
+                        {userPhone !== '243' ? userPhone : 'Configurer votre profil'}
+                    </Text>
                 </View>
 
                 <View style={styles.statsCard}>
@@ -59,7 +201,13 @@ const ProfileScreen = () => {
 
                 <View style={styles.menuSection}>
                     {menuItems.map((item) => (
-                        <TouchableOpacity key={item.id} style={styles.menuItem} activeOpacity={0.8}>
+                        <TouchableOpacity 
+                            key={item.id} 
+                            style={styles.menuItem} 
+                            activeOpacity={0.8}
+                            onPress={item.action}
+                            disabled={item.isToggle}
+                        >
                             <View style={styles.menuIconContainer}>
                                 <Ionicons name={item.icon as any} size={24} color={Colors.primary} />
                             </View>
@@ -67,18 +215,95 @@ const ProfileScreen = () => {
                                 <Text style={styles.menuTitle}>{item.title}</Text>
                                 <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
+                            {item.isToggle ? (
+                                <Switch
+                                    value={notificationsEnabled}
+                                    onValueChange={handleToggleNotifications}
+                                    trackColor={{ false: '#D1D1D6', true: Colors.primary + '80' }}
+                                    thumbColor={notificationsEnabled ? Colors.primary : '#F4F3F4'}
+                                />
+                            ) : (
+                                <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
+                            )}
                         </TouchableOpacity>
                     ))}
                 </View>
 
-                <TouchableOpacity style={styles.logoutButton} activeOpacity={0.8}>
-                    <Ionicons name="log-out-outline" size={20} color={Colors.error} />
-                    <Text style={styles.logoutText}>Déconnexion</Text>
-                </TouchableOpacity>
-
                 <Text style={styles.version}>Version 1.0.0</Text>
             </ScrollView>
+
+            {/* Modal Modifier le profil */}
+            <Modal
+                visible={showEditModal}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setShowEditModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Modifier le profil</Text>
+                            <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                                <Ionicons name="close-circle" size={28} color="#888" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <Text style={styles.inputLabel}>Adresse email</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="votre@email.com"
+                                value={userEmail}
+                                onChangeText={setUserEmail}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                            />
+
+                            <Text style={styles.inputLabel}>Téléphone (pour achats)</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="243XXXXXXXXX"
+                                value={userPhone}
+                                onChangeText={setUserPhone}
+                                keyboardType="phone-pad"
+                                maxLength={12}
+                            />
+
+                            <Text style={styles.sectionLabel}>Réseaux sociaux</Text>
+                            
+                            <View style={styles.socialInputRow}>
+                                <View style={[styles.socialIcon, { backgroundColor: '#000' }]}>
+                                    <Ionicons name="logo-twitter" size={20} color="#FFF" />
+                                </View>
+                                <TextInput
+                                    style={[styles.input, styles.socialInput]}
+                                    placeholder="@votre_pseudo"
+                                    value={socialX}
+                                    onChangeText={setSocialX}
+                                    autoCapitalize="none"
+                                />
+                            </View>
+
+                            <View style={styles.socialInputRow}>
+                                <View style={[styles.socialIcon, { backgroundColor: '#1877F2' }]}>
+                                    <Ionicons name="logo-facebook" size={20} color="#FFF" />
+                                </View>
+                                <TextInput
+                                    style={[styles.input, styles.socialInput]}
+                                    placeholder="votre.nom.facebook"
+                                    value={socialFB}
+                                    onChangeText={setSocialFB}
+                                    autoCapitalize="none"
+                                />
+                            </View>
+
+                            <TouchableOpacity style={styles.saveButton} onPress={handleSaveProfile}>
+                                <Text style={styles.saveButtonText}>Enregistrer</Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -101,14 +326,6 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: '700',
         color: Colors.text,
-    },
-    settingsButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        backgroundColor: Colors.borderLight,
-        justifyContent: 'center',
-        alignItems: 'center',
     },
     content: {
         paddingBottom: 100,
@@ -160,21 +377,6 @@ const styles = StyleSheet.create({
     userEmail: {
         fontSize: 14,
         color: Colors.textSecondary,
-        marginBottom: 16,
-    },
-    premiumBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: Colors.primary,
-        paddingHorizontal: 20,
-        paddingVertical: 10,
-        borderRadius: 20,
-    },
-    premiumText: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#FFF',
-        marginLeft: 6,
     },
     statsCard: {
         flexDirection: 'row',
@@ -246,29 +448,90 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: Colors.textSecondary,
     },
-    logoutButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: Colors.backgroundLight,
-        marginHorizontal: 20,
-        marginTop: 24,
-        padding: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: Colors.error + '30',
-    },
-    logoutText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: Colors.error,
-        marginLeft: 8,
-    },
     version: {
         textAlign: 'center',
         fontSize: 12,
         color: Colors.textLight,
         marginTop: 24,
+    },
+    // Modal styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: '#FFF',
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 20,
+        maxHeight: '80%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#EEE',
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#333',
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#555',
+        marginBottom: 8,
+        marginTop: 16,
+    },
+    sectionLabel: {
+        fontSize: 16,
+        fontWeight: '700',
+        color: '#333',
+        marginTop: 24,
+        marginBottom: 8,
+    },
+    input: {
+        backgroundColor: '#F5F5F5',
+        borderRadius: 12,
+        padding: 14,
+        fontSize: 16,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+    },
+    socialInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 12,
+    },
+    socialIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    socialInput: {
+        flex: 1,
+        marginTop: 0,
+    },
+    saveButton: {
+        backgroundColor: Colors.primary,
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        marginTop: 30,
+        marginBottom: 20,
+    },
+    saveButtonText: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '700',
     },
 });
 

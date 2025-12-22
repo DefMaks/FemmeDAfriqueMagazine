@@ -8,30 +8,76 @@ import {
     StyleSheet,
     TouchableOpacity,
     Modal,
-    ScrollView,
     Alert,
     TextInput,
-    Keyboard
+    Keyboard,
+    ActivityIndicator,
+    Platform,
+    ScrollView,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getMagazines, getMedia } from '../services/api';
 import { Magazine } from '../models/Magazine';
 import { Colors } from '../theme/colors';
-import { initiatePayment, checkPaymentStatus } from '../services/twigaPaie';
+import { 
+    initiatePayment, 
+    checkPaymentStatus,
+    initiateCardPayment,
+    checkCardPaymentStatus,
+    openCardPaymentPageSimple,
+    formatPhoneAndDeduceProvider,
+    generateOrderId,
+    handlePaymentError,
+    pollPaymentStatus,
+    pollCardPaymentStatus,
+    isPaymentSuccessful,
+    isPaymentFailed,
+    PaymentMethod,
+    PaymentStatusResponse
+} from '../services/twigaPaie';
+import { recordMagazinePurchase } from '../services/defmaksApi';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import { Ionicons } from '@expo/vector-icons';
+
+const STORAGE_KEY_PHONE = '@fda_user_phone';
+
+// 🧪 Mode test : si true, le prix est de 100 CDF TTC
+const isTest = true;
+const TEST_PRICE_CDF = 100;
 
 const ShopScreen = () => {
     const [magazines, setMagazines] = useState<Magazine[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedMagazine, setSelectedMagazine] = useState<Magazine | null>(null);
-    const [phone, setPhone] = useState('');
+    const [phone, setPhone] = useState('243');
+    const [defaultPhone, setDefaultPhone] = useState('243');
     const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [loadingPayment, setLoadingPayment] = useState(false);
-    const [showInfoModal, setShowInfoModal] = useState(false);
+    const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+    const [detectedProvider, setDetectedProvider] = useState<string>('');
+    const [showSecurityNotice, setShowSecurityNotice] = useState(false);
+    const [currentOrderNumber, setCurrentOrderNumber] = useState<string>('');
+    const [paymentStatusMessage, setPaymentStatusMessage] = useState<string>('');
+    const [showDownloadPopup, setShowDownloadPopup] = useState(false);
 
     useEffect(() => {
         fetchMagazines();
+        loadDefaultPhone();
     }, []);
+
+    // Charger le numéro par défaut du profil
+    const loadDefaultPhone = async () => {
+        try {
+            const savedPhone = await AsyncStorage.getItem(STORAGE_KEY_PHONE);
+            if (savedPhone && savedPhone.length >= 5) {
+                setDefaultPhone(savedPhone);
+            }
+        } catch (error) {
+            console.log('Erreur chargement numéro par défaut');
+        }
+    };
 
     const fetchMagazines = async () => {
         try {
@@ -44,54 +90,337 @@ const ShopScreen = () => {
         }
     };
 
-    const totalPrice = selectedMagazine
-        ? selectedMagazine.acf.prix_mag + selectedMagazine.acf.tva
-        : 0;
+    // Prix total : en mode test = 100 CDF, sinon prix normal en USD
+    const totalPrice = isTest 
+        ? TEST_PRICE_CDF 
+        : (selectedMagazine ? selectedMagazine.acf.prix_mag + selectedMagazine.acf.tva : 0);
+    
+    // Devise selon le mode
+    const currency = isTest ? 'CDF' : 'USD';
 
     const handleOpenCheckout = (mag: Magazine) => {
         setSelectedMagazine(mag);
-        setShowInfoModal(true);
+        setShowCheckoutModal(true);
+        setShowSecurityNotice(true);
+        setPaymentMethod(null);
+        // Charger le numéro par défaut du profil
+        setPhone(defaultPhone || '243');
+        // Détecter le provider si numéro existant
+        if (defaultPhone && defaultPhone.length >= 5) {
+            try {
+                const { providerName } = formatPhoneAndDeduceProvider(defaultPhone);
+                setDetectedProvider(providerName);
+            } catch {
+                setDetectedProvider('');
+            }
+        } else {
+            setDetectedProvider('');
+        }
+        setCurrentOrderNumber('');
     };
 
     const closeCheckout = () => {
         setSelectedMagazine(null);
-        setPhone('');
+        setPhone('243');
         setPaymentSuccess(false);
-        setShowInfoModal(false);
+        setShowCheckoutModal(false);
+        setPaymentMethod(null);
+        setDetectedProvider('');
+        setShowSecurityNotice(false);
+        setCurrentOrderNumber('');
+        setShowDownloadPopup(false);
+        setPaymentStatusMessage('');
     };
 
-    const handlePayment = async () => {
+    const handlePhoneChange = (text: string) => {
+        if (!text.startsWith('243')) {
+            text = '243' + text.replace(/^243/, '');
+        }
+        setPhone(text);
+        
+        if (text.length >= 5) {
+            try {
+                const { providerName } = formatPhoneAndDeduceProvider(text);
+                setDetectedProvider(providerName);
+            } catch {
+                setDetectedProvider('');
+            }
+        } else {
+            setDetectedProvider('');
+        }
+    };
+
+    // Fonction pour enregistrer l'achat sur DefMaks après succès
+    const recordSuccessfulPurchase = async (
+        orderId: string,
+        paymentMethodUsed: 'emoney' | 'ecard',
+        providerName?: string
+    ) => {
         if (!selectedMagazine) return;
-        if (!phone.trim().startsWith('243')) {
-            Alert.alert('Erreur', 'Le numéro doit commencer par 243');
+        
+        try {
+            console.log('📝 Enregistrement de l\'achat sur DefMaks...');
+            
+            const result = await recordMagazinePurchase(
+                orderId,
+                phone,
+                {
+                    id: selectedMagazine.id,
+                    numero: String(selectedMagazine.acf.numero),
+                    title: selectedMagazine.title.rendered,
+                },
+                totalPrice.toString(),
+                currency,
+                paymentMethodUsed,
+                providerName
+            );
+            
+            if (result.success) {
+                console.log('✅ Achat enregistré sur DefMaks:', result.purchase_id);
+            } else {
+                console.warn('⚠️ Échec enregistrement DefMaks:', result.message);
+            }
+        } catch (error) {
+            console.error('❌ Erreur enregistrement DefMaks:', error);
+            // Ne pas bloquer le flux principal
+        }
+    };
+
+    // Paiement E-Money avec polling optimisé
+    const handleEmoneyPayment = async () => {
+        if (!selectedMagazine) return;
+        
+        if (phone.length < 12) {
+            Alert.alert('Erreur', 'Veuillez entrer un numéro de téléphone valide (12 chiffres)');
             return;
         }
 
         setLoadingPayment(true);
+        setPaymentStatusMessage('Initialisation du paiement...');
+        Keyboard.dismiss();
+
         try {
+            const orderId = generateOrderId();
+            setCurrentOrderNumber(orderId);
+            
             const result = await initiatePayment(
                 phone,
                 totalPrice.toString(),
-                `MAG-${selectedMagazine.id}`
+                orderId,
+                currency  // CDF en mode test, USD sinon
             );
 
-            setTimeout(async () => {
-                try {
-                    const status = await checkPaymentStatus(result.order_id);
-                    if (status.status === 'completed') {
-                        setPaymentSuccess(true);
-                    } else {
-                        Alert.alert('Paiement en attente', 'Veuillez vérifier plus tard.');
+            setPaymentStatusMessage('📱 Veuillez confirmer sur votre téléphone...');
+            
+            Alert.alert(
+                '📱 Paiement initié',
+                `Veuillez confirmer le paiement de ${totalPrice} ${currency} sur votre téléphone.\n\nVous recevrez une notification push de votre opérateur mobile.`,
+                [{ text: 'OK, je confirme' }]
+            );
+
+            // Polling avec mise à jour du statut
+            setPaymentStatusMessage('🔄 Vérification en cours...');
+            
+            const finalStatus = await pollPaymentStatus(
+                result.order_id,
+                8,  // 8 tentatives
+                4000,  // 4 secondes entre chaque
+                (status: PaymentStatusResponse) => {
+                    console.log('📊 Statut mis à jour:', status.status);
+                    if (status.status === 'pending') {
+                        setPaymentStatusMessage('⏳ En attente de confirmation...');
                     }
-                } catch (err) {
-                    Alert.alert('Erreur', 'Impossible de vérifier le paiement.');
-                } finally {
-                    setLoadingPayment(false);
                 }
-            }, 3000);
+            );
+
+            if (isPaymentSuccessful(finalStatus.status)) {
+                setPaymentStatusMessage('✅ Paiement confirmé !');
+                
+                // Enregistrer l'achat sur DefMaks
+                await recordSuccessfulPurchase(result.order_id, 'emoney', detectedProvider);
+                
+                setPaymentSuccess(true);
+                setShowDownloadPopup(true);
+            } else if (isPaymentFailed(finalStatus.status)) {
+                setPaymentStatusMessage('');
+                Alert.alert(
+                    '❌ Paiement échoué',
+                    `Le paiement a échoué (${finalStatus.rawStatus || finalStatus.status}). Veuillez réessayer.`,
+                    [{ text: 'OK' }]
+                );
+            } else {
+                // Toujours en attente après le polling
+                setPaymentStatusMessage('');
+                Alert.alert(
+                    '⏳ Paiement en attente', 
+                    'Le paiement n\'a pas encore été confirmé.\n\nVeuillez vérifier si vous avez reçu une demande de confirmation sur votre téléphone.',
+                    [
+                        { text: 'Annuler', style: 'cancel' },
+                        { text: 'Revérifier', onPress: () => recheckPayment(result.order_id) }
+                    ]
+                );
+            }
         } catch (error: any) {
-            console.error('Paiement échoué:', error);
-            Alert.alert('Erreur', 'Le paiement a échoué. Veuillez réessayer.');
+            setPaymentStatusMessage('');
+            handlePaymentError(error);
+        } finally {
+            setLoadingPayment(false);
+        }
+    };
+
+    const recheckPayment = async (orderId: string) => {
+        setLoadingPayment(true);
+        setPaymentStatusMessage('🔄 Vérification en cours...');
+        
+        try {
+            const status = await pollPaymentStatus(orderId, 3, 3000);
+            
+            if (isPaymentSuccessful(status.status)) {
+                setPaymentStatusMessage('✅ Paiement confirmé !');
+                
+                // Enregistrer l'achat sur DefMaks
+                await recordSuccessfulPurchase(orderId, 'emoney', detectedProvider);
+                
+                setPaymentSuccess(true);
+                setShowDownloadPopup(true);
+            } else if (isPaymentFailed(status.status)) {
+                setPaymentStatusMessage('');
+                Alert.alert('❌ Échec', `Le paiement a échoué: ${status.rawStatus || status.status}`);
+            } else {
+                setPaymentStatusMessage('');
+                Alert.alert(
+                    '⏳ En attente', 
+                    'Le paiement n\'est pas encore confirmé.\n\nAssurez-vous d\'avoir validé la demande sur votre téléphone.',
+                    [
+                        { text: 'OK' },
+                        { text: 'Réessayer', onPress: () => recheckPayment(orderId) }
+                    ]
+                );
+            }
+        } catch (err) {
+            setPaymentStatusMessage('');
+            handlePaymentError(err);
+        } finally {
+            setLoadingPayment(false);
+        }
+    };
+
+    // Paiement E-Card avec in-app browser
+    const handleCardPayment = async () => {
+        if (!selectedMagazine) return;
+
+        setLoadingPayment(true);
+        setPaymentStatusMessage('Initialisation du paiement par carte...');
+
+        try {
+            const orderId = generateOrderId();
+            const result = await initiateCardPayment(
+                totalPrice.toString(),
+                currency,  // CDF en mode test, USD sinon
+                `Magazine FDA N°${selectedMagazine.acf.numero}`,
+                orderId
+            );
+
+            if (result.redirect_url) {
+                setCurrentOrderNumber(result.orderNumber || orderId);
+                setPaymentStatusMessage('🌐 Ouverture de la page de paiement...');
+                
+                // Ouvrir le navigateur in-app
+                const browserResult = await openCardPaymentPageSimple(result.redirect_url);
+                
+                console.log('📱 Navigateur fermé, résultat:', browserResult);
+                
+                // Après fermeture du navigateur, vérifier le statut
+                setPaymentStatusMessage('🔄 Vérification du paiement...');
+                
+                // Polling pour vérifier le statut
+                const finalStatus = await pollCardPaymentStatus(
+                    result.orderNumber || orderId,
+                    5,  // 5 tentatives
+                    3000,  // 3 secondes entre chaque
+                    (status: PaymentStatusResponse) => {
+                        console.log('📊 Statut carte mis à jour:', status.status);
+                    }
+                );
+
+                if (isPaymentSuccessful(finalStatus.status)) {
+                    setPaymentStatusMessage('✅ Paiement confirmé !');
+                    
+                    // Enregistrer l'achat sur DefMaks
+                    await recordSuccessfulPurchase(result.orderNumber || orderId, 'ecard', 'FlexPay');
+                    
+                    setPaymentSuccess(true);
+                    setShowDownloadPopup(true);
+                } else if (isPaymentFailed(finalStatus.status)) {
+                    setPaymentStatusMessage('');
+                    Alert.alert(
+                        '❌ Paiement échoué',
+                        `Le paiement par carte a échoué (${finalStatus.rawStatus || finalStatus.status}).`,
+                        [{ text: 'OK' }]
+                    );
+                } else {
+                    // Toujours en attente - demander à l'utilisateur
+                    setPaymentStatusMessage('');
+                    Alert.alert(
+                        '🔍 Vérification du paiement',
+                        'Avez-vous complété le paiement par carte ?',
+                        [
+                            { 
+                                text: 'Non, annuler', 
+                                style: 'cancel',
+                            },
+                            { 
+                                text: 'Oui, vérifier', 
+                                onPress: () => verifyCardPayment(result.orderNumber || orderId) 
+                            }
+                        ]
+                    );
+                }
+            }
+        } catch (error: any) {
+            setPaymentStatusMessage('');
+            handlePaymentError(error);
+        } finally {
+            setLoadingPayment(false);
+        }
+    };
+
+    const verifyCardPayment = async (orderNumber: string) => {
+        setLoadingPayment(true);
+        setPaymentStatusMessage('🔄 Vérification en cours...');
+        
+        try {
+            const status = await pollCardPaymentStatus(orderNumber, 3, 3000);
+            
+            if (isPaymentSuccessful(status.status)) {
+                setPaymentStatusMessage('✅ Paiement confirmé !');
+                
+                // Enregistrer l'achat sur DefMaks
+                await recordSuccessfulPurchase(orderNumber, 'ecard', 'FlexPay');
+                
+                setPaymentSuccess(true);
+                setShowDownloadPopup(true);
+            } else if (isPaymentFailed(status.status)) {
+                setPaymentStatusMessage('');
+                Alert.alert(
+                    '❌ Paiement échoué', 
+                    `Le paiement a échoué: ${status.rawStatus || status.status}`
+                );
+            } else {
+                setPaymentStatusMessage('');
+                Alert.alert(
+                    '⏳ Paiement en attente', 
+                    'Le paiement n\'a pas encore été confirmé.',
+                    [
+                        { text: 'OK' },
+                        { text: 'Revérifier', onPress: () => verifyCardPayment(orderNumber) }
+                    ]
+                );
+            }
+        } catch (error) {
+            setPaymentStatusMessage('');
+            handlePaymentError(error);
+        } finally {
             setLoadingPayment(false);
         }
     };
@@ -102,13 +431,20 @@ const ShopScreen = () => {
             const media = await getMedia(selectedMagazine.acf.pdf);
             const pdfUrl = media.source_url;
             const filename = `FDA_N${selectedMagazine.acf.numero}.pdf`;
-            const localUri = `${FileSystem.Directory}${filename}`;
-            await FileSystem.downloadAsync(pdfUrl, localUri);
+            const documentDir = FileSystem.Paths?.document?.uri || FileSystem.Paths?.cache?.uri || '';
+            const localUri = `${documentDir}/${filename}`;
+            
+            // Télécharger le fichier
+            const downloadResult = await FileSystem.downloadAsync(pdfUrl, localUri);
 
-            if (await Sharing.isAvailableAsync()) {
-                await Sharing.shareAsync(localUri);
+            if (downloadResult.status === 200) {
+                if (await Sharing.isAvailableAsync()) {
+                    await Sharing.shareAsync(localUri);
+                } else {
+                    Alert.alert('Succès', `PDF sauvegardé : ${filename}`);
+                }
             } else {
-                Alert.alert('Succès', `PDF sauvegardé : ${filename}`);
+                throw new Error('Téléchargement échoué');
             }
         } catch (error) {
             console.error('Erreur PDF:', error);
@@ -116,31 +452,57 @@ const ShopScreen = () => {
         }
     };
 
-    const renderMagazine = ({ item }: { item: Magazine }) => (
-        <TouchableOpacity
-            style={styles.magazineCard}
-            onPress={() => handleOpenCheckout(item)}
-        >
-            <Image
-                source={{
-                    uri: item.better_featured_image?.source_url || item.dmks_featured_image?.src,
-                }}
-                style={styles.coverMagImage}
-            />
-            <View style={styles.magazineCardInfo}>
-                <Text style={styles.title}>N°{item.acf.numero}</Text>
-                {/* <Text style={styles.title}>{item.title.rendered}</Text> */}
-                <Text style={styles.info}>{item.acf.pages} pages</Text>
-                {/* <Text style={styles.info}>N°{item.acf.numero} • {item.acf.pages} pages</Text> */}
-                <Text style={styles.price}>${(item.acf.prix_mag + item.acf.tva).toFixed(2)} TTC*</Text>
-            </View>
-        </TouchableOpacity>
-    );
+    const formatMagazineDate = (dateString: string) => {
+        try {
+            const date = new Date(dateString);
+            const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+            return `${months[date.getMonth()]} ${date.getFullYear()}`;
+        } catch {
+            return '';
+        }
+    };
+
+    const renderMagazine = ({ item }: { item: Magazine }) => {
+        const displayPrice = isTest 
+            ? `${TEST_PRICE_CDF} CDF TTC` 
+            : `$${(item.acf.prix_mag + item.acf.tva).toFixed(2)} TTC*`;
+        
+        return (
+            <TouchableOpacity
+                style={styles.magazineCard}
+                onPress={() => handleOpenCheckout(item)}
+            >
+                <View style={styles.imageContainer}>
+                    <Image
+                        source={{
+                            uri: item.better_featured_image?.source_url || item.dmks_featured_image?.src,
+                        }}
+                        style={styles.coverMagImage}
+                    />
+                    <View style={styles.dateBadge}>
+                        <Text style={styles.dateBadgeText}>{formatMagazineDate(item.date)}</Text>
+                    </View>
+                    {isTest && (
+                        <View style={styles.testBadge}>
+                            <Text style={styles.testBadgeText}>TEST</Text>
+                        </View>
+                    )}
+                </View>
+                
+                <View style={styles.magazineCardInfo}>
+                    <Text style={styles.title}>N°{item.acf.numero}</Text>
+                    <Text style={styles.info}>{item.acf.pages} pages</Text>
+                    <Text style={styles.price}>{displayPrice}</Text>
+                </View>
+            </TouchableOpacity>
+        );
+    };
 
     if (loading) {
         return (
             <View style={styles.center}>
-                <Text>Chargement...</Text>
+                <ActivityIndicator size="large" color={Colors.primary} />
+                <Text style={styles.loadingText}>Chargement...</Text>
             </View>
         );
     }
@@ -158,126 +520,290 @@ const ShopScreen = () => {
                 columnWrapperStyle={styles.columnWrapper}
             />
 
-            {/* Overlay flou */}
-            {selectedMagazine && (
-                <View style={styles.overlay} />
-            )}
-
-            {/* Modal de checkout (moitié inférieure) */}
-            {selectedMagazine && (
-                <Modal transparent={true} animationType="slide">
-                    <TouchableOpacity
-                        style={styles.modalContainer}
-                        activeOpacity={1}
-                        onPress={() => Keyboard.dismiss()}
-                    >
-                        <View style={styles.modalContainer}>
-                            <View style={styles.checkoutPanel}>
-                                {/* En-tête */}
-                                <View style={styles.checkoutHeader}>
-                                    <Text style={styles.checkoutTitle}>Paiement sécurisé </Text>
-                                    <TouchableOpacity onPress={closeCheckout}>
-                                        <Text style={styles.closeButton}>×</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                {/* Info magazine */}
-                                {/* <View style={styles.magazineInfo}>
+            {/* Modal de checkout */}
+            <Modal
+                visible={showCheckoutModal}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={closeCheckout}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => Keyboard.dismiss()}
+                >
+                    <View style={styles.checkoutPanel}>
+                        {/* En-tête */}
+                        <View style={styles.checkoutHeader}>
+                            <View style={styles.headerLeft}>
                                 <Image
-                                    source={{
-                                        uri: selectedMagazine.better_featured_image?.source_url ||
-                                            selectedMagazine.dmks_featured_image?.src,
-                                    }}
-                                    style={styles.coverImage}
+                                    source={require('../../assets/twigapaie-logo.png')}
+                                    style={styles.twigaLogo}
+                                    resizeMode="contain"
                                 />
-                                <Text style={styles.magazineTitle}>{selectedMagazine.title.rendered}</Text>
-                                <Text style={styles.magazineDetails}>
-                                    N°{selectedMagazine.acf.numero} • {selectedMagazine.acf.pages} pages
-                                </Text>
-                                <Text style={styles.price}>${totalPrice.toFixed(2)} TTC*</Text>
-                                <Text style={styles.fees}>*Frais: {selectedMagazine.acf.prix_mag} $ + 3%</Text>
-                            </View> */}
+                                <Text style={styles.checkoutTitle}>Paiement sécurisé</Text>
+                            </View>
+                            <TouchableOpacity onPress={closeCheckout}>
+                                <Ionicons name="close-circle" size={28} color="#888" />
+                            </TouchableOpacity>
+                        </View>
 
+                        {selectedMagazine && !paymentSuccess && (
+                            <>
+                                {/* Info magazine */}
                                 <View style={styles.magazineInfo}>
-                                    <View style={styles.row}>
-                                        {/* Colonne gauche - Image */}
-                                        <View style={styles.column}>
-                                            <Image
-                                                source={{ uri: selectedMagazine.better_featured_image?.source_url || selectedMagazine.dmks_featured_image?.src }}
-                                                style={styles.coverImage}
-                                            />
-                                        </View>
-
-                                        {/* Colonne droite - Texte */}
-                                        <View style={styles.column}>
-                                            <Text style={styles.magazineTitle}>{selectedMagazine.title.rendered}</Text>
-                                            <Text style={styles.magazineDetails}>
-                                                N°{selectedMagazine.acf.numero} • {selectedMagazine.acf.pages} pages
-                                            </Text>
-                                            {/* <Text style={styles.magazineDetails}>
+                                    <Image
+                                        source={{ 
+                                            uri: selectedMagazine.better_featured_image?.source_url || 
+                                                 selectedMagazine.dmks_featured_image?.src 
+                                        }}
+                                        style={styles.checkoutCover}
+                                    />
+                                    <View style={styles.magazineDetails}>
+                                        <Text style={styles.magazineTitle}>{selectedMagazine.title.rendered}</Text>
+                                        <Text style={styles.magazineSubtitle}>
                                             N°{selectedMagazine.acf.numero} • {selectedMagazine.acf.pages} pages
-                                        </Text> */}
-                                            <Text style={[styles.price, { textAlign: 'center' }]}>${totalPrice.toFixed(2)} TTC*</Text>
-                                            <Text style={[styles.fees, { textAlign: 'center' }]}>*Frais: {selectedMagazine.acf.prix_mag} $ + 3%</Text>
-                                        </View>
+                                        </Text>
+                                        <Text style={styles.totalPrice}>
+                                            {isTest ? `${totalPrice} CDF` : `$${totalPrice.toFixed(2)}`} TTC
+                                        </Text>
+                                        {!isTest && (
+                                            <Text style={styles.fees}>*Inclus {selectedMagazine.acf.tva}$ de frais</Text>
+                                        )}
+                                        {isTest && (
+                                            <Text style={styles.testModeLabel}>🧪 Mode Test</Text>
+                                        )}
                                     </View>
                                 </View>
 
-                                {/* Modal info sécurité */}
-                                {showInfoModal && (
-                                    <Modal transparent={true} animationType="fade">
-                                        <View style={styles.infoModalOverlay}>
-                                            <View style={styles.infoModalContent}>
-                                                <Text style={styles.infoModalTitle}>✅ Paiement sécurisé</Text>
-                                                <Text style={styles.infoModalText}>
-                                                    Votre paiement est traité via TwigaPaie en toute sécurité.
-                                                </Text>
-                                                <TouchableOpacity style={styles.infoModalButton} onPress={() => setShowInfoModal(false)}>
-                                                    <Text style={styles.infoModalButtonText}>COMPRIS !</Text>
-                                                </TouchableOpacity>
+                                {/* Sélection méthode de paiement */}
+                                {!paymentMethod && (
+                                    <View style={styles.paymentMethods}>
+                                        <Text style={styles.sectionTitle}>Choisir le mode de paiement</Text>
+                                        
+                                        <TouchableOpacity
+                                            style={styles.paymentOption}
+                                            onPress={() => setPaymentMethod('emoney')}
+                                        >
+                                            <View style={styles.paymentOptionIcon}>
+                                                <Ionicons name="phone-portrait-outline" size={24} color={Colors.primary} />
                                             </View>
-                                        </View>
-                                    </Modal>
+                                            <View style={styles.paymentOptionText}>
+                                                <Text style={styles.paymentOptionTitle}>E-Money</Text>
+                                                <Text style={styles.paymentOptionSubtitle}>M-Pesa, Orange Money, Airtel Money</Text>
+                                            </View>
+                                            <Ionicons name="chevron-forward" size={20} color="#888" />
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                            style={styles.paymentOption}
+                                            onPress={() => setPaymentMethod('ecard')}
+                                        >
+                                            <View style={styles.paymentOptionIcon}>
+                                                <Ionicons name="card-outline" size={24} color={Colors.primary} />
+                                            </View>
+                                            <View style={styles.paymentOptionText}>
+                                                <Text style={styles.paymentOptionTitle}>E-Card</Text>
+                                                <Text style={styles.paymentOptionSubtitle}>Visa, Mastercard via FlexPay</Text>
+                                            </View>
+                                            <Ionicons name="chevron-forward" size={20} color="#888" />
+                                        </TouchableOpacity>
+                                    </View>
                                 )}
 
-                                {/* Formulaire ou succès */}
-                                {!paymentSuccess ? (
+                                {/* Formulaire E-Money */}
+                                {paymentMethod === 'emoney' && (
                                     <View style={styles.paymentForm}>
-                                        <Text style={styles.sectionTitle}>Payer avec e-money</Text>
-                                        <Text style={styles.phoneLabel}>Numéro (commence par 243)</Text>
+                                        <TouchableOpacity 
+                                            style={styles.backToMethods}
+                                            onPress={() => setPaymentMethod(null)}
+                                        >
+                                            <Ionicons name="arrow-back" size={20} color={Colors.primary} />
+                                            <Text style={styles.backText}>Changer de méthode</Text>
+                                        </TouchableOpacity>
+
+                                        <Text style={styles.sectionTitle}>Paiement E-Money</Text>
+                                        <Text style={styles.phoneLabel}>Numéro de téléphone (243...)</Text>
                                         <TextInput
                                             style={styles.phoneInput}
                                             placeholder="243XXXXXXXXX"
                                             value={phone}
-                                            onChangeText={setPhone}
+                                            onChangeText={handlePhoneChange}
                                             keyboardType="phone-pad"
+                                            maxLength={12}
                                         />
+                                        {detectedProvider ? (
+                                            <Text style={styles.providerDetected}>
+                                                📱 {detectedProvider} détecté
+                                            </Text>
+                                        ) : null}
+
                                         <TouchableOpacity
                                             style={[styles.payButton, loadingPayment && styles.payButtonDisabled]}
-                                            onPress={handlePayment}
+                                            onPress={handleEmoneyPayment}
                                             disabled={loadingPayment}
                                         >
-                                            <Text style={styles.payButtonText}>
-                                                {loadingPayment ? 'En cours...' : 'Acheter'}
-                                            </Text>
+                                            {loadingPayment ? (
+                                                <ActivityIndicator color="#FFF" />
+                                            ) : (
+                                                <Text style={styles.payButtonText}>
+                                                    Payer {isTest ? `${totalPrice} CDF` : `$${totalPrice.toFixed(2)}`}
+                                                </Text>
+                                            )}
                                         </TouchableOpacity>
-                                    </View>
-                                ) : (
-                                    <View style={styles.successContainer}>
-                                        <Text style={styles.successTitle}>🎉 Paiement réussi !</Text>
-                                        <TouchableOpacity style={styles.downloadButton} onPress={downloadPdf}>
-                                            <Text style={styles.downloadButtonText}>📥 Télécharger le PDF</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity style={styles.backButton} onPress={closeCheckout}>
-                                            <Text style={styles.backButtonText}>← Retour à la boutique</Text>
-                                        </TouchableOpacity>
+                                        
+                                        {/* Message de statut du paiement */}
+                                        {paymentStatusMessage ? (
+                                            <View style={styles.statusMessageContainer}>
+                                                <Text style={styles.statusMessageText}>{paymentStatusMessage}</Text>
+                                            </View>
+                                        ) : null}
                                     </View>
                                 )}
+
+                                {/* Formulaire E-Card */}
+                                {paymentMethod === 'ecard' && (
+                                    <View style={styles.paymentForm}>
+                                        <TouchableOpacity 
+                                            style={styles.backToMethods}
+                                            onPress={() => setPaymentMethod(null)}
+                                        >
+                                            <Ionicons name="arrow-back" size={20} color={Colors.primary} />
+                                            <Text style={styles.backText}>Changer de méthode</Text>
+                                        </TouchableOpacity>
+
+                                        <Text style={styles.sectionTitle}>Paiement par Carte</Text>
+                                        <Text style={styles.cardInfo}>
+                                            Vous serez redirigé vers la page de paiement sécurisée FlexPay pour entrer vos informations de carte.
+                                        </Text>
+
+                                        <View style={styles.cardIcons}>
+                                            <Ionicons name="card" size={36} color="#1A1F71" />
+                                            <Ionicons name="card" size={36} color="#FF5F00" style={{ marginLeft: 16 }} />
+                                        </View>
+
+                                        <TouchableOpacity
+                                            style={[styles.payButton, styles.cardPayButton, loadingPayment && styles.payButtonDisabled]}
+                                            onPress={handleCardPayment}
+                                            disabled={loadingPayment}
+                                        >
+                                            {loadingPayment ? (
+                                                <ActivityIndicator color="#FFF" />
+                                            ) : (
+                                                <>
+                                                    <Ionicons name="lock-closed" size={18} color="#FFF" />
+                                                    <Text style={[styles.payButtonText, { marginLeft: 8 }]}>
+                                                        Payer {isTest ? `${totalPrice} CDF` : `$${totalPrice.toFixed(2)}`}
+                                                    </Text>
+                                                </>
+                                            )}
+                                        </TouchableOpacity>
+                                        
+                                        {/* Message de statut du paiement */}
+                                        {paymentStatusMessage ? (
+                                            <View style={styles.statusMessageContainer}>
+                                                <Text style={styles.statusMessageText}>{paymentStatusMessage}</Text>
+                                            </View>
+                                        ) : null}
+                                    </View>
+                                )}
+                            </>
+                        )}
+
+                        {/* Succès */}
+                        {paymentSuccess && (
+                            <View style={styles.successContainer}>
+                                <Ionicons name="checkmark-circle" size={64} color="#4CAF50" />
+                                <Text style={styles.successTitle}>Paiement réussi !</Text>
+                                <Text style={styles.successSubtitle}>
+                                    Merci pour votre achat du Magazine N°{selectedMagazine?.acf.numero}
+                                </Text>
+                                <TouchableOpacity style={styles.downloadButton} onPress={downloadPdf}>
+                                    <Ionicons name="download-outline" size={20} color="#FFF" />
+                                    <Text style={styles.downloadButtonText}>Télécharger le PDF</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={styles.backButton} onPress={closeCheckout}>
+                                    <Text style={styles.backButtonText}>← Retour à la boutique</Text>
+                                </TouchableOpacity>
                             </View>
-                        </View>
-                    </TouchableOpacity>
-                </Modal>
-            )}
+                        )}
+
+                        {/* Pop-up de téléchargement */}
+                        <Modal
+                            visible={showDownloadPopup}
+                            transparent={true}
+                            animationType="fade"
+                        >
+                            <View style={styles.downloadPopupOverlay}>
+                                <View style={styles.downloadPopupModal}>
+                                    <View style={styles.downloadPopupIconContainer}>
+                                        <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
+                                    </View>
+                                    <Text style={styles.downloadPopupTitle}>🎉 Paiement réussi !</Text>
+                                    <Text style={styles.downloadPopupSubtitle}>
+                                        Votre magazine N°{selectedMagazine?.acf.numero} est prêt !
+                                    </Text>
+                                    <Text style={styles.downloadPopupText}>
+                                        Téléchargez dès maintenant votre magazine en PDF pour le lire hors-ligne.
+                                    </Text>
+                                    <TouchableOpacity 
+                                        style={styles.downloadPopupButton}
+                                        onPress={() => {
+                                            setShowDownloadPopup(false);
+                                            downloadPdf();
+                                        }}
+                                    >
+                                        <Ionicons name="download-outline" size={22} color="#FFF" />
+                                        <Text style={styles.downloadPopupButtonText}>Télécharger le PDF</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity 
+                                        style={styles.downloadPopupLaterButton}
+                                        onPress={() => setShowDownloadPopup(false)}
+                                    >
+                                        <Text style={styles.downloadPopupLaterText}>Plus tard</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </Modal>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+
+            {/* Modal notification sécurité TwigaPaie - Placé en dernier pour être au premier plan sur Android */}
+            <Modal
+                visible={showSecurityNotice}
+                transparent={true}
+                animationType="fade"
+                statusBarTranslucent={true}
+                hardwareAccelerated={true}
+            >
+                <View style={styles.securityOverlay}>
+                    <View style={styles.securityModal}>
+                        <Image
+                            source={require('../../assets/twigapaie-logo.png')}
+                            style={styles.securityLogo}
+                            resizeMode="contain"
+                        />
+                        <Ionicons name="shield-checkmark" size={48} color="#4CAF50" />
+                        <Text style={styles.securityTitle}>Paiement 100% Sécurisé</Text>
+                        <Text style={styles.securityText}>
+                            Votre transaction est sécurisée par TwigaPaie, 
+                            conformément aux termes établis entre{' '}
+                            <Text style={styles.boldText}>Femme d'Afrique Magazine</Text> et{' '}
+                            <Text style={styles.boldText}>DefMaks</Text>.
+                        </Text>
+                        <Text style={styles.securitySubtext}>
+                            Vos données de paiement sont cryptées et ne sont jamais stockées sur nos serveurs.
+                        </Text>
+                        <TouchableOpacity 
+                            style={styles.securityButton}
+                            onPress={() => setShowSecurityNotice(false)}
+                        >
+                            <Text style={styles.securityButtonText}>J'ai compris</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -285,17 +811,15 @@ const ShopScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.shadow,
-        // backgroundColor: Colors.background,
-        paddingTop: 45,
-        paddingBottom: 20,
+        backgroundColor: '#111',
+        paddingTop: 50,
         paddingHorizontal: 16,
     },
     header: {
         fontSize: 24,
         fontWeight: 'bold',
         marginBottom: 16,
-        color: Colors.border,
+        color: '#FFF',
         textAlign: 'center',
     },
     list: {
@@ -304,165 +828,316 @@ const styles = StyleSheet.create({
     columnWrapper: {
         justifyContent: 'space-between',
     },
-    magazineCardInfo: {
-        paddingHorizontal: 15,
-        paddingTop: 7,
-        paddingBottom: 15
+    center: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#111',
+    },
+    loadingText: {
+        marginTop: 12,
+        color: '#888',
+        fontSize: 16,
     },
     magazineCard: {
-        backgroundColor: '#ffffff',
+        backgroundColor: '#FFF',
         borderRadius: 12,
         marginBottom: 16,
-        // padding: 12,
         width: '48%',
-        shadowColor: '#b4b4b4',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
         elevation: 5,
-        borderColor: 'rgba((255,255,255), 0.4)',
-        borderWidth: 1,
+        overflow: 'hidden',
+    },
+    imageContainer: {
+        position: 'relative',
     },
     coverMagImage: {
         width: '100%',
         height: 250,
-        // borderRadius: 8,
-        borderTopLeftRadius: 8,
-        borderTopRightRadius: 8,
-        marginBottom: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.primary
+        borderTopLeftRadius: 12,
+        borderTopRightRadius: 12,
     },
-    // coverMagImage: {
-    //     width: '100%',
-    //     height: 200,
-    //     resizeMode: 'contain',
-    // },
+    dateBadge: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        backgroundColor: '#FFF',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+        elevation: 3,
+    },
+    dateBadgeText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#333',
+    },
+    magazineCardInfo: {
+        paddingHorizontal: 15,
+        paddingTop: 10,
+        paddingBottom: 15,
+    },
     title: {
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: 'bold',
-        color: Colors.text,
+        color: '#333',
         marginBottom: 4,
     },
     info: {
         fontSize: 13,
         color: '#666',
-        marginBottom: 4,
+        marginBottom: 6,
     },
     price: {
-        fontSize: 15,
+        fontSize: 16,
         fontWeight: 'bold',
         color: Colors.primary,
     },
-    center: {
+    modalOverlay: {
         flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    overlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'black',
-        opacity: 0.4,
-        zIndex: 10,
-    },
-    modalContainer: {
-        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.6)',
         justifyContent: 'flex-end',
     },
     checkoutPanel: {
-        height: '60%', // ← Moitié inférieure (ajustable)
         backgroundColor: '#FFF',
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
-        padding: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 10,
-        elevation: 10,
+        padding: 20,
+        maxHeight: '85%',
     },
     checkoutHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 16,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#EEE',
+    },
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    twigaLogo: {
+        width: 32,
+        height: 32,
+        marginRight: 10,
     },
     checkoutTitle: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: Colors.text,
+        color: '#333',
     },
-    closeButton: {
-        fontSize: 24,
-        color: '#888',
-    },
-    //
-    //
-
-    magazineInfo: {
-        marginVertical: 10,
-    },
-    row: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-    },
-    column: {
+    // Notification sécurité
+    securityOverlay: {
         flex: 1,
-        paddingHorizontal: 8,
-    },
-    coverImage: {
-        width: '100%',
-        height: 200,
-        resizeMode: 'contain',
-    },
-    //
-    //
-    _magazineInfo: {
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 20,
+        padding: 20,
     },
-    magazineTitle: {
-        fontSize: 18,
+    securityModal: {
+        backgroundColor: '#FFF',
+        borderRadius: 20,
+        padding: 24,
+        alignItems: 'center',
+        width: '100%',
+        maxWidth: 340,
+    },
+    securityLogo: {
+        width: 60,
+        height: 60,
+        marginBottom: 12,
+    },
+    securityTitle: {
+        fontSize: 20,
         fontWeight: 'bold',
-        textAlign: 'center',
-        marginVertical: 8,
+        color: '#333',
+        marginTop: 12,
+        marginBottom: 12,
     },
-    magazineDetails: {
+    securityText: {
         fontSize: 14,
+        color: '#555',
         textAlign: 'center',
+        lineHeight: 20,
         marginBottom: 8,
     },
-    fees: {
-        fontSize: 12,
-        color: '#666',
-        marginTop: 4,
+    boldText: {
+        fontWeight: 'bold',
+        color: Colors.primary,
     },
-    paymentForm: {
-        paddingVertical: 8,
+    securitySubtext: {
+        fontSize: 12,
+        color: '#888',
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    securityButton: {
+        backgroundColor: Colors.primary,
+        paddingVertical: 14,
+        paddingHorizontal: 40,
+        borderRadius: 25,
+    },
+    securityButtonText: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    // Info magazine
+    magazineInfo: {
+        flexDirection: 'row',
+        marginBottom: 20,
+        padding: 12,
+        backgroundColor: '#F8F8F8',
+        borderRadius: 12,
+    },
+    checkoutCover: {
+        width: 80,
+        height: 110,
+        borderRadius: 8,
+    },
+    magazineDetails: {
+        flex: 1,
+        marginLeft: 16,
+        justifyContent: 'center',
+    },
+    magazineTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 4,
+    },
+    magazineSubtitle: {
+        fontSize: 13,
+        color: '#666',
+        marginBottom: 8,
+    },
+    totalPrice: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: Colors.primary,
+    },
+    fees: {
+        fontSize: 11,
+        color: '#888',
+        marginTop: 2,
+    },
+    paymentMethods: {
+        marginBottom: 20,
     },
     sectionTitle: {
         fontSize: 16,
-        fontWeight: 'bold',
+        fontWeight: '600',
+        color: '#333',
         marginBottom: 12,
+    },
+    paymentOption: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 16,
+        backgroundColor: '#F8F8F8',
+        borderRadius: 12,
+        marginBottom: 10,
+        borderWidth: 1,
+        borderColor: '#EEE',
+    },
+    paymentOptionIcon: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#FFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+    },
+    paymentOptionText: {
+        flex: 1,
+    },
+    paymentOptionTitle: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#333',
+    },
+    paymentOptionSubtitle: {
+        fontSize: 12,
+        color: '#888',
+        marginTop: 2,
+    },
+    paymentForm: {
+        paddingTop: 8,
+    },
+    backToMethods: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    backText: {
+        color: Colors.primary,
+        marginLeft: 6,
+        fontSize: 14,
     },
     phoneLabel: {
         fontSize: 14,
+        color: '#555',
         marginBottom: 8,
     },
     phoneInput: {
         borderWidth: 1,
-        borderColor: '#ccc',
-        borderRadius: 8,
-        padding: 12,
+        borderColor: '#DDD',
+        borderRadius: 10,
+        padding: 14,
         fontSize: 16,
-        backgroundColor: '#FFF',
+        backgroundColor: '#FAFAFA',
+        marginBottom: 8,
+    },
+    providerDetected: {
+        fontSize: 13,
+        color: '#4CAF50',
         marginBottom: 16,
+    },
+    // Style pour le message de statut du paiement
+    statusMessageContainer: {
+        marginTop: 16,
+        padding: 12,
+        backgroundColor: '#F0F7FF',
+        borderRadius: 8,
+        borderLeftWidth: 3,
+        borderLeftColor: Colors.primary,
+    },
+    statusMessageText: {
+        fontSize: 14,
+        color: '#333',
+        textAlign: 'center',
+    },
+    cardInfo: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 16,
+        lineHeight: 20,
+    },
+    cardIcons: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginBottom: 20,
     },
     payButton: {
         backgroundColor: Colors.primary,
         padding: 16,
-        borderRadius: 8,
+        borderRadius: 12,
         alignItems: 'center',
+        justifyContent: 'center',
+        flexDirection: 'row',
+    },
+    cardPayButton: {
+        backgroundColor: '#1A1F71',
     },
     payButtonDisabled: {
         opacity: 0.7,
@@ -473,312 +1148,141 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
     successContainer: {
-        paddingVertical: 8,
         alignItems: 'center',
+        paddingVertical: 20,
     },
     successTitle: {
         fontSize: 22,
         fontWeight: 'bold',
-        color: Colors.primary,
+        color: '#4CAF50',
+        marginTop: 12,
+        marginBottom: 8,
+    },
+    successSubtitle: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
         marginBottom: 24,
     },
     downloadButton: {
         backgroundColor: Colors.primary,
-        padding: 14,
-        borderRadius: 8,
-        width: '80%',
+        flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 16,
+        padding: 14,
+        borderRadius: 10,
+        width: '80%',
+        justifyContent: 'center',
+        marginBottom: 12,
     },
     downloadButtonText: {
         color: '#FFF',
         fontSize: 16,
-        fontWeight: 'bold',
+        fontWeight: '600',
+        marginLeft: 8,
     },
     backButton: {
         padding: 10,
     },
     backButtonText: {
         color: Colors.primary,
-        fontSize: 16,
+        fontSize: 14,
     },
-    infoModalOverlay: {
+    // Styles pour le mode test
+    testBadge: {
+        position: 'absolute',
+        top: 12,
+        left: 12,
+        backgroundColor: '#FF9800',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+    },
+    testBadgeText: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        color: '#FFF',
+    },
+    testModeLabel: {
+        fontSize: 12,
+        color: '#FF9800',
+        fontWeight: '600',
+        marginTop: 4,
+    },
+    // Styles pour le pop-up de téléchargement
+    downloadPopupOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
+        backgroundColor: 'rgba(0,0,0,0.7)',
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    infoModalContent: {
-        backgroundColor: '#FFF',
         padding: 20,
-        marginHorizontal: 40,
-        borderRadius: 12,
-        alignItems: 'center',
     },
-    infoModalTitle: {
-        fontSize: 18,
+    downloadPopupModal: {
+        backgroundColor: '#FFF',
+        borderRadius: 24,
+        padding: 28,
+        alignItems: 'center',
+        width: '100%',
+        maxWidth: 340,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 10,
+    },
+    downloadPopupIconContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#E8F5E9',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    downloadPopupTitle: {
+        fontSize: 22,
         fontWeight: 'bold',
+        color: '#333',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    downloadPopupSubtitle: {
+        fontSize: 16,
+        fontWeight: '600',
         color: Colors.primary,
         marginBottom: 12,
-    },
-    infoModalText: {
-        fontSize: 14,
         textAlign: 'center',
-        marginBottom: 20,
     },
-    infoModalButton: {
+    downloadPopupText: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 20,
+        marginBottom: 24,
+    },
+    downloadPopupButton: {
         backgroundColor: Colors.primary,
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        borderRadius: 6,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 24,
+        borderRadius: 12,
+        width: '100%',
+        marginBottom: 12,
     },
-    infoModalButtonText: {
+    downloadPopupButtonText: {
         color: '#FFF',
-        fontWeight: 'bold',
+        fontSize: 16,
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    downloadPopupLaterButton: {
+        paddingVertical: 10,
+    },
+    downloadPopupLaterText: {
+        color: '#888',
+        fontSize: 14,
     },
 });
 
 export default ShopScreen;
-
-// // src/screens/ShopScreen.tsx
-// import React, { useEffect, useState } from 'react';
-// import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-// import { getMagazines, getMedia } from '../services/api';
-// import { Magazine } from '../models/Magazine';
-// import { Colors } from '../theme/colors';
-// import { Ionicons } from '@expo/vector-icons';
-// import { useNavigation } from '@react-navigation/native';
-
-// const ShopScreen = () => {
-//     const [magazines, setMagazines] = useState<Magazine[]>([]);
-//     const [loading, setLoading] = useState(true);
-//     const navigation = useNavigation<any>();
-
-
-//     useEffect(() => {
-//         fetchMagazines();
-//     }, []);
-
-//     const fetchMagazines = async () => {
-//         try {
-//             const data = await getMagazines(1, 10);
-//             setMagazines(data);
-//         } catch (error) {
-//             console.error('Erreur:', error);
-//         } finally {
-//             setLoading(false);
-//         }
-//     };
-
-//     const getPdfUrl = async (pdfId: number) => {
-//         try {
-//             const media = await getMedia(pdfId);
-//             return media.source_url;
-//         } catch (error) {
-//             console.error('Erreur récupération PDF:', error);
-//             return null;
-//         }
-//     };
-
-//     const renderMagazine = ({ item }: { item: Magazine }) => (
-//         <TouchableOpacity style={styles.magazineCard} activeOpacity={0.8} onPress={() => navigation.navigate('Checkout', { magazine: item })} // ← Ajouté
-//         >
-//             <View style={styles.imageContainer}>
-//                 <Image
-//                     source={{ uri: item.better_featured_image?.source_url || item.dmks_featured_image?.src }}
-//                     style={styles.coverImage}
-//                 />
-//                 <View style={styles.badge}>
-//                     <Text style={styles.badgeText}>N°{item.acf.numero}</Text>
-//                 </View>
-//             </View>
-//             <View style={styles.magazineInfo}>
-//                 <Text style={styles.title} numberOfLines={2}>{item.title.rendered}</Text>
-//                 <View style={styles.metaInfo}>
-//                     <Ionicons name="document-text-outline" size={14} color={Colors.textSecondary} />
-//                     <Text style={styles.pages}>{item.acf.pages} pages</Text>
-//                 </View>
-//                 <View style={styles.priceContainer}>
-//                     <Text style={styles.price}>${(item.acf.prix_mag + item.acf.tva).toFixed(2)}</Text>
-//                     <TouchableOpacity style={styles.addButton}>
-//                         <Ionicons name="cart-outline" size={18} color="#FFF" />
-//                     </TouchableOpacity>
-//                 </View>
-//             </View>
-//         </TouchableOpacity>
-//     );
-
-//     if (loading) {
-//         return (
-//             <View style={styles.loadingContainer}>
-//                 <ActivityIndicator size="large" color={Colors.primary} />
-//                 <Text style={styles.loadingText}>Chargement...</Text>
-//             </View>
-//         );
-//     }
-
-//     return (
-//         <View style={styles.container}>
-//             <View style={styles.header}>
-//                 <View>
-//                     <Text style={styles.headerSubtitle}>Explorez</Text>
-//                     <Text style={styles.headerTitle}>Notre Boutique</Text>
-//                 </View>
-//                 <TouchableOpacity style={styles.searchButton}>
-//                     <Ionicons name="search-outline" size={24} color={Colors.text} />
-//                 </TouchableOpacity>
-
-//             </View>
-
-//             {/* Bande disclaimer ici */}
-
-//             <FlatList
-//                 data={magazines}
-//                 renderItem={renderMagazine}
-//                 keyExtractor={(item) => item.id.toString()}
-//                 contentContainerStyle={styles.list}
-//                 numColumns={2}
-//                 columnWrapperStyle={styles.columnWrapper}
-//                 showsVerticalScrollIndicator={false}
-//             />
-//         </View>
-//     );
-// };
-
-// const styles = StyleSheet.create({
-//     container: {
-//         flex: 1,
-//         backgroundColor: '#000000',
-//     },
-//     header: {
-//         flexDirection: 'row',
-//         justifyContent: 'space-between',
-//         alignItems: 'center',
-//         paddingHorizontal: 20,
-//         paddingTop: 60,
-//         paddingBottom: 20,
-//         backgroundColor: '#000000',
-//     },
-//     headerSubtitle: {
-//         fontSize: 14,
-//         color: '#999999',
-//         marginBottom: 4,
-//     },
-//     headerTitle: {
-//         fontSize: 24,
-//         fontWeight: '700',
-//         color: '#FFFFFF',
-//     },
-//     searchButton: {
-//         width: 44,
-//         height: 44,
-//         borderRadius: 22,
-//         backgroundColor: Colors.borderLight,
-//         justifyContent: 'center',
-//         alignItems: 'center',
-//     },
-//     logoShop: {
-//         // width: 44,
-//         // height: 44,
-//         // borderRadius: 22,
-//         // backgroundColor: Colors.borderLight,
-//         // justifyContent: 'center',
-//         // alignItems: 'center',
-//         width: 40,
-//         height: 40,
-//         marginRight: 12,
-//     },
-//     list: {
-//         paddingHorizontal: 12,
-//         paddingTop: 12,
-//         paddingBottom: 100,
-//     },
-//     columnWrapper: {
-//         justifyContent: 'space-between',
-//         paddingHorizontal: 8,
-//     },
-//     magazineCard: {
-//         backgroundColor: Colors.backgroundLight,
-//         borderRadius: 16,
-//         marginBottom: 16,
-//         width: '48%',
-//         shadowColor: Colors.shadow,
-//         shadowOffset: { width: 0, height: 2 },
-//         shadowOpacity: 0.08,
-//         shadowRadius: 8,
-//         elevation: 3,
-//         overflow: 'hidden',
-//     },
-//     imageContainer: {
-//         position: 'relative',
-//     },
-//     coverImage: {
-//         width: '100%',
-//         height: 220,
-//     },
-//     badge: {
-//         position: 'absolute',
-//         top: 12,
-//         right: 12,
-//         backgroundColor: Colors.primary,
-//         paddingHorizontal: 10,
-//         paddingVertical: 6,
-//         borderRadius: 12,
-//     },
-//     badgeText: {
-//         fontSize: 11,
-//         fontWeight: '700',
-//         color: '#FFF',
-//     },
-//     magazineInfo: {
-//         padding: 12,
-//     },
-//     title: {
-//         fontSize: 14,
-//         fontWeight: '700',
-//         color: Colors.text,
-//         marginBottom: 8,
-//         lineHeight: 18,
-//     },
-//     metaInfo: {
-//         flexDirection: 'row',
-//         alignItems: 'center',
-//         marginBottom: 12,
-//     },
-//     pages: {
-//         fontSize: 12,
-//         color: Colors.textSecondary,
-//         marginLeft: 6,
-//     },
-//     priceContainer: {
-//         flexDirection: 'row',
-//         justifyContent: 'space-between',
-//         alignItems: 'center',
-//     },
-//     price: {
-//         fontSize: 18,
-//         fontWeight: '700',
-//         color: Colors.primary,
-//     },
-//     addButton: {
-//         width: 36,
-//         height: 36,
-//         borderRadius: 18,
-//         backgroundColor: Colors.primary,
-//         justifyContent: 'center',
-//         alignItems: 'center',
-//     },
-//     loadingContainer: {
-//         flex: 1,
-//         justifyContent: 'center',
-//         alignItems: 'center',
-//         backgroundColor: Colors.background,
-//     },
-//     loadingText: {
-//         marginTop: 16,
-//         fontSize: 16,
-//         color: Colors.textSecondary,
-//     },
-// });
-
-// export default ShopScreen;

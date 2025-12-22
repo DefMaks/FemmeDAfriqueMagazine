@@ -2,7 +2,7 @@ export default {
   expo: {
     name: "Femme D'Afrique Magazine",
     slug: "FemmeDAfriqueMagazine",
-    version: "1.0.0",
+    version: "2.0.0",
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
@@ -14,10 +14,16 @@ export default {
     },
     ios: {
       bundleIdentifier: "com.defmaks.fda",
-      supportsTablet: true
+      supportsTablet: true,
+      buildNumber: "14.0",  // Ajouté pour la version iOS
+      infoPlist: {
+        NSLocationWhenInUseUsageDescription: "Cette application n'utilise pas votre position. Certaines bibliothèques externes peuvent y faire référence, mais aucune donnée de localisation n'est collectée ni utilisée.",
+        ITSAppUsesNonExemptEncryption: false
+      }
     },
     android: {
       package: "com.defmaks.fda",
+      versionCode: 14,  // Ajouté pour la version Android
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
@@ -28,6 +34,10 @@ export default {
       favicon: "./assets/favicon.png"
     },
     extra: {
+      // EAS Project ID - AJOUTÉ
+      eas: {
+        projectId: "2226573c-1349-4d26-953b-92f717a4efb5"
+      },
       // Supabase Configuration
       EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
       EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,

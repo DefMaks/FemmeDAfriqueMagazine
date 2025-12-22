@@ -9,7 +9,7 @@ import {
     FlatList,
     ActivityIndicator,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
@@ -29,6 +29,10 @@ import CategoryCard from '../components/CategoryCard';
 import { analyticsService } from '../services/analytics';
 
 type DiscoverScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+type DiscoverScreenRouteProps = {
+    categoryId?: number;
+    categoryName?: string;
+};
 
 const FEATURED_CATEGORIES = {
     'Communiqués': 3038,
@@ -54,6 +58,9 @@ const CATEGORY_ICONS: { [key: string]: string } = {
 
 const DiscoverScreen = () => {
     const navigation = useNavigation<DiscoverScreenNavigationProp>();
+    const route = useRoute();
+    const params = route.params as DiscoverScreenRouteProps | undefined;
+    
     const [searchQuery, setSearchQuery] = useState('');
     const [categories, setCategories] = useState<Category[]>([]);
     const [featuredPosts, setFeaturedPosts] = useState<{ [key: string]: Post[] }>({});
@@ -73,14 +80,31 @@ const DiscoverScreen = () => {
     const [hasMore, setHasMore] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
 
+    // ⬇️ États pour le scroll infini dans les catégories
+    const [categoryPage, setCategoryPage] = useState(1);
+    const [categoryHasMore, setCategoryHasMore] = useState(true);
+    const [loadingMoreCategory, setLoadingMoreCategory] = useState(false);
+
+    // ⬇️ États pour le scroll infini dans la recherche
+    const [searchPage, setSearchPage] = useState(1);
+    const [searchHasMore, setSearchHasMore] = useState(true);
+    const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
+    const [currentSearchQuery, setCurrentSearchQuery] = useState('');
+
     useEffect(() => {
         loadCategories();
         loadFeaturedCategories();
-        loadPosts(1); // Chargement initial
+        loadPosts(1);
         
-        // 📊 Track screen view
         analyticsService.trackScreenView('Discover');
     }, []);
+
+    // Gérer la navigation avec paramètre de catégorie
+    useEffect(() => {
+        if (params?.categoryId && params?.categoryName) {
+            handleCategoryPress(params.categoryId, params.categoryName);
+        }
+    }, [params?.categoryId, params?.categoryName]);
 
     // ⬇️ Fonction générique de chargement des posts
     const loadPosts = async (pageNum: number, loadMore = false) => {
@@ -151,13 +175,40 @@ const DiscoverScreen = () => {
         setSelectedCategory(categoryId);
         setSelectedCategoryName(categoryName);
         setLoadingCategoryPosts(true);
+        setCategoryPage(1);
+        setCategoryHasMore(true);
+        setCategoryPosts([]);
         try {
             const posts = await getPostsByCategory(categoryId, 1, 10);
             setCategoryPosts(posts);
+            setCategoryHasMore(posts.length >= 10);
         } catch (err) {
             console.error('Error loading category posts:', err);
         } finally {
             setLoadingCategoryPosts(false);
+        }
+    };
+
+    // ⬇️ Fonction pour charger plus d'articles dans une catégorie
+    const loadMoreCategoryPosts = async () => {
+        if (loadingMoreCategory || !categoryHasMore || !selectedCategory) return;
+        
+        setLoadingMoreCategory(true);
+        try {
+            const nextPage = categoryPage + 1;
+            const morePosts = await getPostsByCategory(selectedCategory, nextPage, 10);
+            if (morePosts.length === 0) {
+                setCategoryHasMore(false);
+            } else {
+                setCategoryPosts(prev => [...prev, ...morePosts]);
+                setCategoryPage(nextPage);
+                setCategoryHasMore(morePosts.length >= 10);
+            }
+        } catch (err) {
+            console.error('Error loading more category posts:', err);
+            setCategoryHasMore(false);
+        } finally {
+            setLoadingMoreCategory(false);
         }
     };
 
@@ -171,16 +222,21 @@ const DiscoverScreen = () => {
             setIsSearching(false);
             setSearchResults([]);
             setSearchLoading(false);
+            setCurrentSearchQuery('');
             return;
         }
 
         setIsSearching(true);
         setSearchLoading(true);
         setSearchResults([]);
+        setSearchPage(1);
+        setSearchHasMore(true);
+        setCurrentSearchQuery(trimmed);
 
         try {
-            const results = await searchPosts(trimmed);
+            const results = await searchPosts(trimmed, 1, 10);
             setSearchResults(results);
+            setSearchHasMore(results.length >= 10);
             
             // 📊 Track search event
             analyticsService.trackSearch(trimmed, results.length);
@@ -188,6 +244,29 @@ const DiscoverScreen = () => {
             console.error('Error searching:', err);
         } finally {
             setSearchLoading(false);
+        }
+    };
+
+    // ⬇️ Fonction pour charger plus de résultats de recherche
+    const loadMoreSearchResults = async () => {
+        if (loadingMoreSearch || !searchHasMore || !currentSearchQuery) return;
+        
+        setLoadingMoreSearch(true);
+        try {
+            const nextPage = searchPage + 1;
+            const moreResults = await searchPosts(currentSearchQuery, nextPage, 10);
+            if (moreResults.length === 0) {
+                setSearchHasMore(false);
+            } else {
+                setSearchResults(prev => [...prev, ...moreResults]);
+                setSearchPage(nextPage);
+                setSearchHasMore(moreResults.length >= 10);
+            }
+        } catch (err) {
+            console.error('Error loading more search results:', err);
+            setSearchHasMore(false);
+        } finally {
+            setLoadingMoreSearch(false);
         }
     };
 
@@ -251,7 +330,7 @@ const DiscoverScreen = () => {
                                 variant="horizontal"
                             />
                         )}
-                        keyExtractor={(item) => item.id.toString()}
+                        keyExtractor={(item, index) => `search_result_${item.id}_${index}`}
                         contentContainerStyle={styles.list}
                         ListEmptyComponent={
                             <View style={styles.emptyState}>
@@ -259,14 +338,16 @@ const DiscoverScreen = () => {
                             </View>
                         }
                         ListFooterComponent={
-                            loadingMore ? (
+                            loadingMoreSearch ? (
                                 <View style={styles.loadingMore}>
                                     <ActivityIndicator size="small" color={Colors.primary} />
                                 </View>
+                            ) : !searchHasMore && searchResults.length > 0 ? (
+                                <Text style={styles.endOfList}>Fin des résultats</Text>
                             ) : null
                         }
-                        onEndReached={loadMore}
-                        onEndReachedThreshold={0.5}
+                        onEndReached={loadMoreSearchResults}
+                        onEndReachedThreshold={0.3}
                         showsVerticalScrollIndicator={false}
                     />
                 )}
@@ -310,18 +391,20 @@ const DiscoverScreen = () => {
                                 variant="horizontal"
                             />
                         )}
-                        keyExtractor={(item) => item.id.toString()}
+                        keyExtractor={(item, index) => `category_post_${item.id}_${index}`}
                         contentContainerStyle={styles.list}
                         showsVerticalScrollIndicator={false}
                         ListFooterComponent={
-                            loadingMore ? (
+                            loadingMoreCategory ? (
                                 <View style={styles.loadingMore}>
                                     <ActivityIndicator size="small" color={Colors.primary} />
                                 </View>
+                            ) : !categoryHasMore && categoryPosts.length > 0 ? (
+                                <Text style={styles.endOfList}>Fin des articles</Text>
                             ) : null
                         }
-                        onEndReached={loadMore}
-                        onEndReachedThreshold={0.5}
+                        onEndReached={loadMoreCategoryPosts}
+                        onEndReachedThreshold={0.3}
                     />
                 )}
             </View>
@@ -362,14 +445,14 @@ const DiscoverScreen = () => {
             {/* ✅ FlatList avec Infinite Scroll */}
             <FlatList
                 data={posts}
-                renderItem={({ item }) => (
+                renderItem={({ item, index }) => (
                     <ArticleCard
                         article={item}
                         onPress={() => handleArticlePress(item)}
                         variant="horizontal"
                     />
                 )}
-                keyExtractor={(item) => item.id.toString()}
+                keyExtractor={(item, index) => `post_${item.id}_${index}`}
                 onEndReached={loadMore}
                 onEndReachedThreshold={0.5}
                 contentContainerStyle={styles.content}
@@ -396,9 +479,8 @@ const DiscoverScreen = () => {
                                             horizontal
                                             showsHorizontalScrollIndicator={false}
                                             data={featuredPosts[name]}
-                                            renderItem={({ item }) => (
+                                            renderItem={({ item, index }) => (
                                                 <TouchableOpacity
-                                                    key={item.id}
                                                     style={styles.featuredPostCard}
                                                     onPress={() => handleArticlePress(item)}
                                                 >
@@ -407,7 +489,7 @@ const DiscoverScreen = () => {
                                                     </Text>
                                                 </TouchableOpacity>
                                             )}
-                                            keyExtractor={(item) => item.id.toString()}
+                                            keyExtractor={(item, index) => `featured_${name}_${item.id}_${index}`}
                                             contentContainerStyle={styles.featuredPostsScroll}
                                         />
                                     )}
@@ -429,18 +511,7 @@ const DiscoverScreen = () => {
                             </View>
                         </View>
 
-                        {/* Section "Derniers articles" */}
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Derniers articles</Text>
-                        </View>
                     </>
-                }
-                ListFooterComponent={
-                    loadingMore ? (
-                        <View style={styles.loadingMore}>
-                            <ActivityIndicator size="small" color={Colors.primary} />
-                        </View>
-                    ) : null
                 }
                 showsVerticalScrollIndicator={false}
             />
@@ -599,6 +670,12 @@ const styles = StyleSheet.create({
     loadingMore: {
         paddingVertical: 16,
         alignItems: 'center',
+    },
+    endOfList: {
+        textAlign: 'center',
+        color: Colors.textLight,
+        fontSize: 14,
+        paddingVertical: 20,
     },
 });
 

@@ -1,27 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Platform, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
-import { savedArticlesService } from '../services/supabaseService';
+import { saveArticle, isArticleSaved, removeArticle } from '../services/savedArticles';
+import { decodeHtmlEntities, getShareMessage } from '../utils/textUtils';
 
 interface ArticleCardProps {
   article: Post;
   onPress: () => void;
   variant?: 'horizontal' | 'vertical' | 'compact';
+  showActions?: boolean;
 }
 
-export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onPress, variant = 'horizontal' }) => {
+export const ArticleCard: React.FC<ArticleCardProps> = ({ 
+  article, 
+  onPress, 
+  variant = 'horizontal',
+  showActions = true 
+}) => {
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // checkIfSaved();
+    checkIfSaved();
   }, [article.id]);
 
   const checkIfSaved = async () => {
-    const saved = await savedArticlesService.isArticleSaved(article.id.toString());
-    setIsSaved(saved);
+    try {
+      const saved = await isArticleSaved(article.id);
+      setIsSaved(saved);
+    } catch (error) {
+      // Silencieux
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -37,29 +48,60 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onPress, vari
     return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   };
 
-  const stripHtml = (html: string) => {
-    return html.replace(/<[^>]*>/g, '').substring(0, 100) + '...';
+  const formatTitle = (title: string) => decodeHtmlEntities(title);
+
+  const getImageUrl = (): string | null => {
+    if (article.dmks_featured_image?.medium_large?.url) {
+      return article.dmks_featured_image.medium_large.url;
+    }
+    if (article.dmks_featured_image?.src) {
+      return article.dmks_featured_image.src;
+    }
+    if (article._embedded?.['wp:featuredmedia']?.[0]?.source_url) {
+      return article._embedded['wp:featuredmedia'][0].source_url;
+    }
+    return null;
   };
 
+  const imageUrl = getImageUrl();
+
   const toggleSave = async () => {
+    if (isLoading) return;
     setIsLoading(true);
-    if (isSaved) {
-      const success = await savedArticlesService.unsaveArticle(article.id.toString());
-      if (success) setIsSaved(false);
-    } else {
-      const success = await savedArticlesService.saveArticle(article);
-      if (success) setIsSaved(true);
+    try {
+      if (isSaved) {
+        await removeArticle(article.id);
+        setIsSaved(false);
+      } else {
+        await saveArticle(article);
+        setIsSaved(true);
+      }
+    } catch (error) {
+      console.error('Erreur sauvegarde:', error);
     }
     setIsLoading(false);
   };
 
+  const handleShare = async () => {
+    try {
+      const message = getShareMessage(article.title.rendered, article.link);
+      await Share.share({
+        message,
+        ...(Platform.OS === 'ios' && { url: article.link }),
+      });
+    } catch (error) {
+      console.error('Erreur partage:', error);
+    }
+  };
+
+  // Variant compact (sans actions)
   if (variant === 'compact') {
     return (
       <TouchableOpacity style={styles.horizontalCard} activeOpacity={0.8} onPress={onPress}>
         <View style={styles.horizontalContent}>
           <View style={styles.textContainer}>
             <Text style={styles.horizontalTitle} numberOfLines={2}>
-              {article.title.rendered}
+              {formatTitle(article.title.rendered)}
             </Text>
             <View style={styles.metaRow}>
               <View style={styles.metaItem}>
@@ -68,158 +110,202 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({ article, onPress, vari
               </View>
             </View>
           </View>
-          {article._embedded?.['wp:featuredmedia']?.[0]?.source_url && (
-            <Image
-              source={{ uri: article.dmks_featured_image.medium_large.url }}
-              // source={{ uri: article._embedded['wp:featuredmedia'][0].source_url }}
-              style={styles.compactImage}
-            />
+          {imageUrl && (
+            <Image source={{ uri: imageUrl }} style={styles.compactImage} />
           )}
         </View>
       </TouchableOpacity>
     );
   }
 
+  // Variant vertical (pour les listes horizontales)
   if (variant === 'vertical') {
     return (
       <TouchableOpacity style={styles.verticalCard} activeOpacity={0.8} onPress={onPress}>
-        {article._embedded?.['wp:featuredmedia']?.[0]?.source_url && (
-          <Image
-            source={{ uri: article.dmks_featured_image.medium_large.url }}
-
-            // source={{ uri: article._embedded['wp:featuredmedia'][0].source_url }}
-            style={styles.verticalImage}
-          />
-        )}
+        <View style={styles.imageWrapper}>
+          {imageUrl && (
+            <Image source={{ uri: imageUrl }} style={styles.verticalImage} />
+          )}
+          {showActions && (
+            <View style={styles.actionsOverlay}>
+              <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
+                <Ionicons name="share-social-outline" size={16} color="#FFF" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionBtn} onPress={toggleSave} disabled={isLoading}>
+                <Ionicons
+                  name={isSaved ? 'heart' : 'heart-outline'}
+                  size={16}
+                  color={isSaved ? '#FF4D67' : '#FFF'}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
         <View style={styles.verticalContent}>
           <Text style={styles.verticalTitle} numberOfLines={2}>
-            {article.title.rendered}
+            {formatTitle(article.title.rendered)}
           </Text>
-          <View style={styles.metaRow}>
-            <View style={styles.metaItem}>
-              <Ionicons name="time-outline" size={12} color={Colors.textLight} />
-              <Text style={styles.metaText}>{formatDate(article.date)}</Text>
-            </View>
-            <TouchableOpacity onPress={toggleSave} disabled={isLoading}>
-              <Ionicons
-                name={isSaved ? 'bookmark' : 'bookmark-outline'}
-                size={20}
-                color={isSaved ? Colors.primary : Colors.textLight}
-              />
-            </TouchableOpacity>
+          <View style={styles.metaItem}>
+            <Ionicons name="time-outline" size={12} color={Colors.textLight} />
+            <Text style={styles.metaText}>{formatDate(article.date)}</Text>
           </View>
         </View>
       </TouchableOpacity>
     );
   }
 
+  // Variant horizontal (par défaut)
   return (
     <TouchableOpacity style={styles.horizontalCard} activeOpacity={0.8} onPress={onPress}>
       <View style={styles.horizontalContent}>
         <View style={styles.textContainer}>
           <Text style={styles.horizontalTitle} numberOfLines={3}>
-            {article.title.rendered}
-          </Text>
-          <Text style={styles.excerpt} numberOfLines={2}>
-            {stripHtml(article.excerpt.rendered)}
+            {formatTitle(article.title.rendered)}
           </Text>
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
               <Ionicons name="time-outline" size={12} color={Colors.textLight} />
               <Text style={styles.metaText}>{formatDate(article.date)}</Text>
             </View>
-            <TouchableOpacity onPress={toggleSave} disabled={isLoading}>
-              <Ionicons
-                name={isSaved ? 'bookmark' : 'bookmark-outline'}
-                size={18}
-                color={isSaved ? Colors.primary : Colors.textLight}
-              />
-            </TouchableOpacity>
           </View>
         </View>
-        {article._embedded?.['wp:featuredmedia']?.[0]?.source_url && (
-          <Image
-            source={{ uri: article._embedded['wp:featuredmedia'][0].source_url }}
-            style={styles.horizontalImage}
-          />
-        )}
+        <View style={styles.imageWithActions}>
+          {imageUrl && (
+            <Image source={{ uri: imageUrl }} style={styles.horizontalImage} />
+          )}
+          {showActions && (
+            <View style={styles.horizontalActions}>
+              <TouchableOpacity style={styles.smallActionBtn} onPress={handleShare}>
+                <Ionicons name="share-social-outline" size={14} color="#666" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.smallActionBtn} onPress={toggleSave} disabled={isLoading}>
+                <Ionicons
+                  name={isSaved ? 'heart' : 'heart-outline'}
+                  size={14}
+                  color={isSaved ? Colors.primary : '#666'}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
+  // Horizontal card
   horizontalCard: {
     backgroundColor: Colors.backgroundLight,
-    marginHorizontal: 20,
-    marginBottom: 16,
     borderRadius: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
     overflow: 'hidden',
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   horizontalContent: {
     flexDirection: 'row',
-    padding: 16,
+    padding: 12,
   },
   textContainer: {
     flex: 1,
-    paddingRight: 12,
+    marginRight: 12,
+    justifyContent: 'space-between',
   },
   horizontalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '600',
     color: Colors.text,
-    lineHeight: 22,
+    lineHeight: 20,
     marginBottom: 8,
   },
-  excerpt: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    lineHeight: 18,
-    marginBottom: 12,
+  imageWithActions: {
+    alignItems: 'flex-end',
   },
   horizontalImage: {
     width: 100,
-    height: 100,
-    borderRadius: 12,
-  },
-  compactImage: {
-    width: 80,
     height: 80,
-    borderRadius: 12,
+    borderRadius: 10,
+    backgroundColor: Colors.borderLight,
   },
+  horizontalActions: {
+    flexDirection: 'row',
+    marginTop: 6,
+    gap: 8,
+  },
+  smallActionBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.borderLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Vertical card
   verticalCard: {
     backgroundColor: Colors.backgroundLight,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
+  },
+  imageWrapper: {
+    position: 'relative',
   },
   verticalImage: {
     width: '100%',
-    height: 150,
+    height: 140,
+    backgroundColor: Colors.borderLight,
+  },
+  actionsOverlay: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    flexDirection: 'row',
+    gap: 6,
+  },
+  actionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   verticalContent: {
     padding: 12,
   },
   verticalTitle: {
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
     color: Colors.text,
-    lineHeight: 20,
+    lineHeight: 18,
     marginBottom: 8,
   },
+  // Common
   metaRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   metaItem: {
     flexDirection: 'row',
@@ -229,5 +315,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textLight,
     marginLeft: 4,
+  },
+  compactImage: {
+    width: 80,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: Colors.borderLight,
   },
 });

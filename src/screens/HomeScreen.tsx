@@ -1,14 +1,14 @@
 // src/screens/HomeScreen.tsx
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
     View,
-    Text,
     StyleSheet,
     ScrollView,
     RefreshControl,
     Image,
     TouchableOpacity,
     Dimensions,
+    Platform,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,24 +16,28 @@ import {
     getPosts,
     getPostsByTag,
     getPostsByCategory,
-    getMedia,
+    getAdById,
 } from '../services/api';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { ArticleCard } from '../components/ArticleCard';
 import { PostSlider } from '../components/PostSlider';
 import { SectionHeader } from '../components/SectionHeader';
-import { AdBanner } from '../components/AdBanner';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { RootStackParamList } from '../navigation/RootNavigator';
-import * as Sharing from 'expo-sharing';
-import { saveArticle, isArticleSaved, removeArticle } from '../services/savedArticles';
-import { Ionicons } from '@expo/vector-icons';
-import ShopScreen from './ShopScreen';
+import { isArticleSaved } from '../services/savedArticles';
 import { analyticsService } from '../services/analytics';
 
-type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+const { width: screenWidth } = Dimensions.get('window');
+const AD_BANNER_HEIGHT = ((screenWidth - 32) * 406) / 1300; // Ratio 1300x406
+
+// ID de la publicité WordPress pour la zone sous le slider
+const HOME_AD_ID = 21755;
+
+type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList> & {
+    navigate: (screen: string) => void;
+};
 
 const SLIDER_TAG_ID = 184;
 const ESPACE_TENDRESSE_ID = 2483;
@@ -51,14 +55,35 @@ const HomeScreen = () => {
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [savedStatus, setSavedStatus] = useState<Record<number, boolean>>({});
+    const [homeBannerAd, setHomeBannerAd] = useState<any>(null);
 
     useEffect(() => {
         loadAllContent();
-        
-        // 📊 Track screen view
+        loadHomeBannerAd();
         analyticsService.trackScreenView('Home');
     }, []);
 
+    // Charger la publicité WordPress pour la zone sous le slider
+    const loadHomeBannerAd = async () => {
+        try {
+            const ad = await getAdById(HOME_AD_ID);
+            if (ad) {
+                setHomeBannerAd(ad);
+            }
+        } catch (error) {
+            console.log('Erreur chargement bannière pub:', error);
+        }
+    };
+
+    // Récupérer l'URL de l'image de la bannière pub
+    const getAdBannerImageUrl = (): string | null => {
+        if (!homeBannerAd) return null;
+        // Essayer différentes sources d'image
+        return homeBannerAd.better_featured_image?.source_url 
+            || homeBannerAd.dmks_featured_image?.src
+            || homeBannerAd.dmks_featured_image?.sizes?.large?.url
+            || null;
+    };
 
     const loadAllContent = async () => {
         try {
@@ -85,7 +110,6 @@ const HomeScreen = () => {
             setGastronomiePosts(gastronomieData);
             setLatestPosts(latestData);
 
-            // ✅ Charger l’état des favoris ici, une seule fois
             const allPosts = [
                 ...sliderData,
                 ...espaceTendresseData,
@@ -98,7 +122,6 @@ const HomeScreen = () => {
                 post.title?.rendered
             );
 
-            // ✅ OPTIMIZATION: Use Promise.all for parallel checks instead of sequential
             const statusChecks = allPosts.map(post => 
                 isArticleSaved(post.id).then(saved => ({ id: post.id, saved }))
             );
@@ -118,41 +141,29 @@ const HomeScreen = () => {
         }
     };
 
-
-
     const onRefresh = () => {
         setRefreshing(true);
         loadAllContent();
+        loadHomeBannerAd();
     };
 
-    // ✅ OPTIMIZATION: Memoize callbacks to prevent unnecessary re-renders
     const handleArticlePress = useCallback((article: Post) => {
         navigation.navigate('ArticleDetail', { article });
     }, [navigation]);
 
-    const handleSeeAll = useCallback((categoryId: number, title: string) => {
-        // Pour l'instant, on reste sur l'accueil
-        // À compléter plus tard avec DiscoverScreen
-    }, []);
+    const handleSeeAllArticles = useCallback(() => {
+        navigation.navigate('AllArticles');
+    }, [navigation]);
 
-    const sharePost = useCallback(async (post: Post) => {
-        const message = `${post.title.rendered}\n\nLire sur Femme d'Afrique : ${post.link}`;
-        await Sharing.shareAsync(message, { dialogTitle: 'Partager' });
-        
-        // 📊 Track share event
-        analyticsService.trackShare(post.id.toString(), post.title.rendered, 'native_share');
-    }, []);
+    const handleSeeAllCategory = useCallback((categoryId: number, categoryName: string) => {
+        // Naviguer vers l'onglet Découvrir avec la catégorie pré-sélectionnée
+        navigation.navigate('Main', {
+            screen: 'Découvrir',
+            params: { categoryId, categoryName },
+        } as any);
+    }, [navigation]);
 
-
-    const toggleSave = useCallback(async (post: Post) => {
-        const isSaved = savedStatus[post.id];
-        if (isSaved) {
-            await removeArticle(post.id);
-        } else {
-            await saveArticle(post);
-        }
-        setSavedStatus((prev) => ({ ...prev, [post.id]: !isSaved }));
-    }, [savedStatus]);
+    // Les boutons sont maintenant intégrés dans ArticleCard
 
     if (loading) {
         return <LoadingSpinner message="Chargement..." />;
@@ -162,146 +173,140 @@ const HomeScreen = () => {
         return <ErrorMessage message={error} onRetry={loadAllContent} />;
     }
 
-
-
-    // ✅ OPTIMIZATION: Memoize render function to prevent unnecessary re-renders
-    const renderArticleWithActions = useCallback((post: Post, variant: 'horizontal' | 'vertical' = 'horizontal') => (
-        <View style={styles.cardWrapper}>
-            <ArticleCard article={post} onPress={() => handleArticlePress(post)} variant={variant} />
-            <View style={styles.actionsContainer}>
-                {/* Bouton Partager */}
-                <TouchableOpacity style={styles.actionButton} onPress={() => sharePost(post)}>
-                    <Ionicons name="share-social-outline" size={18} color="#666" />
-                </TouchableOpacity>
-                {/* Bouton Favori */}
-                <TouchableOpacity style={styles.actionButton} onPress={() => toggleSave(post)}>
-                    <Ionicons
-                        name={savedStatus[post.id] ? 'heart' : 'heart-outline'}
-                        size={18}
-                        color={savedStatus[post.id] ? Colors.primary : '#666'}
-                    />
-                </TouchableOpacity>
-            </View>
-        </View>
-    ), [savedStatus, handleArticlePress, sharePost, toggleSave]);
-
     return (
-        <View style={styles.container}>
+        <ScrollView
+            style={styles.container}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
+            }
+        >
             <View style={styles.header}>
                 <Image
-                    source={require('../../assets/fda.png')}
+                    source={require('../../assets/logo.png')}
                     style={styles.logo}
                     resizeMode="contain"
                 />
-
-
             </View>
 
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        tintColor={Colors.primary}
-                        colors={[Colors.primary]}
+            {/* Slider principal */}
+            {sliderPosts.length > 0 && (
+                <View style={styles.section}>
+                    <PostSlider 
+                        posts={sliderPosts} 
+                        onPress={handleArticlePress}
                     />
-                }
-            >
-                {sliderPosts.length > 0 && (
-                    <View style={styles.section}>
-                        <SectionHeader title="À LA UNE" icon="star" color={Colors.primary} />
-                        <PostSlider posts={sliderPosts} onPress={handleArticlePress} />
-                    </View>
-                )}
+                </View>
+            )}
 
-                <View style={styles.bannerWrapper}>
-                    <TouchableOpacity onPress={() => {
-                        navigation.navigate('Boutique');
-                    }}>
+            {/* Bannière publicitaire - Entre le slider et les derniers articles */}
+            {getAdBannerImageUrl() && (
+                <View style={styles.adBannerSection}>
+                    <TouchableOpacity 
+                        onPress={() => navigation.navigate('Boutique')}
+                        activeOpacity={0.9}
+                    >
                         <Image
-                            source={require('../../assets/Banniere_FDA.jpg')}
-                            style={styles.banner}
-                            resizeMode="contain" />
+                            source={{ uri: getAdBannerImageUrl()! }}
+                            style={styles.adBannerImage}
+                            resizeMode="cover"
+                        />
                     </TouchableOpacity>
                 </View>
+            )}
 
-                {latestPosts.length > 0 && (
-                    <View style={styles.section}>
-                        <SectionHeader title="Derniers articles" icon="time-outline" color={Colors.primary} />
-                        <View style={styles.latestGrid}>
-                            {latestPosts.map((post) => (
-                                <View key={post.id} style={styles.latestCard}>
-                                    {renderArticleWithActions(post, 'horizontal')}
-                                </View>
-                            ))}
-                        </View>
-                    </View>
-                )}
-
-                {espaceTendressePosts.length > 0 && (
-                    <View style={styles.section}>
-                        <SectionHeader
-                            title="Espace Tendresse"
-                            icon="heart"
-                            color="#FF6B9D"
-                            onSeeAll={() => handleSeeAll(ESPACE_TENDRESSE_ID, 'Espace Tendresse')}
+            {/* Derniers articles */}
+            {latestPosts.length > 0 && (
+                <View style={styles.section}>
+                    <SectionHeader title="Derniers articles" onSeeAll={handleSeeAllArticles} />
+                    {latestPosts.map((post, index) => (
+                        <ArticleCard 
+                            key={`latest_${post.id}_${index}`}
+                            article={post} 
+                            onPress={() => handleArticlePress(post)} 
+                            variant="horizontal" 
                         />
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.horizontalScroll}
-                        >
-                            {espaceTendressePosts.map((post) => (
-                                <View key={post.id} style={styles.horizontalCard}>
-                                    {renderArticleWithActions(post, 'horizontal')}
-                                </View>
-                            ))}
-                        </ScrollView>
-                    </View>
-                )}
+                    ))}
+                </View>
+            )}
 
-                <AdBanner zone="home" />
+            {/* Espace Tendresse */}
+            {espaceTendressePosts.length > 0 && (
+                <View style={styles.section}>
+                    <SectionHeader
+                        title="Espace Tendresse"
+                        onSeeAll={() => handleSeeAllCategory(ESPACE_TENDRESSE_ID, 'Espace Tendresse')}
+                    />
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.horizontalList}
+                    >
+                        {espaceTendressePosts.map((post, index) => (
+                            <View key={`espace_${post.id}_${index}`} style={styles.horizontalCard}>
+                                <ArticleCard 
+                                    article={post} 
+                                    onPress={() => handleArticlePress(post)} 
+                                    variant="vertical" 
+                                />
+                            </View>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
 
-                {entrepreneuriatPosts.length > 0 && (
-                    <View style={styles.section}>
-                        <SectionHeader
-                            title="Entrepreneuriat"
-                            icon="briefcase"
-                            color="#4834DF"
-                            onSeeAll={() => handleSeeAll(ENTREPRENEURIAT_ID, 'Entrepreneuriat')}
-                        />
-                        <View style={styles.listSection}>
-                            {entrepreneuriatPosts.map((post) => (
-                                <View key={post.id} style={styles.listItem}>
-                                    {renderArticleWithActions(post, 'horizontal')}
-                                </View>
-                            ))}
-                        </View>
-                    </View>
-                )}
+            {/* Entrepreneuriat */}
+            {entrepreneuriatPosts.length > 0 && (
+                <View style={styles.section}>
+                    <SectionHeader
+                        title="Entrepreneuriat"
+                        onSeeAll={() => handleSeeAllCategory(ENTREPRENEURIAT_ID, 'Entrepreneuriat')}
+                    />
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.horizontalList}
+                    >
+                        {entrepreneuriatPosts.map((post, index) => (
+                            <View key={`entrepreneur_${post.id}_${index}`} style={styles.horizontalCard}>
+                                <ArticleCard 
+                                    article={post} 
+                                    onPress={() => handleArticlePress(post)} 
+                                    variant="vertical" 
+                                />
+                            </View>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
 
-                {gastronomiePosts.length > 0 && (
-                    <View style={styles.section}>
-                        <SectionHeader
-                            title="Gastronomie"
-                            icon="restaurant"
-                            color="#26DE81"
-                            onSeeAll={() => handleSeeAll(GASTRONOMIE_ID, 'Gastronomie')}
-                        />
-                        <View style={styles.listSection}>
-                            {gastronomiePosts.map((post) => (
-                                <View key={post.id} style={styles.listItem}>
-                                    {renderArticleWithActions(post, 'horizontal')}
-                                </View>
-                            ))}
-                        </View>
-                    </View>
-                )}
+            {/* Gastronomie */}
+            {gastronomiePosts.length > 0 && (
+                <View style={styles.section}>
+                    <SectionHeader
+                        title="Gastronomie"
+                        onSeeAll={() => handleSeeAllCategory(GASTRONOMIE_ID, 'Gastronomie')}
+                    />
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.horizontalList}
+                    >
+                        {gastronomiePosts.map((post, index) => (
+                            <View key={`gastro_${post.id}_${index}`} style={styles.horizontalCard}>
+                                <ArticleCard 
+                                    article={post} 
+                                    onPress={() => handleArticlePress(post)} 
+                                    variant="vertical" 
+                                />
+                            </View>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
 
-                <View style={styles.bottomPadding} />
-            </ScrollView>
-        </View>
+            <View style={styles.footer} />
+        </ScrollView>
     );
 };
 
@@ -311,85 +316,36 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.background,
     },
     header: {
-        flexDirection: 'row',
+        paddingTop: Platform.OS === 'ios' ? 60 : 50,
+        paddingBottom: 16,
         alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingTop: 60,
-        paddingBottom: 8,
         backgroundColor: Colors.backgroundLight,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.borderLight,
     },
     logo: {
-        width: 110,
+        width: 180,
         height: 50,
-        marginRight: 12,
-    },
-    bannerWrapper: {
-        width: Dimensions.get('window').width - 40,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        // marginBottom: 16,
-        borderRadius: 8,
-        overflow: 'hidden',
-        textAlign: 'center',
-        alignSelf: 'center',
-    },
-    banner: {
-        width: '100%',
-        height: 150,
-        // marginVertical: 16,
     },
     section: {
-        marginTop: 24,
+        marginBottom: 24,
     },
-    latestGrid: {
-        paddingHorizontal: 20,
+    adBannerSection: {
+        paddingHorizontal: 16,
+        marginBottom: 20,
     },
-    latestCard: {
-        marginBottom: 12,
+    adBannerImage: {
+        width: '100%',
+        height: AD_BANNER_HEIGHT,
+        borderRadius: 12,
+        backgroundColor: '#f0f0f0',
     },
-    horizontalScroll: {
-        paddingLeft: 20,
-        paddingRight: 32,
+    horizontalList: {
+        paddingHorizontal: 16,
     },
     horizontalCard: {
-        width: 280,
+        width: 200,
         marginRight: 16,
     },
-    listSection: {
-        paddingHorizontal: 20,
-    },
-    listItem: {
-        marginBottom: 12,
-    },
-    cardWrapper: {
-        position: 'relative',
-    },
-    actionsContainer: {
-        position: 'absolute',
-        top: 8,
-        right: 8,
-        flexDirection: 'row',
-        gap: 8,
-    },
-    actionButton: {
-        backgroundColor: '#FFF',
-        borderRadius: 16,
-        width: 32,
-        height: 32,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.15,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    bottomPadding: {
+    footer: {
         height: 100,
     },
 });

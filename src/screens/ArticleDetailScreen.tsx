@@ -5,19 +5,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { savedArticlesService } from '../services/supabaseService';
-import axios from 'axios';
-import { CommentsList } from '../components/CommentsList';
+import { CommentsSection } from '../components/CommentsSection';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import RenderHtml from 'react-native-render-html';
-import { WebView } from 'react-native-webview';
 import { analyticsService } from '../services/analytics';
-
-
+import { getAdsByZoneId } from '../services/api';
+import { InlineAdBanner, AppAd } from '../components/InlineAdBanner';
 
 const { width } = Dimensions.get('window');
 const screenWidth = Dimensions.get('window').width;
 const height = Dimensions.get('window').height;
+
+// Zone ID pour les pubs dans l'écran de lecture
+const IN_READ_AD_ZONE_ID = 18751;
 
 type ArticleDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'ArticleDetail'>;
 
@@ -27,33 +28,30 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
   const { article } = route.params;
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [comments, setComments] = useState<any[]>([]);
-  const [loadingComments, setLoadingComments] = useState(true);
+  const [inReadAds, setInReadAds] = useState<AppAd[]>([]);
 
   useEffect(() => {
-    // checkIfSaved();
-    loadComments();
-    
     // 📊 Track article view
     analyticsService.trackArticleView(
       article.id.toString(),
       article.title.rendered,
       'article_detail'
     );
+    
+    // Charger les pubs pour la zone de lecture
+    loadInReadAds();
   }, [article.id, article.title.rendered]);
 
-  const loadComments = async () => {
+  const loadInReadAds = async () => {
     try {
-      const response = await axios.get(
-        `https://femmedafrique.net/wp-json/wp/v2/comments?post=${article.id}`
-      );
-      setComments(response.data);
+      const ads = await getAdsByZoneId(IN_READ_AD_ZONE_ID);
+      setInReadAds(ads);
     } catch (error) {
-      console.error('Error loading comments:', error);
-    } finally {
-      setLoadingComments(false);
+      console.log('Erreur chargement pubs in-read:', error);
     }
   };
+
+  // Les commentaires sont maintenant gérés par CommentsSection
 
   const checkIfSaved = async () => {
     const saved = await savedArticlesService.isArticleSaved(article.id.toString());
@@ -74,13 +72,47 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
 
   const handleShare = async () => {
     try {
+      const shareMessage = `${decodeHtmlEntities(article.title.rendered)}
+
+Lire sur Femme d'Afrique : ${article.link}
+
+Téléchargez notre application sur
+Playstore: https://bit.ly/461FINi
+AppStore : Bientôt disponible`;
+
       await Share.share({
-        message: `${article.title.rendered}\n\nLire sur Femme d'Afrique : ${article.link}`,
+        message: shareMessage,
         url: article.link,
       });
     } catch (error) {
       console.error('Error sharing:', error);
     }
+  };
+
+  // Fonction de décodage des entités HTML
+  const decodeHtmlEntities = (text: string): string => {
+    if (!text) return '';
+    return text
+      .replace(/&rsquo;/g, "'")
+      .replace(/&lsquo;/g, "'")
+      .replace(/&#039;/g, "'")
+      .replace(/&#8217;/g, "'")
+      .replace(/&ldquo;/g, '"')
+      .replace(/&rdquo;/g, '"')
+      .replace(/&quot;/g, '"')
+      .replace(/&eacute;/g, 'é')
+      .replace(/&egrave;/g, 'è')
+      .replace(/&ecirc;/g, 'ê')
+      .replace(/&agrave;/g, 'à')
+      .replace(/&acirc;/g, 'â')
+      .replace(/&ocirc;/g, 'ô')
+      .replace(/&ucirc;/g, 'û')
+      .replace(/&ccedil;/g, 'ç')
+      .replace(/&amp;/g, '&')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&ndash;/g, '–')
+      .replace(/&mdash;/g, '—')
+      .replace(/&hellip;/g, '…');
   };
 
   const formatDate = (dateString: string) => {
@@ -129,7 +161,7 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
         )}
 
         <View style={styles.content}>
-          <Text style={styles.title}>{article.title.rendered}</Text>
+          <Text style={styles.title} selectable>{decodeHtmlEntities(article.title.rendered)}</Text>
 
           <View style={styles.meta}>
             <View style={styles.metaItem}>
@@ -140,38 +172,56 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
 
           <View style={styles.divider} />
 
+          {/* Pub avant le contenu */}
+          {inReadAds.length > 0 && (
+            <View style={styles.inContentAd}>
+              <InlineAdBanner ad={inReadAds[0]} />
+            </View>
+          )}
+
           {/* <Text style={styles.body}>{stripHtml(article.content.rendered)}</Text> */}
           {/* <View style={styles.body}> */}
           <RenderHtml
-            // contentWidth={300} // Largeur du contenu
-            contentWidth={screenWidth - 40} // Padding inclus
+            contentWidth={screenWidth - 40}
             source={{ html: article.content.rendered }}
+            defaultTextProps={{
+              selectable: true, // Activer la sélection de texte
+            }}
+            baseStyle={{
+              fontSize: 17,
+              lineHeight: 28,
+              color: Colors.text,
+            }}
             tagsStyles={{
               img: { maxWidth: screenWidth - 52, borderRadius: 8, marginVertical: 5, overflow: 'hidden' },
-              figure: { marginVertical: 10, marginHorizontal: 5, width: 400, height: 'auto' },
-              p: { marginBottom: 15, marginTop: 5 },
+              figure: { marginVertical: 10, marginHorizontal: 5, width: screenWidth - 52, height: 'auto' },
+              p: { marginBottom: 15, marginTop: 5, fontSize: 17, lineHeight: 28 },
               strong: { fontWeight: '700' },
-              h1: { fontSize: 24, fontWeight: '700', marginBottom: 10 },
-              h2: { fontSize: 22, fontWeight: '700', marginBottom: 10 },
-              h3: { fontSize: 20, fontWeight: '700', marginBottom: 10 },
-              h4: { fontSize: 18, fontWeight: '700', marginBottom: 10 },
+              h1: { fontSize: 24, fontWeight: '700', marginBottom: 10, marginTop: 20 },
+              h2: { fontSize: 22, fontWeight: '700', marginBottom: 10, marginTop: 18 },
+              h3: { fontSize: 20, fontWeight: '700', marginBottom: 10, marginTop: 16 },
+              h4: { fontSize: 18, fontWeight: '700', marginBottom: 10, marginTop: 14 },
               h5: { fontSize: 16, fontWeight: '700', marginBottom: 10 },
               h6: { fontSize: 14, fontWeight: '700', marginBottom: 10 },
-              em: {
-                fontStyle: 'italic'
-              }
+              em: { fontStyle: 'italic' },
+              a: { color: Colors.primary, textDecorationLine: 'underline' },
+              blockquote: { 
+                borderLeftWidth: 4, 
+                borderLeftColor: Colors.primary, 
+                paddingLeft: 16, 
+                marginVertical: 16,
+                fontStyle: 'italic',
+                backgroundColor: '#f5f5f5',
+                padding: 12,
+                borderRadius: 8,
+              },
+              ul: { marginVertical: 10 },
+              ol: { marginVertical: 10 },
+              li: { marginBottom: 8 },
             }}
             classesStyles={{
-              'wp-block-image': { backgroundColor: '#f5f5f5' },
-              'body': {
-                // fontSize: 50,
-                // paddingHorizontal: 2,
-              },
-              'MsoNormal': {
-                fontSize: 17,
-                color: Colors.text,
-                // lineHeight: 28,
-              }
+              'wp-block-image': { backgroundColor: '#f5f5f5', borderRadius: 8 },
+              'MsoNormal': { fontSize: 17, color: Colors.text, lineHeight: 28 },
             }}
           />
           {/* <WebView
@@ -181,15 +231,17 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
           /> */}
           {/* </View> */}
 
-          <View style={styles.commentsSection}>
-            <Text style={styles.commentsTitle}>Commentaires ({comments.length})</Text>
-            {loadingComments ? (
-              <Text style={styles.loadingText}>Chargement des commentaires...</Text>
-            ) : (
-              <CommentsList comments={comments} />
-            )}
-          </View>
         </View>
+
+        {/* Pub après le contenu (utilise la 2ème pub si disponible, sinon la 1ère) */}
+        {inReadAds.length > 0 && (
+          <InlineAdBanner ad={inReadAds.length > 1 ? inReadAds[1] : inReadAds[0]} />
+        )}
+
+        {/* Section Commentaires */}
+        <CommentsSection postId={article.id} />
+        
+        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
@@ -279,6 +331,10 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     textAlign: 'center',
     padding: 20,
+  },
+  inContentAd: {
+    marginHorizontal: -20, // Compenser le padding du content pour avoir 100% width
+    marginBottom: 16,
   },
 });
 
