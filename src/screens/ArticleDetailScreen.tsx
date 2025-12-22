@@ -187,6 +187,16 @@ AppStore : Bientôt disponible`;
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerButton}
+            onPress={toggleLike}
+          >
+            <Ionicons
+              name={isLiked ? 'heart' : 'heart-outline'}
+              size={24}
+              color={isLiked ? '#FF4444' : Colors.text}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerButton}
             onPress={toggleSave}
             disabled={isLoading}
           >
