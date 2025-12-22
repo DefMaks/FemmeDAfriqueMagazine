@@ -478,59 +478,133 @@ const ShopScreen = () => {
         }
     };
 
+    const [downloadProgress, setDownloadProgress] = useState(0);
+
     const downloadPdf = async () => {
         if (!selectedMagazine) return;
         
-        setPaymentStatusMessage('📥 Téléchargement en cours...');
+        setDownloadProgress(0);
+        setPaymentStatusMessage('📥 Préparation du téléchargement...');
         
         try {
             const media = await getMedia(selectedMagazine.acf.pdf);
             const pdfUrl = media.source_url;
             const filename = `FDA_N${selectedMagazine.acf.numero}.pdf`;
             
-            // Utiliser le répertoire cache ou document
-            const cacheDir = LegacyFileSystem.cacheDirectory;
-            const localUri = `${cacheDir}${filename}`;
+            // Utiliser le répertoire documents pour persistance
+            const documentDir = LegacyFileSystem.documentDirectory;
+            const localUri = `${documentDir}${filename}`;
             
             console.log(`📥 Téléchargement PDF: ${pdfUrl}`);
             console.log(`📁 Destination: ${localUri}`);
             
-            // Télécharger le fichier avec l'API legacy
-            const downloadResult = await LegacyFileSystem.downloadAsync(pdfUrl, localUri);
+            // Afficher le toast de début de téléchargement
+            Toast.show({
+                type: 'info',
+                text1: '📥 Téléchargement en cours',
+                text2: `Le fichier sera enregistré sous: ${filename}`,
+                position: 'top',
+                visibilityTime: 3000,
+            });
 
-            if (downloadResult.status === 200) {
-                setPaymentStatusMessage('');
-                
-                Toast.show({
-                    type: 'success',
-                    text1: '✅ Téléchargement terminé',
-                    text2: 'Ouverture du partage...',
-                    position: 'top',
-                    visibilityTime: 2000,
-                });
-                
-                if (await Sharing.isAvailableAsync()) {
-                    await Sharing.shareAsync(downloadResult.uri, {
-                        mimeType: 'application/pdf',
-                        dialogTitle: `Magazine FDA N°${selectedMagazine.acf.numero}`,
-                    });
-                } else {
-                    Alert.alert('Succès', `PDF sauvegardé : ${filename}`);
+            // Créer un callback de progression
+            const downloadResumable = LegacyFileSystem.createDownloadResumable(
+                pdfUrl,
+                localUri,
+                {},
+                (downloadProgress) => {
+                    const progress = downloadProgress.totalBytesWritten / downloadProgress.totalBytesExpectedToWrite;
+                    const percentage = Math.round(progress * 100);
+                    setDownloadProgress(percentage);
+                    setPaymentStatusMessage(`📥 Téléchargement: ${percentage}%`);
                 }
+            );
+
+            const downloadResult = await downloadResumable.downloadAsync();
+
+            if (downloadResult && downloadResult.status === 200) {
+                setPaymentStatusMessage('');
+                setDownloadProgress(100);
+                
+                // Afficher alerte avec le chemin du fichier
+                Alert.alert(
+                    '✅ Téléchargement terminé',
+                    `Votre magazine a été enregistré avec succès.\n\n📁 Fichier: ${filename}\n📂 Dossier: Documents de l'application`,
+                    [
+                        {
+                            text: 'Fermer',
+                            style: 'cancel',
+                        },
+                        {
+                            text: '📖 Ouvrir le PDF',
+                            onPress: () => openPdf(downloadResult.uri, filename),
+                        },
+                        {
+                            text: '📤 Partager',
+                            onPress: () => sharePdf(downloadResult.uri, filename),
+                        },
+                    ]
+                );
             } else {
-                throw new Error(`Téléchargement échoué (status: ${downloadResult.status})`);
+                throw new Error(`Téléchargement échoué (status: ${downloadResult?.status})`);
             }
         } catch (error: any) {
             console.error('Erreur PDF:', error);
             setPaymentStatusMessage('');
+            setDownloadProgress(0);
             
             Toast.show({
                 type: 'error',
                 text1: '❌ Erreur de téléchargement',
-                text2: 'Impossible de télécharger le PDF. Réessayez.',
+                text2: error.message || 'Impossible de télécharger le PDF. Réessayez.',
                 position: 'top',
                 visibilityTime: 4000,
             });
+        }
+    };
+
+    const openPdf = async (uri: string, filename: string) => {
+        try {
+            if (Platform.OS === 'ios') {
+                // Sur iOS, utiliser Sharing pour ouvrir avec une autre app
+                await Sharing.shareAsync(uri, {
+                    mimeType: 'application/pdf',
+                    UTI: 'com.adobe.pdf',
+                });
+            } else {
+                // Sur Android, utiliser IntentLauncher
+                const contentUri = await LegacyFileSystem.getContentUriAsync(uri);
+                await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+                    data: contentUri,
+                    flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+                    type: 'application/pdf',
+                });
+            }
+        } catch (error: any) {
+            console.error('Erreur ouverture PDF:', error);
+            // Fallback: proposer le partage
+            Toast.show({
+                type: 'info',
+                text1: 'Aucune app PDF trouvée',
+                text2: 'Utilisez le partage pour ouvrir le fichier',
+                position: 'top',
+            });
+            sharePdf(uri, filename);
+        }
+    };
+
+    const sharePdf = async (uri: string, filename: string) => {
+        try {
+            if (await Sharing.isAvailableAsync()) {
+                await Sharing.shareAsync(uri, {
+                    mimeType: 'application/pdf',
+                    dialogTitle: `Partager ${filename}`,
+                });
+            } else {
+                Alert.alert('Erreur', 'Le partage n\'est pas disponible sur cet appareil.');
+            }
+        } catch (error) {
+            console.error('Erreur partage:', error);
         }
     };
 
