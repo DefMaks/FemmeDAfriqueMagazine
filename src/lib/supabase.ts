@@ -3,12 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Load directly from environment variables
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+// Utilise la bonne URL Supabase DefMaks
+const SUPABASE_URL = process.env.EXPO_PUBLIC_DEFMAKS_SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://hcpogyjdbtcxndzpyjvd.supabase.co';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_DEFMAKS_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 // Validation: Ensure environment variables are set
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error('⚠️ CRITICAL: Supabase credentials are missing! Please check your .env file.');
+if (!SUPABASE_ANON_KEY) {
+  console.warn('⚠️ Supabase anon key missing - some features may not work');
 }
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
