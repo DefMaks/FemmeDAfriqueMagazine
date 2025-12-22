@@ -39,6 +39,7 @@ import {
 import { recordMagazinePurchase } from '../services/defmaksApi';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { Ionicons } from '@expo/vector-icons';
 
 const STORAGE_KEY_PHONE = '@fda_user_phone';
