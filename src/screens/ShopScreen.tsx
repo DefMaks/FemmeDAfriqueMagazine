@@ -63,6 +63,7 @@ const ShopScreen = () => {
     const [currentOrderNumber, setCurrentOrderNumber] = useState<string>('');
     const [paymentStatusMessage, setPaymentStatusMessage] = useState<string>('');
     const [showDownloadPopup, setShowDownloadPopup] = useState(false);
+    const [downloadProgress, setDownloadProgress] = useState(0);
 
     useEffect(() => {
         fetchMagazines();
