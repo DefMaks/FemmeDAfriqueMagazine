@@ -192,7 +192,13 @@ const ShopScreen = () => {
         if (!selectedMagazine) return;
         
         if (phone.length < 12) {
-            Alert.alert('Erreur', 'Veuillez entrer un numéro de téléphone valide (12 chiffres)');
+            Toast.show({
+                type: 'error',
+                text1: 'Numéro invalide',
+                text2: 'Veuillez entrer un numéro de téléphone valide (12 chiffres)',
+                position: 'top',
+                visibilityTime: 3000,
+            });
             return;
         }
 
@@ -211,20 +217,21 @@ const ShopScreen = () => {
                 currency  // CDF en mode test, USD sinon
             );
 
-            setPaymentStatusMessage('📱 Veuillez confirmer sur votre téléphone...');
-            
-            Alert.alert(
-                '📱 Paiement initié',
-                `Veuillez confirmer le paiement de ${totalPrice} ${currency} sur votre téléphone.\n\nVous recevrez une notification push de votre opérateur mobile.`,
-                [{ text: 'OK, je confirme' }]
-            );
+            // Toast pour informer l'utilisateur du USSD
+            Toast.show({
+                type: 'info',
+                text1: '📱 Demande USSD envoyée',
+                text2: `Confirmez le paiement de ${totalPrice} ${currency} sur votre téléphone`,
+                position: 'top',
+                visibilityTime: 5000,
+            });
 
-            // Polling avec mise à jour du statut
-            setPaymentStatusMessage('🔄 Vérification en cours...');
-            
+            setPaymentStatusMessage('📱 Veuillez confirmer sur votre téléphone...');
+
+            // Polling automatique - 5 tentatives, 4 secondes entre chaque
             const finalStatus = await pollPaymentStatus(
                 result.order_id,
-                8,  // 8 tentatives
+                5,  // 5 tentatives
                 4000,  // 4 secondes entre chaque
                 (status: PaymentStatusResponse) => {
                     console.log('📊 Statut mis à jour:', status.status);
@@ -237,29 +244,60 @@ const ShopScreen = () => {
             if (isPaymentSuccessful(finalStatus.status)) {
                 setPaymentStatusMessage('✅ Paiement confirmé !');
                 
+                Toast.show({
+                    type: 'success',
+                    text1: '✅ Paiement réussi !',
+                    text2: 'Votre magazine est prêt à être téléchargé',
+                    position: 'top',
+                    visibilityTime: 3000,
+                });
+                
                 // Enregistrer l'achat sur DefMaks
                 await recordSuccessfulPurchase(result.order_id, 'emoney', detectedProvider);
                 
+                // Passer directement au téléchargement
                 setPaymentSuccess(true);
                 setShowDownloadPopup(true);
             } else if (isPaymentFailed(finalStatus.status)) {
                 setPaymentStatusMessage('');
-                Alert.alert(
-                    '❌ Paiement échoué',
-                    `Le paiement a échoué (${finalStatus.rawStatus || finalStatus.status}). Veuillez réessayer.`,
-                    [{ text: 'OK' }]
-                );
+                Toast.show({
+                    type: 'error',
+                    text1: '❌ Paiement échoué',
+                    text2: `Erreur: ${finalStatus.rawStatus || finalStatus.status}. Réessayez.`,
+                    position: 'top',
+                    visibilityTime: 4000,
+                });
             } else {
-                // Toujours en attente après le polling
-                setPaymentStatusMessage('');
-                Alert.alert(
-                    '⏳ Paiement en attente', 
-                    'Le paiement n\'a pas encore été confirmé.\n\nVeuillez vérifier si vous avez reçu une demande de confirmation sur votre téléphone.',
-                    [
-                        { text: 'Annuler', style: 'cancel' },
-                        { text: 'Revérifier', onPress: () => recheckPayment(result.order_id) }
-                    ]
-                );
+                // Toujours en attente après le polling - vérifier une dernière fois
+                setPaymentStatusMessage('🔄 Dernière vérification...');
+                
+                // Une dernière tentative de vérification
+                const lastCheck = await checkPaymentStatus(result.order_id);
+                
+                if (isPaymentSuccessful(lastCheck.status)) {
+                    setPaymentStatusMessage('✅ Paiement confirmé !');
+                    
+                    Toast.show({
+                        type: 'success',
+                        text1: '✅ Paiement réussi !',
+                        text2: 'Votre magazine est prêt à être téléchargé',
+                        position: 'top',
+                        visibilityTime: 3000,
+                    });
+                    
+                    await recordSuccessfulPurchase(result.order_id, 'emoney', detectedProvider);
+                    setPaymentSuccess(true);
+                    setShowDownloadPopup(true);
+                } else {
+                    setPaymentStatusMessage('');
+                    Toast.show({
+                        type: 'info',
+                        text1: '⏳ Paiement en cours',
+                        text2: 'Vérifiez votre téléphone pour confirmer le paiement',
+                        position: 'top',
+                        visibilityTime: 4000,
+                    });
+                }
             }
         } catch (error: any) {
             setPaymentStatusMessage('');
