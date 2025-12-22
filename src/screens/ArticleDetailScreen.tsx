@@ -12,6 +12,7 @@ import RenderHtml from 'react-native-render-html';
 import { analyticsService } from '../services/analytics';
 import { getAdsByZoneId } from '../services/api';
 import { InlineAdBanner, AppAd } from '../components/InlineAdBanner';
+import { markArticleAsRead, toggleFavorite as toggleFavoriteAPI, isFavorite as isFavoriteAPI } from '../services/userProfileAPI';
 
 const { width } = Dimensions.get('window');
 const screenWidth = Dimensions.get('window').width;
@@ -29,6 +30,7 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [inReadAds, setInReadAds] = useState<AppAd[]>([]);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
     // 📊 Track article view
@@ -38,9 +40,25 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
       'article_detail'
     );
     
+    // Marquer l'article comme lu
+    markArticleAsRead(article.id);
+    
+    // Vérifier si l'article est en favori
+    checkFavoriteStatus();
+    
     // Charger les pubs pour la zone de lecture
     loadInReadAds();
   }, [article.id, article.title.rendered]);
+
+  const checkFavoriteStatus = async () => {
+    const favorite = await isFavoriteAPI(article.id);
+    setIsFavorite(favorite);
+  };
+
+  const handleToggleFavorite = async () => {
+    const result = await toggleFavoriteAPI(article.id);
+    setIsFavorite(result.isFavorite);
+  };
 
   const loadInReadAds = async () => {
     try {
