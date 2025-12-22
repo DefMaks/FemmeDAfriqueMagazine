@@ -368,6 +368,8 @@ const ProfileScreen = () => {
         setAuthEmail('');
         setAuthPassword('');
         setAuthConfirmPassword('');
+        setShowPassword(false);
+        setShowConfirmPassword(false);
     };
 
     const openAboutPage = async () => {
