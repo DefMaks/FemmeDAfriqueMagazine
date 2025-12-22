@@ -54,17 +54,36 @@
 
 ---
 
-### Feature 4: Profile Screen
-**Status:** ✅ Complete
+### Feature 4: Profile Screen & User Authentication System
+**Status:** 🔄 IN TESTING
 
 **Files:**
-- `/app/src/screens/ProfileScreen.tsx` - Full profile management
+- `/app/src/screens/ProfileScreen.tsx` - Full profile management with auth
+- `/app/src/services/userProfileAPI.ts` - WordPress REST API integration
+- `/app/src/hooks/useUserProfile.ts` - React hook for profile management
 
-**Features:**
+**Features to Test:**
+- ✅ Registration form UI
+- ✅ Login form UI
+- ✅ Profile edit modal (name, phone, social links)
+- ✅ Photo upload functionality
 - ✅ Notifications toggle
-- ✅ Profile edit modal (email, phone, social links)
 - ✅ External links (About, Réclamations, Support)
 - ✅ Data persistence with AsyncStorage
+- ✅ TypeScript compilation fixed
+
+**API Endpoints Tested (via curl):**
+- ✅ `GET /defmaks/v1/user/profile` - Returns user profile
+- ✅ `GET /defmaks/v1/user/analytics` - Returns analytics data
+- ✅ `POST /defmaks/v1/user/read` - Marks article as read
+- ✅ `POST /defmaks/v1/user/favorite` - Toggles favorite
+- ⚠️ `POST /defmaks/v1/auth/login` - Returns error for non-existent user (expected)
+- ⏳ `POST /defmaks/v1/auth/register` - Not tested yet
+
+**Integration in ArticleDetailScreen:**
+- ✅ `markArticleAsRead()` - Called on article view
+- ✅ `toggleFavorite()` - Linked to favorite button
+- ✅ `isFavoriteAPI()` - Checks favorite status
 
 ## Incorporate User Feedback
 - User requested width: 100% and height: auto for ad images (variable height based on image dimensions)
