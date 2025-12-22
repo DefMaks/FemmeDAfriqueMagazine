@@ -816,7 +816,7 @@ const toggleLocalInteraction = async (
   postId: number,
   title?: string,
   url?: string
-): Promise<{ success: boolean; isFavorite: boolean; isLiked?: boolean }> => {
+): Promise<{ success: boolean; isFavorite: boolean; isLiked: boolean }> => {
   try {
     const stored = await AsyncStorage.getItem(key);
     let items: ArticleInteraction[] = stored ? JSON.parse(stored) : [];
@@ -839,7 +839,7 @@ const toggleLocalInteraction = async (
     
     return { success: true, isFavorite: !exists, isLiked: !exists };
   } catch (error) {
-    return { success: false, isFavorite: false };
+    return { success: false, isFavorite: false, isLiked: false };
   }
 };
 
