@@ -40,11 +40,21 @@ export interface PurchaseResponse {
 
 /**
  * Enregistre un achat réussi sur la base de données DefMaks
+ * Note: Si l'API n'est pas configurée, l'erreur est ignorée silencieusement
  */
 export const recordPurchase = async (purchase: PurchaseRecord): Promise<PurchaseResponse> => {
+  // Vérifier si l'API est configurée
+  if (!DEFMAKS_API_URL || DEFMAKS_API_URL === 'https://api.defmaks.com') {
+    console.log('ℹ️ API DefMaks non configurée - enregistrement ignoré');
+    return {
+      success: true,
+      message: 'API non configurée (mode local)',
+      purchase_id: `local_${Date.now()}`,
+    };
+  }
+
   try {
     console.log('📝 Enregistrement de l\'achat sur DefMaks...');
-    console.log('   📦 Données:', JSON.stringify(purchase, null, 2));
 
     const response = await fetch(`${DEFMAKS_API_URL}/api/purchases`, {
       method: 'POST',
@@ -57,10 +67,9 @@ export const recordPurchase = async (purchase: PurchaseRecord): Promise<Purchase
     });
 
     const data = await response.json();
-    console.log('📥 Réponse DefMaks:', JSON.stringify(data, null, 2));
 
     if (!response.ok) {
-      console.error('❌ Erreur enregistrement DefMaks:', data);
+      console.warn('⚠️ Erreur enregistrement DefMaks (non bloquant):', data?.message);
       return {
         success: false,
         message: data?.message || 'Erreur lors de l\'enregistrement',
@@ -75,9 +84,8 @@ export const recordPurchase = async (purchase: PurchaseRecord): Promise<Purchase
       purchase_id: data?.purchase_id || data?.id,
     };
   } catch (error: any) {
-    console.error('❌ Erreur DefMaks - recordPurchase:', error);
-    
-    // Ne pas bloquer le flux principal en cas d'erreur
+    // Erreur silencieuse - ne pas bloquer le flux principal
+    console.warn('⚠️ DefMaks indisponible (non bloquant):', error.message);
     return {
       success: false,
       message: error.message || 'Impossible d\'enregistrer l\'achat',
