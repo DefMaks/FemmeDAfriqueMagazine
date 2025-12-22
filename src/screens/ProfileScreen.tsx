@@ -77,6 +77,8 @@ const ProfileScreen = () => {
     const [authPassword, setAuthPassword] = useState('');
     const [authConfirmPassword, setAuthConfirmPassword] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     
     // Upload photo
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
