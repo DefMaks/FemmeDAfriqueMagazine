@@ -15,6 +15,8 @@ import {
   markArticleAsRead, 
   toggleFavorite as toggleFavoriteAPI, 
   isFavorite as isFavoriteAPI,
+  toggleLike as toggleLikeAPI,
+  isLiked as isLikedAPI,
   recordShare 
 } from '../services/userProfileAPI';
 
@@ -32,6 +34,7 @@ type ArticleDetailScreenProps = NativeStackScreenProps<RootStackParamList, 'Arti
 const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) => {
   const { article } = route.params;
   const [isSaved, setIsSaved] = useState(false);
+  const [isLiked, setIsLiked] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [inReadAds, setInReadAds] = useState<AppAd[]>([]);
 
