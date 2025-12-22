@@ -856,6 +856,9 @@ const ShopScreen = () => {
                     </View>
                 </View>
             </Modal>
+            
+            {/* Toast Messages */}
+            <Toast />
         </View>
     );
 };
