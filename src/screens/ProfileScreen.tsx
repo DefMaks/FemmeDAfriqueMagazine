@@ -748,13 +748,25 @@ const ProfileScreen = () => {
                             />
 
                             <Text style={styles.inputLabel}>Mot de passe</Text>
-                            <TextInput
-                                style={styles.input}
-                                placeholder="••••••••"
-                                value={authPassword}
-                                onChangeText={setAuthPassword}
-                                secureTextEntry
-                            />
+                            <View style={styles.passwordContainer}>
+                                <TextInput
+                                    style={styles.passwordInput}
+                                    placeholder="••••••••"
+                                    value={authPassword}
+                                    onChangeText={setAuthPassword}
+                                    secureTextEntry={!showPassword}
+                                />
+                                <TouchableOpacity 
+                                    style={styles.passwordToggle}
+                                    onPress={() => setShowPassword(!showPassword)}
+                                >
+                                    <Ionicons 
+                                        name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
+                                        size={22} 
+                                        color="#888" 
+                                    />
+                                </TouchableOpacity>
+                            </View>
 
                             <TouchableOpacity 
                                 style={[styles.saveButton, isSubmitting && styles.buttonDisabled]} 
