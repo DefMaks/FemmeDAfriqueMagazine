@@ -53,8 +53,9 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
       article.link
     );
     
-    // Vérifier si l'article est en favori (via WordPress)
+    // Vérifier si l'article est en favori et liké (via WordPress)
     checkFavoriteStatus();
+    checkLikeStatus();
     
     // Charger les pubs pour la zone de lecture
     loadInReadAds();
@@ -63,6 +64,11 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
   const checkFavoriteStatus = async () => {
     const favorite = await isFavoriteAPI(article.id);
     setIsSaved(favorite);
+  };
+
+  const checkLikeStatus = async () => {
+    const liked = await isLikedAPI(article.id);
+    setIsLiked(liked);
   };
 
   const loadInReadAds = async () => {
