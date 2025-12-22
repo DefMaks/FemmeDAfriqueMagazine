@@ -97,6 +97,20 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
     }
   };
 
+  // Toggle like via WordPress API
+  const toggleLike = async () => {
+    try {
+      const result = await toggleLikeAPI(
+        article.id, 
+        article.title?.rendered, 
+        article.link
+      );
+      setIsLiked(result.isLiked);
+    } catch (error) {
+      console.error('Erreur toggle like:', error);
+    }
+  };
+
   const handleShare = async () => {
     try {
       const shareMessage = `${decodeHtmlEntities(article.title.rendered)}
