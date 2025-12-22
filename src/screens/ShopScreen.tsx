@@ -317,6 +317,14 @@ const ShopScreen = () => {
             if (isPaymentSuccessful(status.status)) {
                 setPaymentStatusMessage('✅ Paiement confirmé !');
                 
+                Toast.show({
+                    type: 'success',
+                    text1: '✅ Paiement réussi !',
+                    text2: 'Votre magazine est prêt',
+                    position: 'top',
+                    visibilityTime: 3000,
+                });
+                
                 // Enregistrer l'achat sur DefMaks
                 await recordSuccessfulPurchase(orderId, 'emoney', detectedProvider);
                 
@@ -324,17 +332,22 @@ const ShopScreen = () => {
                 setShowDownloadPopup(true);
             } else if (isPaymentFailed(status.status)) {
                 setPaymentStatusMessage('');
-                Alert.alert('❌ Échec', `Le paiement a échoué: ${status.rawStatus || status.status}`);
+                Toast.show({
+                    type: 'error',
+                    text1: '❌ Paiement échoué',
+                    text2: `Erreur: ${status.rawStatus || status.status}`,
+                    position: 'top',
+                    visibilityTime: 4000,
+                });
             } else {
                 setPaymentStatusMessage('');
-                Alert.alert(
-                    '⏳ En attente', 
-                    'Le paiement n\'est pas encore confirmé.\n\nAssurez-vous d\'avoir validé la demande sur votre téléphone.',
-                    [
-                        { text: 'OK' },
-                        { text: 'Réessayer', onPress: () => recheckPayment(orderId) }
-                    ]
-                );
+                Toast.show({
+                    type: 'info',
+                    text1: '⏳ Paiement en cours',
+                    text2: 'Confirmez sur votre téléphone',
+                    position: 'top',
+                    visibilityTime: 3000,
+                });
             }
         } catch (err) {
             setPaymentStatusMessage('');
