@@ -3,11 +3,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Configuration Supabase DefMaks
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://hfvfljgmgarlctgrknop.supabase.co';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+// Configuration Supabase DefMaks (URL corrigée)
+const SUPABASE_URL = process.env.EXPO_PUBLIC_DEFMAKS_SUPABASE_URL || 'https://hcpogyjdbtcxndzpyjvd.supabase.co';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_DEFMAKS_SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
-// Créer le client Supabase
+// Créer le client Supabase pour les publicités
 const supabaseAds = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 export type AdZone = 'home' | 'inner' | 'single' | 'page' | 'coinshop' | 'in_read' | null;
