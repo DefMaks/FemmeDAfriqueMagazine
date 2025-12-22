@@ -166,7 +166,7 @@ const ShopScreen = () => {
                 phone,
                 {
                     id: selectedMagazine.id,
-                    numero: selectedMagazine.acf.numero,
+                    numero: String(selectedMagazine.acf.numero),
                     title: selectedMagazine.title.rendered,
                 },
                 totalPrice.toString(),
