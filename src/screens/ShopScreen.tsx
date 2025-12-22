@@ -37,6 +37,7 @@ import {
     PaymentStatusResponse
 } from '../services/twigaPaie';
 import { recordMagazinePurchase } from '../services/defmaksApi';
+import { addPurchase as addUserPurchase } from '../services/userProfileAPI';
 import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as IntentLauncher from 'expo-intent-launcher';
