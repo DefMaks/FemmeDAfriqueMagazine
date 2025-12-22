@@ -163,8 +163,9 @@ const ShopScreen = () => {
         if (!selectedMagazine) return;
         
         try {
-            console.log('📝 Enregistrement de l\'achat sur DefMaks...');
+            console.log('📝 Enregistrement de l\'achat...');
             
+            // 1. Enregistrer sur DefMaks
             const result = await recordMagazinePurchase(
                 orderId,
                 phone,
@@ -181,11 +182,15 @@ const ShopScreen = () => {
             
             if (result.success) {
                 console.log('✅ Achat enregistré sur DefMaks:', result.purchase_id);
-            } else {
-                console.warn('⚠️ Échec enregistrement DefMaks:', result.message);
             }
+            
+            // 2. Enregistrer dans le profil utilisateur WordPress
+            const productName = `Magazine FDA N°${selectedMagazine.acf.numero}`;
+            await addUserPurchase(productName, totalPrice);
+            console.log('✅ Achat enregistré dans le profil utilisateur');
+            
         } catch (error) {
-            console.error('❌ Erreur enregistrement DefMaks:', error);
+            console.error('❌ Erreur enregistrement achat:', error);
             // Ne pas bloquer le flux principal
         }
     };
