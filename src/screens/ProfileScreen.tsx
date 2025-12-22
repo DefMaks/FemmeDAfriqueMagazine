@@ -1308,6 +1308,25 @@ const styles = StyleSheet.create({
         fontSize: 15,
         color: '#333',
     },
+    passwordContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F5F5F5',
+        borderRadius: 10,
+        overflow: 'hidden',
+    },
+    passwordInput: {
+        flex: 1,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 15,
+        color: '#333',
+    },
+    passwordToggle: {
+        padding: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     socialInputRow: {
         flexDirection: 'row',
         alignItems: 'center',
