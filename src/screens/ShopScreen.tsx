@@ -479,8 +479,6 @@ const ShopScreen = () => {
         }
     };
 
-    const [downloadProgress, setDownloadProgress] = useState(0);
-
     const downloadPdf = async () => {
         if (!selectedMagazine) return;
         
