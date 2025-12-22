@@ -28,6 +28,7 @@ import { ErrorMessage } from '../components/ErrorMessage';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { isArticleSaved } from '../services/savedArticles';
 import { analyticsService } from '../services/analytics';
+import { DmksEncart } from '../components/DmksEncart';
 
 const { width: screenWidth } = Dimensions.get('window');
 const AD_BANNER_HEIGHT = ((screenWidth - 32) * 406) / 1300; // Ratio 1300x406
