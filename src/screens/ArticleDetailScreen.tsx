@@ -98,10 +98,19 @@ Téléchargez notre application sur
 Playstore: https://bit.ly/461FINi
 AppStore : Bientôt disponible`;
 
-      await Share.share({
+      const result = await Share.share({
         message: shareMessage,
         url: article.link,
       });
+      
+      // Enregistrer le partage si l'utilisateur a partagé
+      if (result.action === Share.sharedAction) {
+        await recordShare(
+          article.id, 
+          article.title?.rendered, 
+          article.link
+        );
+      }
     } catch (error) {
       console.error('Error sharing:', error);
     }
