@@ -15,6 +15,7 @@ import {
     Platform,
     ScrollView,
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getMagazines, getMedia } from '../services/api';
 import { Magazine } from '../models/Magazine';
