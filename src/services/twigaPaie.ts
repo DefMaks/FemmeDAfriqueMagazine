@@ -86,22 +86,27 @@ export const generateOrderId = (): string => {
 
 /**
  * Normalise le statut de paiement selon la documentation TwigaPaie
+ * status 1 = en cours (Transaction In Progress - TIP)
+ * status 2 = succès (Transaction réussie)
+ * status 0 = échec
  */
-const normalizeStatus = (status: string | undefined): PaymentStatus => {
-  if (!status) return 'pending';
-  const normalized = status.toLowerCase().trim();
+const normalizeStatus = (status: string | number | undefined): PaymentStatus => {
+  if (status === undefined || status === null) return 'pending';
   
-  // Statuts de succès
-  if (['success', 'succeeded', 'completed', 'paid', '0', '1'].includes(normalized)) return 'success';
+  // Convertir en string pour comparaison uniforme
+  const normalized = String(status).toLowerCase().trim();
   
-  // Statuts d'échec
-  if (['failed', 'rejected', 'declined', 'error', '2'].includes(normalized)) return 'failed';
+  // Statuts de succès - status 2 = succès pour TwigaPaie
+  if (['success', 'succeeded', 'completed', 'paid', '2'].includes(normalized)) return 'success';
+  
+  // Statuts d'échec - status 0 = échec
+  if (['failed', 'rejected', 'declined', 'error', '0'].includes(normalized)) return 'failed';
   
   // Statuts d'annulation
   if (['cancelled', 'canceled'].includes(normalized)) return 'cancelled';
   
-  // Statuts en cours
-  if (['initiated', 'pending', 'processing', 'in_progress'].includes(normalized)) return 'pending';
+  // Statuts en cours - status 1 = TIP (Transaction In Progress)
+  if (['initiated', 'pending', 'processing', 'in_progress', '1'].includes(normalized)) return 'pending';
   
   // Statut expiré
   if (['expired'].includes(normalized)) return 'expired';
