@@ -166,7 +166,7 @@ const ShopScreen = () => {
         try {
             console.log('📝 Enregistrement de l\'achat...');
             
-            // 1. Enregistrer sur DefMaks
+            // 1. Enregistrer sur DefMaks API
             const result = await recordMagazinePurchase(
                 orderId,
                 phone,
@@ -189,6 +189,21 @@ const ShopScreen = () => {
             const productName = `Magazine FDA N°${selectedMagazine.acf.numero}`;
             await addUserPurchase(productName, totalPrice);
             console.log('✅ Achat enregistré dans le profil utilisateur');
+            
+            // 3. Enregistrer la transaction dans Supabase
+            const magazineTitle = `FDA N°${selectedMagazine.acf.numero} - ${selectedMagazine.title.rendered}`;
+            const transactionResult = await recordMagazineTransaction(
+                totalPrice,
+                currency as CurrencyType,
+                magazineTitle,
+                orderId
+            );
+            
+            if (transactionResult.success) {
+                console.log('✅ Transaction Supabase enregistrée:', transactionResult.transaction_id);
+            } else {
+                console.warn('⚠️ Échec enregistrement transaction Supabase:', transactionResult.error);
+            }
             
         } catch (error) {
             console.error('❌ Erreur enregistrement achat:', error);
