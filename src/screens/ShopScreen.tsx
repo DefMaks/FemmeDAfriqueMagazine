@@ -479,28 +479,57 @@ const ShopScreen = () => {
 
     const downloadPdf = async () => {
         if (!selectedMagazine) return;
+        
+        setPaymentStatusMessage('📥 Téléchargement en cours...');
+        
         try {
             const media = await getMedia(selectedMagazine.acf.pdf);
             const pdfUrl = media.source_url;
             const filename = `FDA_N${selectedMagazine.acf.numero}.pdf`;
-            const documentDir = FileSystem.Paths?.document?.uri || FileSystem.Paths?.cache?.uri || '';
-            const localUri = `${documentDir}/${filename}`;
             
-            // Télécharger le fichier
-            const downloadResult = await FileSystem.downloadAsync(pdfUrl, localUri);
+            // Utiliser le répertoire cache ou document
+            const cacheDir = LegacyFileSystem.cacheDirectory;
+            const localUri = `${cacheDir}${filename}`;
+            
+            console.log(`📥 Téléchargement PDF: ${pdfUrl}`);
+            console.log(`📁 Destination: ${localUri}`);
+            
+            // Télécharger le fichier avec l'API legacy
+            const downloadResult = await LegacyFileSystem.downloadAsync(pdfUrl, localUri);
 
             if (downloadResult.status === 200) {
+                setPaymentStatusMessage('');
+                
+                Toast.show({
+                    type: 'success',
+                    text1: '✅ Téléchargement terminé',
+                    text2: 'Ouverture du partage...',
+                    position: 'top',
+                    visibilityTime: 2000,
+                });
+                
                 if (await Sharing.isAvailableAsync()) {
-                    await Sharing.shareAsync(localUri);
+                    await Sharing.shareAsync(downloadResult.uri, {
+                        mimeType: 'application/pdf',
+                        dialogTitle: `Magazine FDA N°${selectedMagazine.acf.numero}`,
+                    });
                 } else {
                     Alert.alert('Succès', `PDF sauvegardé : ${filename}`);
                 }
             } else {
-                throw new Error('Téléchargement échoué');
+                throw new Error(`Téléchargement échoué (status: ${downloadResult.status})`);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Erreur PDF:', error);
-            Alert.alert('Erreur', 'Impossible de télécharger le PDF.');
+            setPaymentStatusMessage('');
+            
+            Toast.show({
+                type: 'error',
+                text1: '❌ Erreur de téléchargement',
+                text2: 'Impossible de télécharger le PDF. Réessayez.',
+                position: 'top',
+                visibilityTime: 4000,
+            });
         }
     };
 
