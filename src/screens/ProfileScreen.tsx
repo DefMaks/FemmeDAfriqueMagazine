@@ -14,6 +14,7 @@ import {
     Image,
     ActivityIndicator,
     RefreshControl,
+    FlatList,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -28,17 +29,23 @@ import {
     syncLocalDataToServer,
     UserProfile,
     ProfileUpdateData,
+    registerUser,
+    loginUser,
+    logoutUser,
+    isUserLoggedIn,
+    getUserAnalytics,
+    UserAnalytics,
+    uploadProfilePhoto,
+    ArticleInteraction,
+    Purchase,
+    getPurchaseHistory,
 } from '../services/userProfileAPI';
-import { isLoggedIn, logout, loginWordPress, getUser } from '../services/wordpressAuth';
 
 const STORAGE_KEYS = {
     NOTIFICATIONS: '@fda_notifications',
-    USER_EMAIL: '@fda_user_email',
-    USER_PHONE: '@fda_user_phone',
-    SOCIAL_X: '@fda_social_x',
-    SOCIAL_FB: '@fda_social_fb',
-    SOCIAL_TIKTOK: '@fda_social_tiktok',
 };
+
+type ModalType = 'none' | 'edit' | 'login' | 'register' | 'analytics' | 'favorites' | 'purchases';
 
 const ProfileScreen = () => {
     const navigation = useNavigation<any>();
@@ -50,31 +57,29 @@ const ProfileScreen = () => {
     
     // États du profil
     const [profile, setProfile] = useState<UserProfile | null>(null);
+    const [analytics, setAnalytics] = useState<UserAnalytics | null>(null);
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     
     // États des modals
-    const [showEditModal, setShowEditModal] = useState(false);
-    const [showLoginModal, setShowLoginModal] = useState(false);
+    const [activeModal, setActiveModal] = useState<ModalType>('none');
     
     // États du formulaire d'édition
+    const [userName, setUserName] = useState('');
     const [userEmail, setUserEmail] = useState('');
     const [userPhone, setUserPhone] = useState('243');
     const [socialX, setSocialX] = useState('');
     const [socialFB, setSocialFB] = useState('');
     const [socialTiktok, setSocialTiktok] = useState('');
     
-    // États formulaire login
-    const [loginUsername, setLoginUsername] = useState('');
-    const [loginPassword, setLoginPassword] = useState('');
-    const [isLoggingIn, setIsLoggingIn] = useState(false);
+    // États formulaire login/register
+    const [authName, setAuthName] = useState('');
+    const [authEmail, setAuthEmail] = useState('');
+    const [authPassword, setAuthPassword] = useState('');
+    const [authConfirmPassword, setAuthConfirmPassword] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
     
-    // Statistiques
-    const [stats, setStats] = useState({
-        articlesRead: 0,
-        favorites: 0,
-        activeDays: 0,
-        purchases: 0,
-    });
+    // Upload photo
+    const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
     // Charger les données au montage
     useEffect(() => {
@@ -85,7 +90,7 @@ const ProfileScreen = () => {
         setIsLoading(true);
         try {
             // Vérifier l'authentification
-            const loggedIn = await isLoggedIn();
+            const loggedIn = await isUserLoggedIn();
             setIsAuthenticated(loggedIn);
 
             // Charger les préférences locales
@@ -98,27 +103,24 @@ const ProfileScreen = () => {
                     setProfile(userProfile);
                     
                     // Mettre à jour les champs
+                    setUserName(userProfile.name || '');
                     setUserEmail(userProfile.email || '');
                     setUserPhone(userProfile.phone || '243');
                     setSocialX(userProfile.twitter || '');
                     setSocialFB(userProfile.facebook || '');
                     setSocialTiktok(userProfile.tiktok || '');
-                    
-                    // Mettre à jour les stats
-                    setStats({
-                        articlesRead: userProfile.read_articles?.length || 0,
-                        favorites: userProfile.favorites?.length || 0,
-                        activeDays: userProfile.active_days?.length || 0,
-                        purchases: userProfile.purchase_history?.length || 0,
-                    });
                 }
+                
+                // Charger les analytics
+                const userAnalytics = await getUserAnalytics();
+                setAnalytics(userAnalytics);
                 
                 // Synchroniser les données locales
                 await syncLocalDataToServer();
             } else {
-                // Charger les favoris locaux pour les stats
-                const localFavorites = await getFavorites();
-                setStats(prev => ({ ...prev, favorites: localFavorites.length }));
+                // Charger les analytics locales
+                const localAnalytics = await getUserAnalytics();
+                setAnalytics(localAnalytics);
             }
         } catch (error) {
             console.error('Erreur chargement données:', error);
@@ -129,21 +131,8 @@ const ProfileScreen = () => {
 
     const loadLocalPreferences = async () => {
         try {
-            const [notifications, email, phone, x, fb, tiktok] = await Promise.all([
-                AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS),
-                AsyncStorage.getItem(STORAGE_KEYS.USER_EMAIL),
-                AsyncStorage.getItem(STORAGE_KEYS.USER_PHONE),
-                AsyncStorage.getItem(STORAGE_KEYS.SOCIAL_X),
-                AsyncStorage.getItem(STORAGE_KEYS.SOCIAL_FB),
-                AsyncStorage.getItem(STORAGE_KEYS.SOCIAL_TIKTOK),
-            ]);
-            
+            const notifications = await AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS);
             setNotificationsEnabled(notifications !== 'false');
-            if (email && !userEmail) setUserEmail(email);
-            if (phone && userPhone === '243') setUserPhone(phone);
-            if (x && !socialX) setSocialX(x);
-            if (fb && !socialFB) setSocialFB(fb);
-            if (tiktok && !socialTiktok) setSocialTiktok(tiktok);
         } catch (error) {
             console.error('Erreur chargement préférences:', error);
         }
@@ -170,54 +159,70 @@ const ProfileScreen = () => {
         }
     };
 
-    const handleSaveProfile = async () => {
+    const handleUploadPhoto = async () => {
+        setIsUploadingPhoto(true);
         try {
-            // Sauvegarder localement
-            await Promise.all([
-                AsyncStorage.setItem(STORAGE_KEYS.USER_EMAIL, userEmail),
-                AsyncStorage.setItem(STORAGE_KEYS.USER_PHONE, userPhone),
-                AsyncStorage.setItem(STORAGE_KEYS.SOCIAL_X, socialX),
-                AsyncStorage.setItem(STORAGE_KEYS.SOCIAL_FB, socialFB),
-                AsyncStorage.setItem(STORAGE_KEYS.SOCIAL_TIKTOK, socialTiktok),
-            ]);
-
-            // Si connecté, sauvegarder sur le serveur
-            if (isAuthenticated) {
-                const updateData: ProfileUpdateData = {
-                    user_phone: userPhone,
-                    user_facebook: socialFB,
-                    user_twitter: socialX,
-                    user_tiktok: socialTiktok,
-                };
-                
-                const result = await updateUserProfile(updateData);
-                
-                if (result.success) {
-                    Toast.show({
-                        type: 'success',
-                        text1: '✅ Profil synchronisé',
-                        text2: 'Vos informations ont été mises à jour',
-                        position: 'top',
-                    });
-                }
-            } else {
+            const result = await uploadProfilePhoto();
+            if (result.success && result.url) {
+                setProfile(prev => prev ? { ...prev, photo: result.url! } : null);
                 Toast.show({
                     type: 'success',
-                    text1: '✅ Profil sauvegardé',
-                    text2: 'Connectez-vous pour synchroniser',
+                    text1: '✅ Photo mise à jour',
+                    position: 'top',
+                });
+            }
+        } catch (error) {
+            Toast.show({
+                type: 'error',
+                text1: '❌ Erreur upload',
+                text2: 'Impossible de mettre à jour la photo',
+                position: 'top',
+            });
+        } finally {
+            setIsUploadingPhoto(false);
+        }
+    };
+
+    const handleSaveProfile = async () => {
+        setIsSubmitting(true);
+        try {
+            const updateData: ProfileUpdateData = {
+                user_name: userName,
+                user_phone: userPhone,
+                user_facebook: socialFB,
+                user_twitter: socialX,
+                user_tiktok: socialTiktok,
+            };
+            
+            const result = await updateUserProfile(updateData);
+            
+            if (result.success) {
+                Toast.show({
+                    type: 'success',
+                    text1: '✅ Profil mis à jour',
+                    position: 'top',
+                });
+                await loadAllData();
+            } else {
+                Toast.show({
+                    type: 'error',
+                    text1: '❌ Erreur',
+                    text2: 'Impossible de sauvegarder',
                     position: 'top',
                 });
             }
             
-            setShowEditModal(false);
+            setActiveModal('none');
         } catch (error) {
             console.error('Erreur sauvegarde profil:', error);
             Alert.alert('Erreur', 'Impossible de sauvegarder vos informations.');
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
-    const handleLogin = async () => {
-        if (!loginUsername || !loginPassword) {
+    const handleRegister = async () => {
+        if (!authName || !authEmail || !authPassword) {
             Toast.show({
                 type: 'error',
                 text1: 'Champs requis',
@@ -227,30 +232,108 @@ const ProfileScreen = () => {
             return;
         }
 
-        setIsLoggingIn(true);
-        try {
-            await loginWordPress(loginUsername, loginPassword);
-            setIsAuthenticated(true);
-            setShowLoginModal(false);
-            
+        if (authPassword !== authConfirmPassword) {
             Toast.show({
-                type: 'success',
-                text1: '✅ Connexion réussie',
-                text2: 'Bienvenue !',
+                type: 'error',
+                text1: 'Erreur',
+                text2: 'Les mots de passe ne correspondent pas',
                 position: 'top',
             });
+            return;
+        }
+
+        if (authPassword.length < 6) {
+            Toast.show({
+                type: 'error',
+                text1: 'Erreur',
+                text2: 'Le mot de passe doit contenir au moins 6 caractères',
+                position: 'top',
+            });
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const result = await registerUser(authEmail, authPassword, authName);
             
-            // Recharger les données
-            await loadAllData();
+            if (result.success) {
+                setIsAuthenticated(true);
+                setActiveModal('none');
+                resetAuthForm();
+                
+                Toast.show({
+                    type: 'success',
+                    text1: '✅ Compte créé !',
+                    text2: 'Bienvenue sur FDA Magazine',
+                    position: 'top',
+                });
+                
+                await loadAllData();
+            } else {
+                Toast.show({
+                    type: 'error',
+                    text1: '❌ Erreur',
+                    text2: result.message || 'Impossible de créer le compte',
+                    position: 'top',
+                });
+            }
         } catch (error: any) {
             Toast.show({
                 type: 'error',
-                text1: '❌ Échec de connexion',
-                text2: error.message || 'Vérifiez vos identifiants',
+                text1: '❌ Erreur',
+                text2: error.message || 'Erreur réseau',
                 position: 'top',
             });
         } finally {
-            setIsLoggingIn(false);
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleLogin = async () => {
+        if (!authEmail || !authPassword) {
+            Toast.show({
+                type: 'error',
+                text1: 'Champs requis',
+                text2: 'Veuillez remplir tous les champs',
+                position: 'top',
+            });
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            const result = await loginUser(authEmail, authPassword);
+            
+            if (result.success) {
+                setIsAuthenticated(true);
+                setActiveModal('none');
+                resetAuthForm();
+                
+                Toast.show({
+                    type: 'success',
+                    text1: '✅ Connexion réussie',
+                    text2: 'Bienvenue !',
+                    position: 'top',
+                });
+                
+                await loadAllData();
+            } else {
+                Toast.show({
+                    type: 'error',
+                    text1: '❌ Échec de connexion',
+                    text2: result.message || 'Vérifiez vos identifiants',
+                    position: 'top',
+                });
+            }
+        } catch (error: any) {
+            Toast.show({
+                type: 'error',
+                text1: '❌ Erreur',
+                text2: error.message || 'Erreur réseau',
+                position: 'top',
+            });
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -264,7 +347,7 @@ const ProfileScreen = () => {
                     text: 'Déconnecter',
                     style: 'destructive',
                     onPress: async () => {
-                        await logout();
+                        await logoutUser();
                         setIsAuthenticated(false);
                         setProfile(null);
                         Toast.show({
@@ -278,12 +361,16 @@ const ProfileScreen = () => {
         );
     };
 
+    const resetAuthForm = () => {
+        setAuthName('');
+        setAuthEmail('');
+        setAuthPassword('');
+        setAuthConfirmPassword('');
+    };
+
     const openAboutPage = async () => {
         try {
-            await WebBrowser.openBrowserAsync('https://femmedafrique.net/a-propos/', {
-                showTitle: true,
-                enableBarCollapsing: true,
-            });
+            await WebBrowser.openBrowserAsync('https://femmedafrique.net/a-propos/');
         } catch (error) {
             console.error('Erreur ouverture page:', error);
         }
@@ -291,10 +378,7 @@ const ProfileScreen = () => {
 
     const openReclamationsPage = async () => {
         try {
-            await WebBrowser.openBrowserAsync('https://femmedafrique.net/procedure-de-reclamation-des-lecteurs-et-abonnes/', {
-                showTitle: true,
-                enableBarCollapsing: true,
-            });
+            await WebBrowser.openBrowserAsync('https://femmedafrique.net/procedure-de-reclamation-des-lecteurs-et-abonnes/');
         } catch (error) {
             console.error('Erreur ouverture page:', error);
         }
@@ -317,8 +401,8 @@ const ProfileScreen = () => {
             id: '1', 
             icon: 'person-outline', 
             title: 'Modifier le profil', 
-            subtitle: 'Email, téléphone, réseaux sociaux',
-            action: () => setShowEditModal(true)
+            subtitle: 'Nom, téléphone, réseaux sociaux',
+            action: () => setActiveModal('edit')
         },
         { 
             id: '2', 
@@ -329,40 +413,64 @@ const ProfileScreen = () => {
         },
         { 
             id: '3', 
-            icon: 'heart-outline', 
-            title: 'Mes favoris', 
-            subtitle: `${stats.favorites} article${stats.favorites > 1 ? 's' : ''} sauvegardé${stats.favorites > 1 ? 's' : ''}`,
-            action: navigateToFavorites
+            icon: 'bar-chart-outline', 
+            title: 'Mon activité', 
+            subtitle: `${analytics?.total_read || 0} lectures, ${analytics?.total_shares || 0} partages`,
+            action: () => setActiveModal('analytics')
         },
         { 
             id: '4', 
-            icon: 'bag-handle-outline', 
-            title: 'Mes achats', 
-            subtitle: `${stats.purchases} achat${stats.purchases > 1 ? 's' : ''}`,
-            action: navigateToPurchases
+            icon: 'heart-outline', 
+            title: 'Mes favoris', 
+            subtitle: `${analytics?.total_favorites || 0} article${(analytics?.total_favorites || 0) > 1 ? 's' : ''}`,
+            action: () => setActiveModal('favorites')
         },
         { 
             id: '5', 
+            icon: 'bag-handle-outline', 
+            title: 'Mes achats', 
+            subtitle: `${analytics?.total_purchases || 0} achat${(analytics?.total_purchases || 0) > 1 ? 's' : ''}`,
+            action: () => setActiveModal('purchases')
+        },
+        { 
+            id: '6', 
             icon: 'information-circle-outline', 
             title: 'À Propos', 
             subtitle: 'En savoir plus sur FDA',
             action: openAboutPage
         },
         { 
-            id: '6', 
+            id: '7', 
             icon: 'chatbubble-ellipses-outline', 
             title: 'Réclamations', 
             subtitle: 'Procédure de réclamation',
             action: openReclamationsPage
         },
         { 
-            id: '7', 
+            id: '8', 
             icon: 'help-circle-outline', 
             title: 'Aide & Support', 
             subtitle: 'Contactez-nous par email',
             action: openSupportEmail
         },
     ];
+
+    const renderInteractionItem = ({ item }: { item: ArticleInteraction }) => (
+        <View style={styles.interactionItem}>
+            <Text style={styles.interactionTitle} numberOfLines={2}>{item.title || `Article #${item.post_id}`}</Text>
+            <Text style={styles.interactionDate}>{new Date(item.date).toLocaleDateString('fr-FR')}</Text>
+        </View>
+    );
+
+    const renderPurchaseItem = ({ item }: { item: Purchase }) => (
+        <View style={styles.purchaseItem}>
+            <View>
+                <Text style={styles.purchaseProduct}>{item.product}</Text>
+                <Text style={styles.purchaseDate}>{new Date(item.date).toLocaleDateString('fr-FR')}</Text>
+            </View>
+            <Text style={styles.purchaseAmount}>{item.amount} CDF</Text>
+        </View>
+    );
 
     if (isLoading) {
         return (
@@ -382,7 +490,7 @@ const ProfileScreen = () => {
                         <Ionicons name="log-out-outline" size={24} color={Colors.primary} />
                     </TouchableOpacity>
                 ) : (
-                    <TouchableOpacity onPress={() => setShowLoginModal(true)}>
+                    <TouchableOpacity onPress={() => setActiveModal('login')}>
                         <Ionicons name="log-in-outline" size={24} color={Colors.primary} />
                     </TouchableOpacity>
                 )}
@@ -397,54 +505,88 @@ const ProfileScreen = () => {
             >
                 {/* Carte Profil */}
                 <View style={styles.profileCard}>
-                    <View style={styles.avatarContainer}>
-                        {profile?.photo ? (
+                    <TouchableOpacity 
+                        style={styles.avatarContainer} 
+                        onPress={isAuthenticated ? handleUploadPhoto : undefined}
+                        disabled={isUploadingPhoto}
+                    >
+                        {isUploadingPhoto ? (
+                            <View style={styles.avatarPlaceholder}>
+                                <ActivityIndicator color={Colors.primary} />
+                            </View>
+                        ) : profile?.photo ? (
                             <Image source={{ uri: profile.photo }} style={styles.avatar} />
                         ) : (
                             <View style={styles.avatarPlaceholder}>
                                 <Ionicons name="person" size={48} color={Colors.primary} />
                             </View>
                         )}
-                        <TouchableOpacity style={styles.editAvatarButton}>
-                            <Ionicons name="camera" size={16} color="#FFF" />
-                        </TouchableOpacity>
-                    </View>
+                        {isAuthenticated && (
+                            <View style={styles.editAvatarButton}>
+                                <Ionicons name="camera" size={16} color="#FFF" />
+                            </View>
+                        )}
+                    </TouchableOpacity>
                     
                     <Text style={styles.userName}>
-                        {profile?.name || userEmail || 'Utilisateur'}
+                        {profile?.name || userName || 'Utilisateur'}
                     </Text>
                     <Text style={styles.userEmail}>
                         {isAuthenticated ? profile?.email || userEmail : 'Non connecté'}
                     </Text>
                     
                     {!isAuthenticated && (
-                        <TouchableOpacity 
-                            style={styles.loginButton}
-                            onPress={() => setShowLoginModal(true)}
-                        >
-                            <Ionicons name="log-in-outline" size={18} color="#FFF" />
-                            <Text style={styles.loginButtonText}>Se connecter</Text>
-                        </TouchableOpacity>
+                        <View style={styles.authButtons}>
+                            <TouchableOpacity 
+                                style={styles.loginButton}
+                                onPress={() => setActiveModal('login')}
+                            >
+                                <Ionicons name="log-in-outline" size={18} color="#FFF" />
+                                <Text style={styles.loginButtonText}>Se connecter</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={styles.registerButton}
+                                onPress={() => setActiveModal('register')}
+                            >
+                                <Ionicons name="person-add-outline" size={18} color={Colors.primary} />
+                                <Text style={styles.registerButtonText}>Créer un compte</Text>
+                            </TouchableOpacity>
+                        </View>
                     )}
                 </View>
 
                 {/* Carte Statistiques */}
                 <View style={styles.statsCard}>
                     <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{stats.articlesRead}</Text>
-                        <Text style={styles.statLabel}>Articles lus</Text>
+                        <Text style={styles.statValue}>{analytics?.total_read || 0}</Text>
+                        <Text style={styles.statLabel}>Lectures</Text>
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{stats.favorites}</Text>
+                        <Text style={styles.statValue}>{analytics?.total_favorites || 0}</Text>
                         <Text style={styles.statLabel}>Favoris</Text>
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
-                        <Text style={styles.statValue}>{stats.activeDays}</Text>
-                        <Text style={styles.statLabel}>Jours actifs</Text>
+                        <Text style={styles.statValue}>{analytics?.total_likes || 0}</Text>
+                        <Text style={styles.statLabel}>Likes</Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statItem}>
+                        <Text style={styles.statValue}>{analytics?.total_shares || 0}</Text>
+                        <Text style={styles.statLabel}>Partages</Text>
                     </View>
                 </View>
+
+                {/* Jours actifs */}
+                {isAuthenticated && analytics && analytics.total_active_days > 0 && (
+                    <View style={styles.activeDaysCard}>
+                        <Ionicons name="flame" size={24} color="#FF6B35" />
+                        <Text style={styles.activeDaysText}>
+                            {analytics.total_active_days} jour{analytics.total_active_days > 1 ? 's' : ''} actif{analytics.total_active_days > 1 ? 's' : ''}
+                        </Text>
+                    </View>
+                )}
 
                 {/* Menu */}
                 <View style={styles.menuSection}>
@@ -482,29 +624,27 @@ const ProfileScreen = () => {
 
             {/* Modal Modifier le profil */}
             <Modal
-                visible={showEditModal}
+                visible={activeModal === 'edit'}
                 animationType="slide"
                 transparent={true}
-                onRequestClose={() => setShowEditModal(false)}
+                onRequestClose={() => setActiveModal('none')}
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Modifier le profil</Text>
-                            <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                            <TouchableOpacity onPress={() => setActiveModal('none')}>
                                 <Ionicons name="close-circle" size={28} color="#888" />
                             </TouchableOpacity>
                         </View>
 
                         <ScrollView showsVerticalScrollIndicator={false}>
-                            <Text style={styles.inputLabel}>Adresse email</Text>
+                            <Text style={styles.inputLabel}>Nom complet</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="votre@email.com"
-                                value={userEmail}
-                                onChangeText={setUserEmail}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
+                                placeholder="Votre nom"
+                                value={userName}
+                                onChangeText={setUserName}
                             />
 
                             <Text style={styles.inputLabel}>Téléphone (pour achats)</Text>
@@ -558,8 +698,16 @@ const ProfileScreen = () => {
                                 />
                             </View>
 
-                            <TouchableOpacity style={styles.saveButton} onPress={handleSaveProfile}>
-                                <Text style={styles.saveButtonText}>Enregistrer</Text>
+                            <TouchableOpacity 
+                                style={[styles.saveButton, isSubmitting && styles.buttonDisabled]} 
+                                onPress={handleSaveProfile}
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting ? (
+                                    <ActivityIndicator color="#FFF" />
+                                ) : (
+                                    <Text style={styles.saveButtonText}>Enregistrer</Text>
+                                )}
                             </TouchableOpacity>
                         </ScrollView>
                     </View>
@@ -568,31 +716,31 @@ const ProfileScreen = () => {
 
             {/* Modal Connexion */}
             <Modal
-                visible={showLoginModal}
+                visible={activeModal === 'login'}
                 animationType="slide"
                 transparent={true}
-                onRequestClose={() => setShowLoginModal(false)}
+                onRequestClose={() => setActiveModal('none')}
             >
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Connexion</Text>
-                            <TouchableOpacity onPress={() => setShowLoginModal(false)}>
+                            <TouchableOpacity onPress={() => { setActiveModal('none'); resetAuthForm(); }}>
                                 <Ionicons name="close-circle" size={28} color="#888" />
                             </TouchableOpacity>
                         </View>
 
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <Text style={styles.loginDescription}>
-                                Connectez-vous pour synchroniser vos favoris, historique de lecture et achats sur tous vos appareils.
+                                Connectez-vous pour synchroniser vos favoris, historique de lecture et achats.
                             </Text>
 
-                            <Text style={styles.inputLabel}>Nom d'utilisateur ou email</Text>
+                            <Text style={styles.inputLabel}>Email</Text>
                             <TextInput
                                 style={styles.input}
-                                placeholder="utilisateur@email.com"
-                                value={loginUsername}
-                                onChangeText={setLoginUsername}
+                                placeholder="votre@email.com"
+                                value={authEmail}
+                                onChangeText={setAuthEmail}
                                 keyboardType="email-address"
                                 autoCapitalize="none"
                             />
@@ -601,17 +749,17 @@ const ProfileScreen = () => {
                             <TextInput
                                 style={styles.input}
                                 placeholder="••••••••"
-                                value={loginPassword}
-                                onChangeText={setLoginPassword}
+                                value={authPassword}
+                                onChangeText={setAuthPassword}
                                 secureTextEntry
                             />
 
                             <TouchableOpacity 
-                                style={[styles.saveButton, isLoggingIn && styles.buttonDisabled]} 
+                                style={[styles.saveButton, isSubmitting && styles.buttonDisabled]} 
                                 onPress={handleLogin}
-                                disabled={isLoggingIn}
+                                disabled={isSubmitting}
                             >
-                                {isLoggingIn ? (
+                                {isSubmitting ? (
                                     <ActivityIndicator color="#FFF" />
                                 ) : (
                                     <Text style={styles.saveButtonText}>Se connecter</Text>
@@ -619,17 +767,241 @@ const ProfileScreen = () => {
                             </TouchableOpacity>
 
                             <TouchableOpacity 
-                                style={styles.registerLink}
-                                onPress={() => {
-                                    setShowLoginModal(false);
-                                    WebBrowser.openBrowserAsync('https://femmedafrique.net/inscription/');
-                                }}
+                                style={styles.switchAuthLink}
+                                onPress={() => { resetAuthForm(); setActiveModal('register'); }}
                             >
-                                <Text style={styles.registerLinkText}>
-                                    Pas encore de compte ? S'inscrire
+                                <Text style={styles.switchAuthLinkText}>
+                                    Pas encore de compte ? <Text style={styles.linkBold}>Créer un compte</Text>
                                 </Text>
                             </TouchableOpacity>
                         </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal Inscription */}
+            <Modal
+                visible={activeModal === 'register'}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setActiveModal('none')}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Créer un compte</Text>
+                            <TouchableOpacity onPress={() => { setActiveModal('none'); resetAuthForm(); }}>
+                                <Ionicons name="close-circle" size={28} color="#888" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            <Text style={styles.loginDescription}>
+                                Créez votre compte FDA pour sauvegarder vos favoris et synchroniser vos données.
+                            </Text>
+
+                            <Text style={styles.inputLabel}>Nom complet *</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Votre nom"
+                                value={authName}
+                                onChangeText={setAuthName}
+                            />
+
+                            <Text style={styles.inputLabel}>Email *</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="votre@email.com"
+                                value={authEmail}
+                                onChangeText={setAuthEmail}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                            />
+
+                            <Text style={styles.inputLabel}>Mot de passe *</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Min. 6 caractères"
+                                value={authPassword}
+                                onChangeText={setAuthPassword}
+                                secureTextEntry
+                            />
+
+                            <Text style={styles.inputLabel}>Confirmer le mot de passe *</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Répétez le mot de passe"
+                                value={authConfirmPassword}
+                                onChangeText={setAuthConfirmPassword}
+                                secureTextEntry
+                            />
+
+                            <TouchableOpacity 
+                                style={[styles.saveButton, isSubmitting && styles.buttonDisabled]} 
+                                onPress={handleRegister}
+                                disabled={isSubmitting}
+                            >
+                                {isSubmitting ? (
+                                    <ActivityIndicator color="#FFF" />
+                                ) : (
+                                    <Text style={styles.saveButtonText}>Créer mon compte</Text>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                style={styles.switchAuthLink}
+                                onPress={() => { resetAuthForm(); setActiveModal('login'); }}
+                            >
+                                <Text style={styles.switchAuthLinkText}>
+                                    Déjà un compte ? <Text style={styles.linkBold}>Se connecter</Text>
+                                </Text>
+                            </TouchableOpacity>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal Analytics */}
+            <Modal
+                visible={activeModal === 'analytics'}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setActiveModal('none')}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Mon activité</Text>
+                            <TouchableOpacity onPress={() => setActiveModal('none')}>
+                                <Ionicons name="close-circle" size={28} color="#888" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {/* Stats Grid */}
+                            <View style={styles.analyticsGrid}>
+                                <View style={styles.analyticsItem}>
+                                    <Ionicons name="book-outline" size={28} color={Colors.primary} />
+                                    <Text style={styles.analyticsValue}>{analytics?.total_read || 0}</Text>
+                                    <Text style={styles.analyticsLabel}>Articles lus</Text>
+                                </View>
+                                <View style={styles.analyticsItem}>
+                                    <Ionicons name="heart-outline" size={28} color="#FF4444" />
+                                    <Text style={styles.analyticsValue}>{analytics?.total_favorites || 0}</Text>
+                                    <Text style={styles.analyticsLabel}>Favoris</Text>
+                                </View>
+                                <View style={styles.analyticsItem}>
+                                    <Ionicons name="thumbs-up-outline" size={28} color="#4CAF50" />
+                                    <Text style={styles.analyticsValue}>{analytics?.total_likes || 0}</Text>
+                                    <Text style={styles.analyticsLabel}>Likes</Text>
+                                </View>
+                                <View style={styles.analyticsItem}>
+                                    <Ionicons name="share-social-outline" size={28} color="#2196F3" />
+                                    <Text style={styles.analyticsValue}>{analytics?.total_shares || 0}</Text>
+                                    <Text style={styles.analyticsLabel}>Partages</Text>
+                                </View>
+                            </View>
+
+                            {/* Activités récentes */}
+                            {analytics?.recent_activity && analytics.recent_activity.length > 0 && (
+                                <View style={styles.recentSection}>
+                                    <Text style={styles.sectionLabel}>Activité récente</Text>
+                                    {analytics.recent_activity.map((item, index) => (
+                                        <View key={`activity_${index}`} style={styles.interactionItem}>
+                                            <Text style={styles.interactionTitle} numberOfLines={2}>
+                                                {item.title || `Article #${item.post_id}`}
+                                            </Text>
+                                            <Text style={styles.interactionDate}>
+                                                {new Date(item.date).toLocaleDateString('fr-FR')}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal Favoris */}
+            <Modal
+                visible={activeModal === 'favorites'}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setActiveModal('none')}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Mes favoris ({profile?.favorites?.length || 0})</Text>
+                            <TouchableOpacity onPress={() => setActiveModal('none')}>
+                                <Ionicons name="close-circle" size={28} color="#888" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {profile?.favorites && profile.favorites.length > 0 ? (
+                            <FlatList
+                                data={profile.favorites}
+                                keyExtractor={(item, index) => `fav_${typeof item === 'number' ? item : item.post_id}_${index}`}
+                                renderItem={({ item }) => (
+                                    <View style={styles.interactionItem}>
+                                        <Text style={styles.interactionTitle} numberOfLines={2}>
+                                            {typeof item === 'number' ? `Article #${item}` : item.title || `Article #${item.post_id}`}
+                                        </Text>
+                                        {typeof item !== 'number' && item.date && (
+                                            <Text style={styles.interactionDate}>
+                                                {new Date(item.date).toLocaleDateString('fr-FR')}
+                                            </Text>
+                                        )}
+                                    </View>
+                                )}
+                                showsVerticalScrollIndicator={false}
+                            />
+                        ) : (
+                            <View style={styles.emptyState}>
+                                <Ionicons name="heart-outline" size={64} color="#DDD" />
+                                <Text style={styles.emptyStateText}>Aucun favori pour le moment</Text>
+                            </View>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Modal Achats */}
+            <Modal
+                visible={activeModal === 'purchases'}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setActiveModal('none')}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Mes achats ({profile?.purchase_history?.length || 0})</Text>
+                            <TouchableOpacity onPress={() => setActiveModal('none')}>
+                                <Ionicons name="close-circle" size={28} color="#888" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {profile?.purchase_history && profile.purchase_history.length > 0 ? (
+                            <FlatList
+                                data={profile.purchase_history}
+                                keyExtractor={(item, index) => `purchase_${index}`}
+                                renderItem={renderPurchaseItem}
+                                showsVerticalScrollIndicator={false}
+                            />
+                        ) : (
+                            <View style={styles.emptyState}>
+                                <Ionicons name="bag-handle-outline" size={64} color="#DDD" />
+                                <Text style={styles.emptyStateText}>Aucun achat pour le moment</Text>
+                                <TouchableOpacity 
+                                    style={styles.emptyStateButton}
+                                    onPress={() => { setActiveModal('none'); navigateToPurchases(); }}
+                                >
+                                    <Text style={styles.emptyStateButtonText}>Voir la boutique</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
                     </View>
                 </View>
             </Modal>
@@ -724,18 +1096,37 @@ const styles = StyleSheet.create({
         color: Colors.textSecondary,
         marginBottom: 16,
     },
+    authButtons: {
+        flexDirection: 'row',
+        gap: 12,
+    },
     loginButton: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: Colors.primary,
         paddingVertical: 10,
-        paddingHorizontal: 20,
+        paddingHorizontal: 16,
         borderRadius: 20,
     },
     loginButtonText: {
         color: '#FFF',
         fontWeight: '600',
-        marginLeft: 8,
+        marginLeft: 6,
+    },
+    registerButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFF',
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: Colors.primary,
+    },
+    registerButtonText: {
+        color: Colors.primary,
+        fontWeight: '600',
+        marginLeft: 6,
     },
     statsCard: {
         flexDirection: 'row',
@@ -743,7 +1134,7 @@ const styles = StyleSheet.create({
         marginHorizontal: 20,
         marginTop: 16,
         borderRadius: 16,
-        padding: 20,
+        padding: 16,
         shadowColor: Colors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.08,
@@ -755,40 +1146,51 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     statValue: {
-        fontSize: 24,
+        fontSize: 20,
         fontWeight: '700',
         color: Colors.primary,
-        marginBottom: 4,
+        marginBottom: 2,
     },
     statLabel: {
-        fontSize: 12,
+        fontSize: 11,
         color: Colors.textSecondary,
     },
     statDivider: {
         width: 1,
         backgroundColor: Colors.border,
     },
+    activeDaysCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FFF5F0',
+        marginHorizontal: 20,
+        marginTop: 12,
+        borderRadius: 12,
+        padding: 12,
+    },
+    activeDaysText: {
+        marginLeft: 8,
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#FF6B35',
+    },
     menuSection: {
-        marginTop: 24,
+        marginTop: 20,
         paddingHorizontal: 20,
     },
     menuItem: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: Colors.backgroundLight,
-        padding: 16,
-        borderRadius: 16,
-        marginBottom: 12,
-        shadowColor: Colors.shadow,
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 1,
+        padding: 14,
+        borderRadius: 14,
+        marginBottom: 10,
     },
     menuIconContainer: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
+        width: 40,
+        height: 40,
+        borderRadius: 10,
         backgroundColor: Colors.borderLight,
         justifyContent: 'center',
         alignItems: 'center',
@@ -798,13 +1200,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     menuTitle: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
         color: Colors.text,
         marginBottom: 2,
     },
     menuSubtitle: {
-        fontSize: 13,
+        fontSize: 12,
         color: Colors.textSecondary,
     },
     version: {
@@ -824,19 +1226,19 @@ const styles = StyleSheet.create({
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         padding: 20,
-        maxHeight: '80%',
+        maxHeight: '85%',
     },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
-        paddingBottom: 16,
+        marginBottom: 16,
+        paddingBottom: 12,
         borderBottomWidth: 1,
         borderBottomColor: '#EEE',
     },
     modalTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '700',
         color: '#333',
     },
@@ -844,42 +1246,42 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#666',
         lineHeight: 20,
-        marginBottom: 20,
+        marginBottom: 16,
     },
     inputLabel: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '600',
         color: '#555',
-        marginBottom: 8,
-        marginTop: 16,
+        marginBottom: 6,
+        marginTop: 12,
     },
     sectionLabel: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '700',
         color: '#333',
-        marginTop: 24,
+        marginTop: 20,
         marginBottom: 8,
     },
     input: {
         backgroundColor: '#F5F5F5',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        fontSize: 16,
+        borderRadius: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        fontSize: 15,
         color: '#333',
     },
     socialInputRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 12,
+        marginTop: 10,
     },
     socialIcon: {
-        width: 40,
-        height: 40,
+        width: 36,
+        height: 36,
         borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 12,
+        marginRight: 10,
     },
     socialInput: {
         flex: 1,
@@ -888,27 +1290,120 @@ const styles = StyleSheet.create({
     saveButton: {
         backgroundColor: Colors.primary,
         borderRadius: 12,
-        paddingVertical: 16,
+        paddingVertical: 14,
         alignItems: 'center',
-        marginTop: 24,
-        marginBottom: 20,
+        marginTop: 20,
+        marginBottom: 16,
     },
     buttonDisabled: {
         opacity: 0.7,
     },
     saveButtonText: {
         color: '#FFF',
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
     },
-    registerLink: {
+    switchAuthLink: {
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: 10,
     },
-    registerLinkText: {
+    switchAuthLinkText: {
+        color: '#666',
+        fontSize: 14,
+    },
+    linkBold: {
         color: Colors.primary,
+        fontWeight: '600',
+    },
+    // Analytics styles
+    analyticsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+    },
+    analyticsItem: {
+        width: '48%',
+        backgroundColor: '#F8F8F8',
+        borderRadius: 12,
+        padding: 16,
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    analyticsValue: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: '#333',
+        marginTop: 8,
+    },
+    analyticsLabel: {
+        fontSize: 12,
+        color: '#888',
+        marginTop: 4,
+    },
+    recentSection: {
+        marginTop: 8,
+    },
+    interactionItem: {
+        backgroundColor: '#F8F8F8',
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 8,
+    },
+    interactionTitle: {
         fontSize: 14,
         fontWeight: '500',
+        color: '#333',
+    },
+    interactionDate: {
+        fontSize: 12,
+        color: '#888',
+        marginTop: 4,
+    },
+    purchaseItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: '#F8F8F8',
+        borderRadius: 10,
+        padding: 12,
+        marginBottom: 8,
+    },
+    purchaseProduct: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#333',
+    },
+    purchaseDate: {
+        fontSize: 12,
+        color: '#888',
+        marginTop: 2,
+    },
+    purchaseAmount: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: Colors.primary,
+    },
+    emptyState: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 40,
+    },
+    emptyStateText: {
+        fontSize: 15,
+        color: '#888',
+        marginTop: 12,
+    },
+    emptyStateButton: {
+        marginTop: 16,
+        backgroundColor: Colors.primary,
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 20,
+    },
+    emptyStateButtonText: {
+        color: '#FFF',
+        fontWeight: '600',
     },
 });
 
