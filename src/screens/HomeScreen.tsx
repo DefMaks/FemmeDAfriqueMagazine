@@ -291,6 +291,14 @@ const HomeScreen = () => {
                 </View>
             )}
 
+            {/* Encart publicitaire DefMaks - Zone In-Read */}
+            <DmksEncart 
+                zone="in_read" 
+                autoPlay={false}
+                height={120}
+                showIndicators={false}
+            />
+
             {/* Gastronomie */}
             {gastronomiePosts.length > 0 && (
                 <View style={styles.section}>
