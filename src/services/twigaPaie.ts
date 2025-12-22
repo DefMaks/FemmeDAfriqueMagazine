@@ -272,6 +272,7 @@ export const initiatePayment = async (
 /**
  * Vérifie le statut d'un paiement E-Money
  * Endpoint: POST /api/payments/payment-check
+ * Structure réponse: { success, message, data: { status, order_id, ... } }
  */
 export const checkPaymentStatus = async (order_id: string): Promise<PaymentStatusResponse> => {
   try {
@@ -293,16 +294,38 @@ export const checkPaymentStatus = async (order_id: string): Promise<PaymentStatu
       );
     }
 
-    const status = normalizeStatus(data.status);
-    console.log(`📊 Statut normalisé: ${data.status} -> ${status}`);
+    // Extraire les données depuis data.data (structure TwigaPaie)
+    const paymentData = data.data || data;
+    const rawStatus = paymentData.status;
+    const status = normalizeStatus(rawStatus);
+    
+    console.log(`📊 Statut normalisé: ${rawStatus} -> ${status}`);
+    
+    // Vérifier aussi le message provider pour détecter le succès
+    const providerMessage = paymentData.provider_result?.message || '';
+    const hasTransactionId = paymentData.transaction_id && paymentData.transaction_id !== 'NA' && paymentData.transaction_id !== '';
+    
+    // Si on a un transaction_id valide et un message de confirmation, c'est un succès
+    if (hasTransactionId && providerMessage.toLowerCase().includes('cdf')) {
+      console.log(`✅ Transaction confirmée: ${paymentData.transaction_id}`);
+      return {
+        status: 'success',
+        order_id: paymentData.order_id || order_id,
+        amount: paymentData.amount || '0',
+        currency: paymentData.currency || 'CDF',
+        transaction_date: paymentData.service_date_time || new Date().toISOString(),
+        rawStatus: String(rawStatus),
+        provider_id: paymentData.transaction_id,
+      };
+    }
 
     return {
       status,
-      order_id: data.order_id || order_id,
-      amount: data.amount || '0',
-      currency: data.currency || 'USD',
-      transaction_date: data.transaction_date || new Date().toISOString(),
-      rawStatus: data.status,
+      order_id: paymentData.order_id || order_id,
+      amount: paymentData.amount || '0',
+      currency: paymentData.currency || 'USD',
+      transaction_date: paymentData.service_date_time || new Date().toISOString(),
+      rawStatus: String(rawStatus),
     };
   } catch (error: any) {
     console.error('❌ Erreur TwigaPaie - checkPaymentStatus:', error);
