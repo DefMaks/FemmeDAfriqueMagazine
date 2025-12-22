@@ -14,14 +14,15 @@ import {
   addPurchase,
   syncLocalDataToServer,
   ProfileUpdateData,
+  ArticleInteraction,
+  isUserLoggedIn,
 } from '../services/userProfileAPI';
-import { isLoggedIn, getUser } from '../services/wordpressAuth';
 
 interface UseUserProfileReturn {
   profile: UserProfile | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  favorites: number[];
+  favorites: ArticleInteraction[];
   refreshProfile: () => Promise<void>;
   updateProfile: (data: ProfileUpdateData) => Promise<boolean>;
   toggleFavorite: (postId: number) => Promise<boolean>;
@@ -36,7 +37,7 @@ export const useUserProfile = (): UseUserProfileReturn => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [favorites, setFavorites] = useState<number[]>([]);
+  const [favorites, setFavorites] = useState<ArticleInteraction[]>([]);
 
   // Charger le profil au montage
   useEffect(() => {
@@ -46,7 +47,7 @@ export const useUserProfile = (): UseUserProfileReturn => {
   const loadProfile = async () => {
     setIsLoading(true);
     try {
-      const loggedIn = await isLoggedIn();
+      const loggedIn = await isUserLoggedIn();
       setIsAuthenticated(loggedIn);
 
       if (loggedIn) {
@@ -85,14 +86,16 @@ export const useUserProfile = (): UseUserProfileReturn => {
 
   const handleToggleFavorite = useCallback(async (postId: number): Promise<boolean> => {
     const result = await toggleFavoriteAPI(postId);
-    if (result.success) {
+    if (result.success && result.favorites) {
       setFavorites(result.favorites);
     }
     return result.isFavorite;
   }, []);
 
   const checkIsFavorite = useCallback((postId: number): boolean => {
-    return favorites.includes(postId);
+    return favorites.some(f => 
+      (typeof f === 'number' ? f : f.post_id) === postId
+    );
   }, [favorites]);
 
   const handleMarkAsRead = useCallback(async (postId: number) => {
