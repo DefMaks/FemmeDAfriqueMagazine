@@ -1,5 +1,20 @@
-import { supabase, getDeviceId } from '../lib/supabase';
+// src/services/supabaseService.ts
+// Service pour les articles sauvegardés (favoris) - utilise WordPress API
+// Supabase est utilisé uniquement pour les transactions d'achat de magazines
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Post } from '../models/Post';
+import { 
+  toggleFavorite, 
+  getFavorites, 
+  isFavorite,
+  ArticleInteraction 
+} from './userProfileAPI';
+
+// Storage keys pour le cache local
+const STORAGE_KEYS = {
+  SAVED_ARTICLES_CACHE: '@fda_saved_articles_cache',
+};
 
 export interface SavedArticle {
   id: string;
@@ -10,85 +25,142 @@ export interface SavedArticle {
   created_at: string;
 }
 
+/**
+ * Service pour gérer les articles sauvegardés (favoris)
+ * Utilise l'API WordPress pour la persistance
+ * Avec cache local pour les performances
+ */
 export const savedArticlesService = {
+  /**
+   * Récupère tous les articles sauvegardés (favoris)
+   */
   async getSavedArticles(): Promise<SavedArticle[]> {
     try {
-      const userId = await getDeviceId();
-      const { data, error } = await supabase
-        .from('saved_articles')
-        .select('*')
-        .eq('user_id', userId)
-        .order('saved_at', { ascending: false });
+      // Récupérer les favoris depuis WordPress/local
+      const favorites = await getFavorites();
+      
+      // Transformer en format SavedArticle pour compatibilité
+      const savedArticles: SavedArticle[] = favorites.map((fav: ArticleInteraction | number, index: number) => {
+        const postId = typeof fav === 'number' ? fav : fav.post_id;
+        const date = typeof fav === 'number' ? new Date().toISOString() : fav.date;
+        
+        return {
+          id: `fav_${postId}_${index}`,
+          user_id: 'current_user',
+          article_id: postId.toString(),
+          article_data: {} as Post, // Les données complètes seront chargées séparément
+          saved_at: date,
+          created_at: date,
+        };
+      });
 
-      if (error) throw error;
-      return data || [];
+      return savedArticles;
     } catch (error) {
       console.error('Error fetching saved articles:', error);
       return [];
     }
   },
 
+  /**
+   * Sauvegarde un article (ajoute aux favoris)
+   */
   async saveArticle(article: Post): Promise<boolean> {
     try {
-      const userId = await getDeviceId();
-      const { error } = await supabase
-        .from('saved_articles')
-        .insert({
-          user_id: userId,
-          article_id: article.id.toString(),
-          article_data: article,
-        });
-
-      if (error) {
-        if (error.code === '23505') {
-          console.log('Article already saved');
+      const result = await toggleFavorite(
+        article.id, 
+        article.title?.rendered || `Article #${article.id}`,
+        article.link
+      );
+      
+      // Si c'est maintenant un favori, c'est un succès
+      if (result.success && result.isFavorite) {
+        // Mettre en cache les données de l'article pour un accès hors ligne
+        await this.cacheArticleData(article);
+        return true;
+      }
+      
+      // Si toggleFavorite a retiré le favori, re-toggle pour l'ajouter
+      if (result.success && !result.isFavorite) {
+        const retoggle = await toggleFavorite(
+          article.id, 
+          article.title?.rendered || `Article #${article.id}`,
+          article.link
+        );
+        if (retoggle.success && retoggle.isFavorite) {
+          await this.cacheArticleData(article);
           return true;
         }
-        throw error;
       }
-      return true;
+      
+      return result.success;
     } catch (error) {
       console.error('Error saving article:', error);
       return false;
     }
   },
 
+  /**
+   * Retire un article des favoris
+   */
   async unsaveArticle(articleId: string): Promise<boolean> {
     try {
-      const userId = await getDeviceId();
-      const { error } = await supabase
-        .from('saved_articles')
-        .delete()
-        .eq('user_id', userId)
-        .eq('article_id', articleId);
-
-      if (error) throw error;
-      return true;
+      const isSaved = await this.isArticleSaved(articleId);
+      
+      if (isSaved) {
+        const result = await toggleFavorite(parseInt(articleId));
+        return result.success && !result.isFavorite;
+      }
+      
+      return true; // Déjà non sauvegardé
     } catch (error) {
       console.error('Error unsaving article:', error);
       return false;
     }
   },
 
+  /**
+   * Vérifie si un article est sauvegardé (en favori)
+   */
   async isArticleSaved(articleId: string): Promise<boolean> {
     try {
-      const userId = await getDeviceId();
-      const { data, error } = await supabase
-        .from('saved_articles')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('article_id', articleId)
-        .maybeSingle();
-
-      if (error) throw error;
-      return !!data;
+      return await isFavorite(parseInt(articleId));
     } catch (error) {
       console.error('Error checking if article is saved:', error);
       return false;
     }
   },
+
+  /**
+   * Cache les données d'un article localement
+   */
+  async cacheArticleData(article: Post): Promise<void> {
+    try {
+      const cacheKey = `${STORAGE_KEYS.SAVED_ARTICLES_CACHE}_${article.id}`;
+      await AsyncStorage.setItem(cacheKey, JSON.stringify(article));
+    } catch (error) {
+      console.error('Error caching article data:', error);
+    }
+  },
+
+  /**
+   * Récupère les données d'un article depuis le cache
+   */
+  async getCachedArticleData(articleId: string): Promise<Post | null> {
+    try {
+      const cacheKey = `${STORAGE_KEYS.SAVED_ARTICLES_CACHE}_${articleId}`;
+      const cached = await AsyncStorage.getItem(cacheKey);
+      return cached ? JSON.parse(cached) : null;
+    } catch (error) {
+      console.error('Error getting cached article data:', error);
+      return null;
+    }
+  },
 };
 
+/**
+ * Service pour les préférences utilisateur
+ * Stockage local uniquement
+ */
 export interface UserPreferences {
   theme?: 'light' | 'dark';
   notifications_enabled?: boolean;
@@ -96,18 +168,13 @@ export interface UserPreferences {
   [key: string]: any;
 }
 
+const PREFERENCES_KEY = '@fda_user_preferences';
+
 export const userPreferencesService = {
   async getPreferences(): Promise<UserPreferences> {
     try {
-      const userId = await getDeviceId();
-      const { data, error } = await supabase
-        .from('user_preferences')
-        .select('preferences')
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data?.preferences || {};
+      const data = await AsyncStorage.getItem(PREFERENCES_KEY);
+      return data ? JSON.parse(data) : {};
     } catch (error) {
       console.error('Error fetching preferences:', error);
       return {};
@@ -116,16 +183,9 @@ export const userPreferencesService = {
 
   async updatePreferences(preferences: UserPreferences): Promise<boolean> {
     try {
-      const userId = await getDeviceId();
-      const { error } = await supabase
-        .from('user_preferences')
-        .upsert({
-          user_id: userId,
-          preferences,
-          updated_at: new Date().toISOString(),
-        });
-
-      if (error) throw error;
+      const current = await this.getPreferences();
+      const updated = { ...current, ...preferences };
+      await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(updated));
       return true;
     } catch (error) {
       console.error('Error updating preferences:', error);
@@ -133,6 +193,12 @@ export const userPreferencesService = {
     }
   },
 };
+
+/**
+ * Service pour le suivi des vues d'articles
+ * Utilise WordPress API via markArticleAsRead
+ */
+import { markArticleAsRead } from './userProfileAPI';
 
 export interface PopularPost {
   post_id: string;
@@ -143,56 +209,25 @@ export interface PopularPost {
 }
 
 export const postViewsService = {
-  async trackView(postId: string): Promise<boolean> {
+  async trackView(postId: string, title?: string, url?: string): Promise<boolean> {
     try {
-      const userId = await getDeviceId();
-      const { error } = await supabase
-        .from('post_views')
-        .insert({
-          post_id: postId,
-          user_id: userId,
-        });
-
-      if (error) throw error;
-
-      await supabase.rpc('update_post_popularity', { p_post_id: postId });
-
-      return true;
+      const result = await markArticleAsRead(parseInt(postId), title, url);
+      return result.success;
     } catch (error) {
       console.error('Error tracking view:', error);
       return false;
     }
   },
 
+  // Note: Les posts populaires ne sont plus disponibles via Supabase
+  // Cette fonctionnalité devra être implémentée côté WordPress si nécessaire
   async getPopularPosts(limit: number = 10): Promise<PopularPost[]> {
-    try {
-      const { data, error } = await supabase
-        .from('post_popularity')
-        .select('*')
-        .order('popularity_score', { ascending: false })
-        .limit(limit);
-
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching popular posts:', error);
-      return [];
-    }
+    console.log('getPopularPosts: Feature not available - requires WordPress implementation');
+    return [];
   },
 
   async getPostViews(postId: string): Promise<number> {
-    try {
-      const { data, error } = await supabase
-        .from('post_popularity')
-        .select('total_views')
-        .eq('post_id', postId)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data?.total_views || 0;
-    } catch (error) {
-      console.error('Error getting post views:', error);
-      return 0;
-    }
+    console.log('getPostViews: Feature not available - requires WordPress implementation');
+    return 0;
   },
 };
