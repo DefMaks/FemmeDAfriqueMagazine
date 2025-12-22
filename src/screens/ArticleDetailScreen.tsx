@@ -4,7 +4,6 @@ import { View, Text, ScrollView, Image, StyleSheet, TouchableOpacity, Share, Dim
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
-import { savedArticlesService } from '../services/supabaseService';
 import { CommentsSection } from '../components/CommentsSection';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
@@ -12,7 +11,12 @@ import RenderHtml from 'react-native-render-html';
 import { analyticsService } from '../services/analytics';
 import { getAdsByZoneId } from '../services/api';
 import { InlineAdBanner, AppAd } from '../components/InlineAdBanner';
-import { markArticleAsRead, toggleFavorite as toggleFavoriteAPI, isFavorite as isFavoriteAPI } from '../services/userProfileAPI';
+import { 
+  markArticleAsRead, 
+  toggleFavorite as toggleFavoriteAPI, 
+  isFavorite as isFavoriteAPI,
+  recordShare 
+} from '../services/userProfileAPI';
 
 const { width } = Dimensions.get('window');
 const screenWidth = Dimensions.get('window').width;
@@ -30,7 +34,6 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [inReadAds, setInReadAds] = useState<AppAd[]>([]);
-  const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
     // 📊 Track article view
@@ -40,10 +43,14 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
       'article_detail'
     );
     
-    // Marquer l'article comme lu
-    markArticleAsRead(article.id);
+    // Marquer l'article comme lu via WordPress
+    markArticleAsRead(
+      article.id, 
+      article.title?.rendered, 
+      article.link
+    );
     
-    // Vérifier si l'article est en favori
+    // Vérifier si l'article est en favori (via WordPress)
     checkFavoriteStatus();
     
     // Charger les pubs pour la zone de lecture
@@ -52,12 +59,7 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
 
   const checkFavoriteStatus = async () => {
     const favorite = await isFavoriteAPI(article.id);
-    setIsFavorite(favorite);
-  };
-
-  const handleToggleFavorite = async () => {
-    const result = await toggleFavoriteAPI(article.id);
-    setIsFavorite(result.isFavorite);
+    setIsSaved(favorite);
   };
 
   const loadInReadAds = async () => {
@@ -69,23 +71,21 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
     }
   };
 
-  // Les commentaires sont maintenant gérés par CommentsSection
-
-  const checkIfSaved = async () => {
-    const saved = await savedArticlesService.isArticleSaved(article.id.toString());
-    setIsSaved(saved);
-  };
-
+  // Toggle favori via WordPress API
   const toggleSave = async () => {
     setIsLoading(true);
-    if (isSaved) {
-      const success = await savedArticlesService.unsaveArticle(article.id.toString());
-      if (success) setIsSaved(false);
-    } else {
-      const success = await savedArticlesService.saveArticle(article);
-      if (success) setIsSaved(true);
+    try {
+      const result = await toggleFavoriteAPI(
+        article.id, 
+        article.title?.rendered, 
+        article.link
+      );
+      setIsSaved(result.isFavorite);
+    } catch (error) {
+      console.error('Erreur toggle favori:', error);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   const handleShare = async () => {
