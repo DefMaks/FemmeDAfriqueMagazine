@@ -72,6 +72,43 @@ export const getActiveAdvertisements = async (zone?: AdZone): Promise<Advertisem
     return [];
   }
 };
+// export const getActiveAdvertisements = async (zone?: AdZone): Promise<Advertisement[]> => {
+//   try {
+//     console.log(`📢 Récupération des publicités${zone ? ` pour zone: ${zone}` : ''}...`);
+
+//     /*  on s’assure que la case corresponde exactement à ce qui est stocké
+//         (ou passe en « overlaps » si tu veux « l’un des »)                              */
+//     const targetFilter = ['FDA']; // ou ['fda'] si tu stockes en minuscule
+
+//     let query = supabaseAds
+//       .from('advertisements')
+//       .select('*')
+//       .eq('is_active', true)
+//       .eq('status', 'en cours')
+//       .overlaps('target', targetFilter); // ← corrige le souci de case
+
+//     if (zone) query = query.eq('zone', zone);
+
+//     const now = new Date().toISOString();
+//     query = query
+//       .lte('start_date', now)
+//       .gte('end_date', now)
+//       .order('created_at', { ascending: false });
+
+//     const { data, error } = await query;
+
+//     if (error) {
+//       console.error('❌ Erreur récupération publicités :', error.message);
+//       return [];
+//     }
+
+//     console.log(`✅ ${data?.length || 0} publicité(s) trouvée(s)`);
+//     return data ?? [];
+//   } catch (err: any) {
+//     console.error('❌ Exception advertisementService :', err.message);
+//     return [];
+//   }
+// };
 
 /**
  * Récupère toutes les publicités actives pour FDA (toutes zones confondues)

@@ -65,7 +65,10 @@ export const AdBanner: React.FC<AdBannerProps> = ({ zone = 'home' }) => {
   return (
     <TouchableOpacity style={styles.container} onPress={handleAdPress} activeOpacity={0.8}>
       {imageUrl ? (
-        <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
+        <>
+          <small style={styles.adLabel}>Publicité</small>
+          <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
+        </>
       ) : (
         <View style={styles.placeholder}>
           <Text style={styles.placeholderText}>Publicité</Text>
@@ -90,6 +93,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+    borderColor: Colors.border,
+    borderWidth: 1,
+  },
+  adLabel: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    zIndex: 10,
   },
   image: {
     width: '100%',

@@ -27,6 +27,7 @@ import { ArticleCard } from '../components/ArticleCard';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import CategoryCard from '../components/CategoryCard';
 import { analyticsService } from '../services/analytics';
+import DmksEncart from '../components/DmksEncart';
 
 type DiscoverScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type DiscoverScreenRouteProps = {
@@ -60,7 +61,7 @@ const DiscoverScreen = () => {
     const navigation = useNavigation<DiscoverScreenNavigationProp>();
     const route = useRoute();
     const params = route.params as DiscoverScreenRouteProps | undefined;
-    
+
     const [searchQuery, setSearchQuery] = useState('');
     const [categories, setCategories] = useState<Category[]>([]);
     const [featuredPosts, setFeaturedPosts] = useState<{ [key: string]: Post[] }>({});
@@ -95,7 +96,7 @@ const DiscoverScreen = () => {
         loadCategories();
         loadFeaturedCategories();
         loadPosts(1);
-        
+
         analyticsService.trackScreenView('Discover');
     }, []);
 
@@ -192,7 +193,7 @@ const DiscoverScreen = () => {
     // ⬇️ Fonction pour charger plus d'articles dans une catégorie
     const loadMoreCategoryPosts = async () => {
         if (loadingMoreCategory || !categoryHasMore || !selectedCategory) return;
-        
+
         setLoadingMoreCategory(true);
         try {
             const nextPage = categoryPage + 1;
@@ -237,7 +238,7 @@ const DiscoverScreen = () => {
             const results = await searchPosts(trimmed, 1, 10);
             setSearchResults(results);
             setSearchHasMore(results.length >= 10);
-            
+
             // 📊 Track search event
             analyticsService.trackSearch(trimmed, results.length);
         } catch (err) {
@@ -250,7 +251,7 @@ const DiscoverScreen = () => {
     // ⬇️ Fonction pour charger plus de résultats de recherche
     const loadMoreSearchResults = async () => {
         if (loadingMoreSearch || !searchHasMore || !currentSearchQuery) return;
-        
+
         setLoadingMoreSearch(true);
         try {
             const nextPage = searchPage + 1;
@@ -497,6 +498,8 @@ const DiscoverScreen = () => {
                             ))}
                         </View>
 
+                        {/* Pub avant le contenu */}
+
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Toutes les catégories</Text>
                             <View style={styles.categoriesGrid}>
@@ -510,6 +513,15 @@ const DiscoverScreen = () => {
                                 ))}
                             </View>
                         </View>
+
+
+                        {/* Encart publicitaire DefMaks - Zone Home */}
+                        <DmksEncart
+                            zone="home"
+                            autoPlay={true}
+                            autoPlayInterval={6000}
+                            height={160}
+                        />
 
                     </>
                 }

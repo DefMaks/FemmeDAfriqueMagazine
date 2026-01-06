@@ -6,7 +6,9 @@ import {
     TouchableOpacity,
     Linking,
     Platform,
+    Text,
 } from 'react-native';
+import { Colors } from '../theme/colors';
 
 export interface AppAd {
     id: number;
@@ -38,7 +40,7 @@ export const InlineAdBanner: React.FC<InlineAdBannerProps> = ({ ad, onPress }) =
     const [aspectRatio, setAspectRatio] = useState(3); // Default aspect ratio (width/height)
 
     const getImageUrl = (): string | null => {
-        return ad.better_featured_image?.source_url 
+        return ad.better_featured_image?.source_url
             || ad.dmks_featured_image?.src
             || ad.dmks_featured_image?.sizes?.large?.url
             || null;
@@ -90,6 +92,9 @@ export const InlineAdBanner: React.FC<InlineAdBannerProps> = ({ ad, onPress }) =
             activeOpacity={0.9}
             onPress={handlePress}
         >
+            <Text style={styles.adLabel}>
+                Publicité
+            </Text>
             <Image
                 source={{ uri: imageUrl }}
                 style={[styles.image, { aspectRatio }]}
@@ -109,14 +114,29 @@ const styles = StyleSheet.create({
         ...Platform.select({
             ios: {
                 shadowColor: '#000',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
+                shadowOffset: { width: 0.5, height: 2 },
+                shadowOpacity: 0.2,
                 shadowRadius: 6,
             },
             android: {
                 elevation: 3,
             },
         }),
+        borderColor: Colors.border,
+        borderWidth: 1,
+    },
+    adLabel: {
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 4,
+        zIndex: 10,
+        color: 'white',
+        fontSize: 10,
+        fontWeight: '500',
     },
     image: {
         width: '100%',

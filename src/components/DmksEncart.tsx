@@ -15,12 +15,12 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Colors } from '../theme/colors';
-import { 
-  Advertisement, 
-  AdZone, 
+import {
+  Advertisement,
+  AdZone,
   getActiveAdvertisements,
   trackAdClick,
-  trackAdImpression 
+  trackAdImpression
 } from '../services/advertisementService';
 
 const { width } = Dimensions.get('window');
@@ -119,7 +119,7 @@ export const DmksEncart: React.FC<DmksEncartProps> = ({
     const contentOffsetX = event.nativeEvent.contentOffset.x;
     const newIndex = Math.round(contentOffsetX / ENCART_WIDTH);
     setCurrentIndex(newIndex);
-    
+
     setTimeout(() => {
       setIsUserInteracting(false);
     }, 3000);
@@ -163,14 +163,14 @@ export const DmksEncart: React.FC<DmksEncartProps> = ({
               style={styles.adImage}
               resizeMode="cover"
             />
-            
+
             {/* Badge "Pub" discret */}
             <View style={styles.adBadge}>
-              <Text style={styles.adBadgeText}>Pub</Text>
+              <Text style={styles.adBadgeText}>Publicité</Text>
             </View>
 
             {/* Overlay avec titre si présent */}
-            {ad.title && (
+            {ad.description && (
               <View style={styles.overlay}>
                 <Text style={styles.adTitle} numberOfLines={1}>
                   {ad.title}
@@ -236,7 +236,7 @@ export const DmksEncartSingle: React.FC<{
 
   const handlePress = async () => {
     if (!ad) return;
-    
+
     await trackAdClick(ad.id);
 
     if (ad.external_link) {
@@ -291,6 +291,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 6,
     elevation: 4,
+    borderColor: Colors.border,
+    borderWidth: 1,
   },
   adImage: {
     width: '100%',

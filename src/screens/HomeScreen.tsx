@@ -80,7 +80,7 @@ const HomeScreen = () => {
     const getAdBannerImageUrl = (): string | null => {
         if (!homeBannerAd) return null;
         // Essayer différentes sources d'image
-        return homeBannerAd.better_featured_image?.source_url 
+        return homeBannerAd.better_featured_image?.source_url
             || homeBannerAd.dmks_featured_image?.src
             || homeBannerAd.dmks_featured_image?.sizes?.large?.url
             || null;
@@ -123,11 +123,11 @@ const HomeScreen = () => {
                 post.title?.rendered
             );
 
-            const statusChecks = allPosts.map(post => 
+            const statusChecks = allPosts.map(post =>
                 isArticleSaved(post.id).then(saved => ({ id: post.id, saved }))
             );
             const statusResults = await Promise.all(statusChecks);
-            
+
             const status: Record<number, boolean> = {};
             statusResults.forEach(({ id, saved }) => {
                 status[id] = saved;
@@ -193,8 +193,8 @@ const HomeScreen = () => {
             {/* Slider principal avec autoplay */}
             {sliderPosts.length > 0 && (
                 <View style={styles.section}>
-                    <PostSlider 
-                        posts={sliderPosts} 
+                    <PostSlider
+                        posts={sliderPosts}
                         onPress={handleArticlePress}
                         autoPlay={true}
                         autoPlayInterval={5000}
@@ -202,18 +202,10 @@ const HomeScreen = () => {
                 </View>
             )}
 
-            {/* Encart publicitaire DefMaks - Zone Home */}
-            <DmksEncart 
-                zone="home" 
-                autoPlay={true}
-                autoPlayInterval={6000}
-                height={160}
-            />
-
             {/* Bannière publicitaire WordPress (fallback) */}
             {getAdBannerImageUrl() && (
                 <View style={styles.adBannerSection}>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         onPress={() => navigation.navigate('Boutique')}
                         activeOpacity={0.9}
                     >
@@ -231,15 +223,18 @@ const HomeScreen = () => {
                 <View style={styles.section}>
                     <SectionHeader title="Derniers articles" onSeeAll={handleSeeAllArticles} />
                     {latestPosts.map((post, index) => (
-                        <ArticleCard 
+                        <ArticleCard
                             key={`latest_${post.id}_${index}`}
-                            article={post} 
-                            onPress={() => handleArticlePress(post)} 
-                            variant="horizontal" 
+                            article={post}
+                            onPress={() => handleArticlePress(post)}
+                            variant="horizontal"
                         />
                     ))}
                 </View>
             )}
+
+            {/* TODO: Ajouter les bannières publicitaires ici <AdBanner />*/}
+
 
             {/* Espace Tendresse */}
             {espaceTendressePosts.length > 0 && (
@@ -255,16 +250,24 @@ const HomeScreen = () => {
                     >
                         {espaceTendressePosts.map((post, index) => (
                             <View key={`espace_${post.id}_${index}`} style={styles.horizontalCard}>
-                                <ArticleCard 
-                                    article={post} 
-                                    onPress={() => handleArticlePress(post)} 
-                                    variant="vertical" 
+                                <ArticleCard
+                                    article={post}
+                                    onPress={() => handleArticlePress(post)}
+                                    variant="vertical"
                                 />
                             </View>
                         ))}
                     </ScrollView>
                 </View>
             )}
+
+            {/* Encart publicitaire DefMaks - Zone Home */}
+            <DmksEncart
+                zone="home"
+                autoPlay={true}
+                autoPlayInterval={6000}
+                height={160}
+            />
 
             {/* Entrepreneuriat */}
             {entrepreneuriatPosts.length > 0 && (
@@ -280,10 +283,10 @@ const HomeScreen = () => {
                     >
                         {entrepreneuriatPosts.map((post, index) => (
                             <View key={`entrepreneur_${post.id}_${index}`} style={styles.horizontalCard}>
-                                <ArticleCard 
-                                    article={post} 
-                                    onPress={() => handleArticlePress(post)} 
-                                    variant="vertical" 
+                                <ArticleCard
+                                    article={post}
+                                    onPress={() => handleArticlePress(post)}
+                                    variant="vertical"
                                 />
                             </View>
                         ))}
@@ -292,8 +295,8 @@ const HomeScreen = () => {
             )}
 
             {/* Encart publicitaire DefMaks - Zone In-Read */}
-            <DmksEncart 
-                zone="in_read" 
+            <DmksEncart
+                zone="in_read"
                 autoPlay={false}
                 height={120}
                 showIndicators={false}
@@ -313,10 +316,10 @@ const HomeScreen = () => {
                     >
                         {gastronomiePosts.map((post, index) => (
                             <View key={`gastro_${post.id}_${index}`} style={styles.horizontalCard}>
-                                <ArticleCard 
-                                    article={post} 
-                                    onPress={() => handleArticlePress(post)} 
-                                    variant="vertical" 
+                                <ArticleCard
+                                    article={post}
+                                    onPress={() => handleArticlePress(post)}
+                                    variant="vertical"
                                 />
                             </View>
                         ))}
