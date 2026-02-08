@@ -2,10 +2,11 @@
  * Analytics Service
  * 
  * Service centralisé pour tracker les événements et les vues d'articles
- * Compatible avec Google Analytics et peut être étendu pour d'autres services
+ * Compatible avec Google Analytics (Expo) et Supabase pour le stockage local
  */
 
 import { supabase, getDeviceId } from '../lib/supabase';
+import { simpleAnalyticsService } from './expoAnalytics';
 
 export interface AnalyticsEvent {
   event_name: string;
@@ -68,6 +69,14 @@ class AnalyticsService {
         console.log('📊 Analytics Event:', eventData);
       }
 
+      // Envoyer à Simple Analytics
+      await simpleAnalyticsService.trackEvent(event.event_name, {
+        event_category: event.event_category,
+        event_label: event.event_label,
+        event_value: event.event_value,
+        ...event.metadata,
+      });
+
       // Envoyer à Supabase pour stockage (silencieux en cas d'erreur)
       // Utiliser un timeout court pour ne pas bloquer l'app
       const analyticsTimeout = new Promise((_, reject) => 
@@ -109,6 +118,9 @@ class AnalyticsService {
       if (__DEV__) {
         console.log('👁️ Article View:', viewData);
       }
+
+      // Envoyer à Simple Analytics
+      await simpleAnalyticsService.trackArticleView(articleId, articleTitle, source);
 
       // Enregistrer la vue dans Supabase (silencieux en cas d'erreur)
       // Utiliser un timeout court pour ne pas bloquer l'app
@@ -154,6 +166,9 @@ class AnalyticsService {
    * Track une ouverture de screen
    */
   async trackScreenView(screenName: string): Promise<boolean> {
+    // Envoyer à Simple Analytics
+    await simpleAnalyticsService.trackScreenView(screenName);
+
     return this.trackEvent({
       event_name: 'screen_view',
       event_category: 'navigation',
@@ -203,6 +218,43 @@ class AnalyticsService {
       event_label: query,
       event_value: resultsCount,
     });
+  }
+
+  /**
+   * Événement personnalisé pour la consultation d'article (spécifique GA4)
+   * @param articleTitle - Titre de l'article
+   * @param category - Catégorie de l'article (optionnel)
+   * @param articleId - ID de l'article (optionnel)
+   */
+  async trackArticleViewed(
+    articleTitle: string, 
+    category?: string, 
+    articleId?: number
+  ): Promise<void> {
+    // Envoyer à Simple Analytics
+    await simpleAnalyticsService.trackArticleViewed(articleTitle, category, articleId);
+
+    // Aussi tracker comme événement générique pour Supabase
+    await this.trackEvent({
+      event_name: 'article_viewed',
+      event_category: 'engagement',
+      event_label: articleTitle,
+      metadata: {
+        article_title: articleTitle,
+        article_category: category || 'non_catégorisé',
+        article_id: articleId?.toString(),
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  /**
+   * Active/désactive la collection de données analytiques Expo
+   * @param enabled - Activer ou désactiver la collection
+   */
+  async setAnalyticsCollectionEnabled(enabled: boolean): Promise<void> {
+    simpleAnalyticsService.setEnabled(enabled);
+    console.log(`� Expo Analytics: Collection ${enabled ? 'activée' : 'désactivée'}`);
   }
 
   /**

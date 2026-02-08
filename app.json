@@ -14,10 +14,12 @@
     },
     "ios": {
       "bundleIdentifier": "com.defmaks.fda",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "supportsTablet": true
     },
     "android": {
       "package": "com.defmaks.fda",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"

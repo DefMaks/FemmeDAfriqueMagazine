@@ -17,6 +17,7 @@ import {
     getCategories,
     getPosts,
     getPostsByCategory,
+    getPostsByTag,
     searchPosts,
 } from '../services/api';
 import { Category } from '../models/Category';
@@ -32,6 +33,7 @@ type DiscoverScreenNavigationProp = NativeStackNavigationProp<RootStackParamList
 type DiscoverScreenRouteProps = {
     categoryId?: number;
     categoryName?: string;
+    isTag?: boolean;
 };
 
 const FEATURED_CATEGORIES = {
@@ -60,7 +62,7 @@ const DiscoverScreen = () => {
     const navigation = useNavigation<DiscoverScreenNavigationProp>();
     const route = useRoute();
     const params = route.params as DiscoverScreenRouteProps | undefined;
-    
+
     const [searchQuery, setSearchQuery] = useState('');
     const [categories, setCategories] = useState<Category[]>([]);
     const [featuredPosts, setFeaturedPosts] = useState<{ [key: string]: Post[] }>({});
@@ -95,7 +97,7 @@ const DiscoverScreen = () => {
         loadCategories();
         loadFeaturedCategories();
         loadPosts(1);
-        
+
         analyticsService.trackScreenView('Discover');
     }, []);
 
@@ -115,7 +117,22 @@ const DiscoverScreen = () => {
         }
 
         try {
-            const data = await getPosts(pageNum, 6);
+            let data;
+
+            // Si on a un categoryId, charger les posts de cette catégorie ou tag
+            if (params?.categoryId) {
+                if (params.isTag) {
+                    // Charger les posts par tag
+                    data = await getPostsByTag(params.categoryId, pageNum, 6);
+                } else {
+                    // Charger les posts par catégorie
+                    data = await getPostsByCategory(params.categoryId, pageNum, 6);
+                }
+            } else {
+                // Charger tous les posts
+                data = await getPosts(pageNum, 6);
+            }
+
             if (data.length === 0) {
                 setHasMore(false);
             } else {
@@ -192,7 +209,7 @@ const DiscoverScreen = () => {
     // ⬇️ Fonction pour charger plus d'articles dans une catégorie
     const loadMoreCategoryPosts = async () => {
         if (loadingMoreCategory || !categoryHasMore || !selectedCategory) return;
-        
+
         setLoadingMoreCategory(true);
         try {
             const nextPage = categoryPage + 1;
@@ -237,7 +254,7 @@ const DiscoverScreen = () => {
             const results = await searchPosts(trimmed, 1, 10);
             setSearchResults(results);
             setSearchHasMore(results.length >= 10);
-            
+
             // 📊 Track search event
             analyticsService.trackSearch(trimmed, results.length);
         } catch (err) {
@@ -250,7 +267,7 @@ const DiscoverScreen = () => {
     // ⬇️ Fonction pour charger plus de résultats de recherche
     const loadMoreSearchResults = async () => {
         if (loadingMoreSearch || !searchHasMore || !currentSearchQuery) return;
-        
+
         setLoadingMoreSearch(true);
         try {
             const nextPage = searchPage + 1;

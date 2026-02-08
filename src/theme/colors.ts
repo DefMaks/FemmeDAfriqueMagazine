@@ -3,6 +3,8 @@ export const Colors = {
   primary_rgb: "169, 63, 85",
   primaryLight: "#D47B8B",
   primaryDark: "#7E2E41",
+  ternary: "#E84D15",
+  ternary_rgb: "232, 77, 21",
   background: "#F8F9FA",
   backgroundLight: "#FFFFFF",
   text: "#1A1A1A",

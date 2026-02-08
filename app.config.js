@@ -29,7 +29,11 @@ export default {
         backgroundColor: "#ffffff"
       }
     },
-    plugins: [],
+    plugins: [
+      ['onesignal-expo-plugin', {
+        mode: __DEV__ ? 'development' : 'production',
+      }]
+    ],
     web: {
       favicon: "./assets/favicon.png"
     },

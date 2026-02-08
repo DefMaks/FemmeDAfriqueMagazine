@@ -19,8 +19,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getMagazines, getMedia } from '../services/api';
 import { Magazine } from '../models/Magazine';
 import { Colors } from '../theme/colors';
-import { 
-    initiatePayment, 
+import {
+    initiatePayment,
     checkPaymentStatus,
     initiateCardPayment,
     checkCardPaymentStatus,
@@ -43,7 +43,7 @@ import { Ionicons } from '@expo/vector-icons';
 const STORAGE_KEY_PHONE = '@fda_user_phone';
 
 // 🧪 Mode test : si true, le prix est de 100 CDF TTC
-const isTest = true;
+const isTest = false;
 const TEST_PRICE_CDF = 100;
 
 const ShopScreen = () => {
@@ -91,10 +91,10 @@ const ShopScreen = () => {
     };
 
     // Prix total : en mode test = 100 CDF, sinon prix normal en USD
-    const totalPrice = isTest 
-        ? TEST_PRICE_CDF 
+    const totalPrice = isTest
+        ? TEST_PRICE_CDF
         : (selectedMagazine ? selectedMagazine.acf.prix_mag + selectedMagazine.acf.tva : 0);
-    
+
     // Devise selon le mode
     const currency = isTest ? 'CDF' : 'USD';
 
@@ -137,7 +137,7 @@ const ShopScreen = () => {
             text = '243' + text.replace(/^243/, '');
         }
         setPhone(text);
-        
+
         if (text.length >= 5) {
             try {
                 const { providerName } = formatPhoneAndDeduceProvider(text);
@@ -157,10 +157,10 @@ const ShopScreen = () => {
         providerName?: string
     ) => {
         if (!selectedMagazine) return;
-        
+
         try {
             console.log('📝 Enregistrement de l\'achat sur DefMaks...');
-            
+
             const result = await recordMagazinePurchase(
                 orderId,
                 phone,
@@ -174,7 +174,7 @@ const ShopScreen = () => {
                 paymentMethodUsed,
                 providerName
             );
-            
+
             if (result.success) {
                 console.log('✅ Achat enregistré sur DefMaks:', result.purchase_id);
             } else {
@@ -189,7 +189,7 @@ const ShopScreen = () => {
     // Paiement E-Money avec polling optimisé
     const handleEmoneyPayment = async () => {
         if (!selectedMagazine) return;
-        
+
         if (phone.length < 12) {
             Alert.alert('Erreur', 'Veuillez entrer un numéro de téléphone valide (12 chiffres)');
             return;
@@ -202,7 +202,7 @@ const ShopScreen = () => {
         try {
             const orderId = generateOrderId();
             setCurrentOrderNumber(orderId);
-            
+
             const result = await initiatePayment(
                 phone,
                 totalPrice.toString(),
@@ -211,7 +211,7 @@ const ShopScreen = () => {
             );
 
             setPaymentStatusMessage('📱 Veuillez confirmer sur votre téléphone...');
-            
+
             Alert.alert(
                 '📱 Paiement initié',
                 `Veuillez confirmer le paiement de ${totalPrice} ${currency} sur votre téléphone.\n\nVous recevrez une notification push de votre opérateur mobile.`,
@@ -220,7 +220,7 @@ const ShopScreen = () => {
 
             // Polling avec mise à jour du statut
             setPaymentStatusMessage('🔄 Vérification en cours...');
-            
+
             const finalStatus = await pollPaymentStatus(
                 result.order_id,
                 8,  // 8 tentatives
@@ -235,10 +235,10 @@ const ShopScreen = () => {
 
             if (isPaymentSuccessful(finalStatus.status)) {
                 setPaymentStatusMessage('✅ Paiement confirmé !');
-                
+
                 // Enregistrer l'achat sur DefMaks
                 await recordSuccessfulPurchase(result.order_id, 'emoney', detectedProvider);
-                
+
                 setPaymentSuccess(true);
                 setShowDownloadPopup(true);
             } else if (isPaymentFailed(finalStatus.status)) {
@@ -252,7 +252,7 @@ const ShopScreen = () => {
                 // Toujours en attente après le polling
                 setPaymentStatusMessage('');
                 Alert.alert(
-                    '⏳ Paiement en attente', 
+                    '⏳ Paiement en attente',
                     'Le paiement n\'a pas encore été confirmé.\n\nVeuillez vérifier si vous avez reçu une demande de confirmation sur votre téléphone.',
                     [
                         { text: 'Annuler', style: 'cancel' },
@@ -271,16 +271,16 @@ const ShopScreen = () => {
     const recheckPayment = async (orderId: string) => {
         setLoadingPayment(true);
         setPaymentStatusMessage('🔄 Vérification en cours...');
-        
+
         try {
             const status = await pollPaymentStatus(orderId, 3, 3000);
-            
+
             if (isPaymentSuccessful(status.status)) {
                 setPaymentStatusMessage('✅ Paiement confirmé !');
-                
+
                 // Enregistrer l'achat sur DefMaks
                 await recordSuccessfulPurchase(orderId, 'emoney', detectedProvider);
-                
+
                 setPaymentSuccess(true);
                 setShowDownloadPopup(true);
             } else if (isPaymentFailed(status.status)) {
@@ -289,7 +289,7 @@ const ShopScreen = () => {
             } else {
                 setPaymentStatusMessage('');
                 Alert.alert(
-                    '⏳ En attente', 
+                    '⏳ En attente',
                     'Le paiement n\'est pas encore confirmé.\n\nAssurez-vous d\'avoir validé la demande sur votre téléphone.',
                     [
                         { text: 'OK' },
@@ -324,15 +324,15 @@ const ShopScreen = () => {
             if (result.redirect_url) {
                 setCurrentOrderNumber(result.orderNumber || orderId);
                 setPaymentStatusMessage('🌐 Ouverture de la page de paiement...');
-                
+
                 // Ouvrir le navigateur in-app
                 const browserResult = await openCardPaymentPageSimple(result.redirect_url);
-                
+
                 console.log('📱 Navigateur fermé, résultat:', browserResult);
-                
+
                 // Après fermeture du navigateur, vérifier le statut
                 setPaymentStatusMessage('🔄 Vérification du paiement...');
-                
+
                 // Polling pour vérifier le statut
                 const finalStatus = await pollCardPaymentStatus(
                     result.orderNumber || orderId,
@@ -345,10 +345,10 @@ const ShopScreen = () => {
 
                 if (isPaymentSuccessful(finalStatus.status)) {
                     setPaymentStatusMessage('✅ Paiement confirmé !');
-                    
+
                     // Enregistrer l'achat sur DefMaks
                     await recordSuccessfulPurchase(result.orderNumber || orderId, 'ecard', 'FlexPay');
-                    
+
                     setPaymentSuccess(true);
                     setShowDownloadPopup(true);
                 } else if (isPaymentFailed(finalStatus.status)) {
@@ -365,13 +365,13 @@ const ShopScreen = () => {
                         '🔍 Vérification du paiement',
                         'Avez-vous complété le paiement par carte ?',
                         [
-                            { 
-                                text: 'Non, annuler', 
+                            {
+                                text: 'Non, annuler',
                                 style: 'cancel',
                             },
-                            { 
-                                text: 'Oui, vérifier', 
-                                onPress: () => verifyCardPayment(result.orderNumber || orderId) 
+                            {
+                                text: 'Oui, vérifier',
+                                onPress: () => verifyCardPayment(result.orderNumber || orderId)
                             }
                         ]
                     );
@@ -388,28 +388,28 @@ const ShopScreen = () => {
     const verifyCardPayment = async (orderNumber: string) => {
         setLoadingPayment(true);
         setPaymentStatusMessage('🔄 Vérification en cours...');
-        
+
         try {
             const status = await pollCardPaymentStatus(orderNumber, 3, 3000);
-            
+
             if (isPaymentSuccessful(status.status)) {
                 setPaymentStatusMessage('✅ Paiement confirmé !');
-                
+
                 // Enregistrer l'achat sur DefMaks
                 await recordSuccessfulPurchase(orderNumber, 'ecard', 'FlexPay');
-                
+
                 setPaymentSuccess(true);
                 setShowDownloadPopup(true);
             } else if (isPaymentFailed(status.status)) {
                 setPaymentStatusMessage('');
                 Alert.alert(
-                    '❌ Paiement échoué', 
+                    '❌ Paiement échoué',
                     `Le paiement a échoué: ${status.rawStatus || status.status}`
                 );
             } else {
                 setPaymentStatusMessage('');
                 Alert.alert(
-                    '⏳ Paiement en attente', 
+                    '⏳ Paiement en attente',
                     'Le paiement n\'a pas encore été confirmé.',
                     [
                         { text: 'OK' },
@@ -433,7 +433,7 @@ const ShopScreen = () => {
             const filename = `FDA_N${selectedMagazine.acf.numero}.pdf`;
             const documentDir = FileSystem.Paths?.document?.uri || FileSystem.Paths?.cache?.uri || '';
             const localUri = `${documentDir}/${filename}`;
-            
+
             // Télécharger le fichier
             const downloadResult = await FileSystem.downloadAsync(pdfUrl, localUri);
 
@@ -463,10 +463,10 @@ const ShopScreen = () => {
     };
 
     const renderMagazine = ({ item }: { item: Magazine }) => {
-        const displayPrice = isTest 
-            ? `${TEST_PRICE_CDF} CDF TTC` 
+        const displayPrice = isTest
+            ? `${TEST_PRICE_CDF} CDF TTC`
             : `$${(item.acf.prix_mag + item.acf.tva).toFixed(2)} TTC*`;
-        
+
         return (
             <TouchableOpacity
                 style={styles.magazineCard}
@@ -488,7 +488,7 @@ const ShopScreen = () => {
                         </View>
                     )}
                 </View>
-                
+
                 <View style={styles.magazineCardInfo}>
                     <Text style={styles.title}>N°{item.acf.numero}</Text>
                     <Text style={styles.info}>{item.acf.pages} pages</Text>
@@ -509,7 +509,7 @@ const ShopScreen = () => {
 
     return (
         <View style={styles.container}>
-            <Text style={styles.header}>Boutique FDA</Text>
+            <Text style={styles.header}>Boutique FAM</Text>
 
             <FlatList
                 data={magazines}
@@ -553,9 +553,9 @@ const ShopScreen = () => {
                                 {/* Info magazine */}
                                 <View style={styles.magazineInfo}>
                                     <Image
-                                        source={{ 
-                                            uri: selectedMagazine.better_featured_image?.source_url || 
-                                                 selectedMagazine.dmks_featured_image?.src 
+                                        source={{
+                                            uri: selectedMagazine.better_featured_image?.source_url ||
+                                                selectedMagazine.dmks_featured_image?.src
                                         }}
                                         style={styles.checkoutCover}
                                     />
@@ -580,7 +580,7 @@ const ShopScreen = () => {
                                 {!paymentMethod && (
                                     <View style={styles.paymentMethods}>
                                         <Text style={styles.sectionTitle}>Choisir le mode de paiement</Text>
-                                        
+
                                         <TouchableOpacity
                                             style={styles.paymentOption}
                                             onPress={() => setPaymentMethod('emoney')}
@@ -614,7 +614,7 @@ const ShopScreen = () => {
                                 {/* Formulaire E-Money */}
                                 {paymentMethod === 'emoney' && (
                                     <View style={styles.paymentForm}>
-                                        <TouchableOpacity 
+                                        <TouchableOpacity
                                             style={styles.backToMethods}
                                             onPress={() => setPaymentMethod(null)}
                                         >
@@ -651,7 +651,7 @@ const ShopScreen = () => {
                                                 </Text>
                                             )}
                                         </TouchableOpacity>
-                                        
+
                                         {/* Message de statut du paiement */}
                                         {paymentStatusMessage ? (
                                             <View style={styles.statusMessageContainer}>
@@ -664,7 +664,7 @@ const ShopScreen = () => {
                                 {/* Formulaire E-Card */}
                                 {paymentMethod === 'ecard' && (
                                     <View style={styles.paymentForm}>
-                                        <TouchableOpacity 
+                                        <TouchableOpacity
                                             style={styles.backToMethods}
                                             onPress={() => setPaymentMethod(null)}
                                         >
@@ -698,7 +698,7 @@ const ShopScreen = () => {
                                                 </>
                                             )}
                                         </TouchableOpacity>
-                                        
+
                                         {/* Message de statut du paiement */}
                                         {paymentStatusMessage ? (
                                             <View style={styles.statusMessageContainer}>
@@ -746,7 +746,7 @@ const ShopScreen = () => {
                                     <Text style={styles.downloadPopupText}>
                                         Téléchargez dès maintenant votre magazine en PDF pour le lire hors-ligne.
                                     </Text>
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={styles.downloadPopupButton}
                                         onPress={() => {
                                             setShowDownloadPopup(false);
@@ -756,7 +756,7 @@ const ShopScreen = () => {
                                         <Ionicons name="download-outline" size={22} color="#FFF" />
                                         <Text style={styles.downloadPopupButtonText}>Télécharger le PDF</Text>
                                     </TouchableOpacity>
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         style={styles.downloadPopupLaterButton}
                                         onPress={() => setShowDownloadPopup(false)}
                                     >
@@ -787,7 +787,7 @@ const ShopScreen = () => {
                         <Ionicons name="shield-checkmark" size={48} color="#4CAF50" />
                         <Text style={styles.securityTitle}>Paiement 100% Sécurisé</Text>
                         <Text style={styles.securityText}>
-                            Votre transaction est sécurisée par TwigaPaie, 
+                            Votre transaction est sécurisée par TwigaPaie,
                             conformément aux termes établis entre{' '}
                             <Text style={styles.boldText}>Femme d'Afrique Magazine</Text> et{' '}
                             <Text style={styles.boldText}>DefMaks</Text>.
@@ -795,7 +795,7 @@ const ShopScreen = () => {
                         <Text style={styles.securitySubtext}>
                             Vos données de paiement sont cryptées et ne sont jamais stockées sur nos serveurs.
                         </Text>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={styles.securityButton}
                             onPress={() => setShowSecurityNotice(false)}
                         >

@@ -1,12 +1,22 @@
 // src/screens/SavedScreen.tsx
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getSavedArticles, removeArticle } from '../services/savedArticles';
 import { Post } from '../models/Post';
 import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
+import { decodeHtmlEntities } from '../utils/textUtils';
+import { RootStackParamList } from '../navigation/RootNavigator';
+
+const formatTitle = (title: string) => decodeHtmlEntities(title);
+
+
+type SavedScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const SavedScreen = () => {
+  const navigation = useNavigation<SavedScreenNavigationProp>();
   const [savedPosts, setSavedPosts] = useState<Post[]>([]);
 
   useEffect(() => {
@@ -23,13 +33,25 @@ const SavedScreen = () => {
     setSavedPosts(prev => prev.filter(p => p.id !== id));
   };
 
+  const handleArticlePress = (article: Post) => {
+    navigation.navigate('ArticleDetail', { article });
+  };
+
   const renderSavedPost = ({ item }: { item: Post }) => (
-    <View style={styles.postCard}>
-      <Text style={styles.title} numberOfLines={2}>{item.title.rendered}</Text>
-      <TouchableOpacity onPress={() => handleRemove(item.id)} style={styles.removeButton}>
+    <TouchableOpacity
+      style={styles.postCard}
+      onPress={() => handleArticlePress(item)}
+      activeOpacity={0.8}
+    >
+      <Text style={styles.title} numberOfLines={2}>{formatTitle(item.title.rendered)}</Text>
+      <TouchableOpacity
+        onPress={() => handleRemove(item.id)}
+        style={styles.removeButton}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
         <Ionicons name="trash-outline" size={18} color={Colors.primary} />
       </TouchableOpacity>
-    </View>
+    </TouchableOpacity>
   );
 
   if (savedPosts.length === 0) {
@@ -42,6 +64,9 @@ const SavedScreen = () => {
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Favoris</Text>
+      </View>
       <FlatList
         data={savedPosts}
         renderItem={renderSavedPost}
@@ -54,6 +79,20 @@ const SavedScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background, padding: 16 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    backgroundColor: Colors.backgroundLight,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: Colors.text,
+    marginLeft: 8,
+  },
   list: { paddingBottom: 20 },
   postCard: {
     backgroundColor: '#fff',

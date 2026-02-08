@@ -30,7 +30,6 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ postId }) => {
     const [guestName, setGuestName] = useState('');
     const [guestEmail, setGuestEmail] = useState('');
     const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
-    const [showGuestFields, setShowGuestFields] = useState(false);
     const [expanded, setExpanded] = useState(false);
 
     useEffect(() => {
@@ -56,6 +55,29 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ postId }) => {
     };
 
     const handleSubmitComment = async () => {
+        // Validation pour les utilisateurs non connectés
+        if (!isUserLoggedIn) {
+            if (!guestName.trim()) {
+                Alert.alert('Erreur', 'Veuillez entrer votre nom');
+                return;
+            }
+            if (guestName.trim().length < 6) {
+                Alert.alert('Erreur', 'Le nom doit contenir au moins 6 caractères');
+                return;
+            }
+            if (!guestEmail.trim()) {
+                Alert.alert('Erreur', 'Veuillez entrer votre email');
+                return;
+            }
+            // Validation du format email
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(guestEmail.trim())) {
+                Alert.alert('Erreur', 'Veuillez entrer une adresse email valide');
+                return;
+            }
+        }
+
+        // Validation du contenu du commentaire
         if (!newComment.trim()) {
             Alert.alert('Erreur', 'Veuillez entrer un commentaire');
             return;
@@ -65,29 +87,49 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ postId }) => {
 
         try {
             let result;
-            
+
             if (isUserLoggedIn) {
                 result = await postComment({
                     post: postId,
-                    content: newComment,
+                    content: newComment.trim(),
                 });
             } else {
-                if (!guestName.trim() || !guestEmail.trim()) {
-                    Alert.alert('Erreur', 'Veuillez entrer votre nom et email');
-                    setSubmitting(false);
-                    setShowGuestFields(true);
-                    return;
-                }
-                result = await postGuestComment(postId, newComment, guestName, guestEmail);
+                result = await postGuestComment(postId, newComment.trim(), guestName.trim(), guestEmail.trim());
             }
 
             if (result) {
                 setComments(prev => [result, ...prev]);
                 setNewComment('');
+                setGuestName('');
+                setGuestEmail('');
                 Alert.alert('Succès', 'Votre commentaire a été publié');
             }
         } catch (error: any) {
-            Alert.alert('Erreur', error.message || 'Impossible de publier le commentaire');
+            console.error('Erreur publication commentaire:', error.message);
+
+            // Si les commentaires invités ne sont pas autorisés
+            if (error.message.includes('connecter') || error.message.includes('invités ne sont pas autorisés')) {
+                Alert.alert(
+                    'Connexion requise',
+                    'Pour commenter cet article, vous devez vous connecter. Voulez-vous vous connecter maintenant ?',
+                    [
+                        {
+                            text: 'Annuler',
+                            style: 'cancel',
+                        },
+                        {
+                            text: 'Se connecter',
+                            onPress: () => {
+                                // Naviguer vers l'écran de connexion
+                                // navigation.navigate('Login');
+                                console.log('Navigation vers connexion');
+                            },
+                        },
+                    ]
+                );
+            } else {
+                Alert.alert('Erreur', error.message || 'Impossible de publier le commentaire');
+            }
         } finally {
             setSubmitting(false);
         }
@@ -122,98 +164,136 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ postId }) => {
     );
 
     return (
-        <View style={styles.container}>
-            <TouchableOpacity 
-                style={styles.header}
-                onPress={() => setExpanded(!expanded)}
-            >
-                <View style={styles.headerLeft}>
-                    <Ionicons name="chatbubbles-outline" size={20} color={Colors.text} />
-                    <Text style={styles.headerTitle}>
-                        Commentaires ({comments.length})
-                    </Text>
-                </View>
-                <Ionicons 
-                    name={expanded ? 'chevron-up' : 'chevron-down'} 
-                    size={20} 
-                    color={Colors.textLight} 
-                />
-            </TouchableOpacity>
-
-            {expanded && (
-                <View style={styles.content}>
-                    {/* Formulaire de commentaire */}
-                    <View style={styles.inputSection}>
-                        {!isUserLoggedIn && showGuestFields && (
-                            <>
-                                <TextInput
-                                    style={styles.guestInput}
-                                    placeholder="Votre nom"
-                                    value={guestName}
-                                    onChangeText={setGuestName}
-                                />
-                                <TextInput
-                                    style={styles.guestInput}
-                                    placeholder="Votre email"
-                                    value={guestEmail}
-                                    onChangeText={setGuestEmail}
-                                    keyboardType="email-address"
-                                    autoCapitalize="none"
-                                />
-                            </>
-                        )}
-                        <View style={styles.inputRow}>
-                            <TextInput
-                                style={styles.commentInput}
-                                placeholder="Écrire un commentaire..."
-                                value={newComment}
-                                onChangeText={setNewComment}
-                                multiline
-                                maxLength={1000}
-                            />
-                            <TouchableOpacity
-                                style={[styles.sendButton, submitting && styles.sendButtonDisabled]}
-                                onPress={handleSubmitComment}
-                                disabled={submitting}
-                            >
-                                {submitting ? (
-                                    <ActivityIndicator size="small" color="#FFF" />
-                                ) : (
-                                    <Ionicons name="send" size={18} color="#FFF" />
-                                )}
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    {/* Liste des commentaires */}
-                    {loading ? (
-                        <ActivityIndicator size="small" color={Colors.primary} style={styles.loader} />
-                    ) : comments.length === 0 ? (
-                        <Text style={styles.emptyText}>
-                            Aucun commentaire. Soyez le premier à réagir !
+        <KeyboardAvoidingView
+            style={styles.container}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+            <View style={styles.innerContainer}>
+                <TouchableOpacity
+                    style={styles.header}
+                    onPress={() => setExpanded(!expanded)}
+                >
+                    <View style={styles.headerLeft}>
+                        <Ionicons name="chatbubbles-outline" size={20} color={Colors.text} />
+                        <Text style={styles.headerTitle}>
+                            Commentaires ({comments.length})
                         </Text>
-                    ) : (
-                        <FlatList
-                            data={comments}
-                            renderItem={renderComment}
-                            keyExtractor={(item) => `comment_${item.id}`}
-                            scrollEnabled={false}
-                            ItemSeparatorComponent={() => <View style={styles.separator} />}
-                        />
-                    )}
-                </View>
-            )}
-        </View>
+                    </View>
+                    <Ionicons
+                        name={expanded ? 'chevron-up' : 'chevron-down'}
+                        size={20}
+                        color={Colors.textLight}
+                    />
+                </TouchableOpacity>
+
+                {expanded && (
+                    <View style={styles.content}>
+                        {/* Formulaire de commentaire */}
+                        <View style={styles.inputSection}>
+                            {!isUserLoggedIn && (
+                                <View style={styles.guestInfoHeader}>
+                                    <Ionicons name="information-circle-outline" size={16} color={Colors.primary} />
+                                    <Text style={styles.guestInfoText}>Tous les champs sont obligatoires (nom: 6 caractères min)</Text>
+                                </View>
+                            )}
+                            {!isUserLoggedIn && (
+                                <View style={styles.loginPrompt}>
+                                    <Ionicons name="lock-closed-outline" size={14} color={Colors.textLight} />
+                                    <Text style={styles.loginPromptText}>
+                                        Les commentaires nécessitent une connexion.
+                                        <Text style={styles.loginLink} onPress={() => console.log('Navigation connexion')}>
+                                            {' '}Se connecter
+                                        </Text>
+                                    </Text>
+                                </View>
+                            )}
+                            {!isUserLoggedIn && (
+                                <>
+                                    <View style={styles.inputContainer}>
+                                        <Text style={styles.inputLabel}>Nom *</Text>
+                                        <TextInput
+                                            style={[styles.guestInput, guestName.trim().length > 0 && guestName.trim().length < 6 && styles.inputError]}
+                                            placeholder="Votre nom (6 caractères minimum)"
+                                            value={guestName}
+                                            onChangeText={setGuestName}
+                                            autoCapitalize="words"
+                                            maxLength={50}
+                                        />
+                                    </View>
+                                    <View style={styles.inputContainer}>
+                                        <Text style={styles.inputLabel}>Email *</Text>
+                                        <TextInput
+                                            style={[styles.guestInput, !guestEmail.trim() && styles.inputError]}
+                                            placeholder="Votre email"
+                                            value={guestEmail}
+                                            onChangeText={setGuestEmail}
+                                            keyboardType="email-address"
+                                            autoCapitalize="none"
+                                        />
+                                    </View>
+                                </>
+                            )}
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.inputLabel}>Message *</Text>
+                                <View style={styles.inputRow}>
+                                    <TextInput
+                                        style={[styles.commentInput, !newComment.trim() && styles.inputError]}
+                                        placeholder="Écrire un commentaire..."
+                                        value={newComment}
+                                        onChangeText={setNewComment}
+                                        multiline
+                                        maxLength={1000}
+                                    />
+                                    <TouchableOpacity
+                                        style={[styles.sendButton, submitting && styles.sendButtonDisabled]}
+                                        onPress={handleSubmitComment}
+                                        disabled={submitting}
+                                    >
+                                        {submitting ? (
+                                            <ActivityIndicator size="small" color="#FFF" />
+                                        ) : (
+                                            <Ionicons name="send" size={18} color="#FFF" />
+                                        )}
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* Liste des commentaires */}
+                        {loading ? (
+                            <ActivityIndicator size="small" color={Colors.primary} style={styles.loader} />
+                        ) : comments.length === 0 ? (
+                            <Text style={styles.emptyText}>
+                                Aucun commentaire. Soyez le premier à réagir !
+                            </Text>
+                        ) : (
+                            <FlatList
+                                data={comments}
+                                renderItem={renderComment}
+                                keyExtractor={(item) => `comment_${item.id}`}
+                                scrollEnabled={false}
+                                ItemSeparatorComponent={() => <View style={styles.separator} />}
+                            />
+                        )}
+                    </View>
+                )}
+            </View>
+        </KeyboardAvoidingView>
     );
 };
 
 const styles = StyleSheet.create({
     container: {
+        flex: 1,
         backgroundColor: Colors.backgroundLight,
         borderRadius: 16,
         marginHorizontal: 20,
         marginTop: 20,
         overflow: 'hidden',
+    },
+    innerContainer: {
+        flex: 1,
     },
     header: {
         flexDirection: 'row',
@@ -239,12 +319,62 @@ const styles = StyleSheet.create({
     inputSection: {
         marginBottom: 16,
     },
+    guestInfoHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.background,
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 12,
+    },
+    guestInfoText: {
+        fontSize: 12,
+        color: Colors.textLight,
+        marginLeft: 6,
+        fontStyle: 'italic',
+    },
+    loginPrompt: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.background,
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: Colors.borderLight,
+    },
+    loginPromptText: {
+        fontSize: 12,
+        color: Colors.textLight,
+        marginLeft: 6,
+        flex: 1,
+    },
+    loginLink: {
+        fontSize: 12,
+        color: Colors.primary,
+        fontWeight: '600',
+        textDecorationLine: 'underline',
+    },
+    inputContainer: {
+        marginBottom: 12,
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: Colors.text,
+        marginBottom: 6,
+    },
+    inputError: {
+        borderColor: Colors.primary,
+        borderWidth: 1,
+    },
     guestInput: {
         backgroundColor: Colors.background,
         borderRadius: 10,
         padding: 12,
-        marginBottom: 8,
         fontSize: 14,
+        borderWidth: 1,
+        borderColor: 'transparent',
     },
     inputRow: {
         flexDirection: 'row',
@@ -258,6 +388,8 @@ const styles = StyleSheet.create({
         fontSize: 14,
         maxHeight: 100,
         marginRight: 8,
+        borderWidth: 1,
+        borderColor: 'transparent',
     },
     sendButton: {
         width: 44,

@@ -59,6 +59,8 @@ const api = axios.create({
   timeout: TIMEOUT,
 });
 
+export { api };
+
 // Fonction de retry avec backoff exponentiel
 const withRetry = async <T>(
   fn: () => Promise<T>,
@@ -119,7 +121,7 @@ export const getPostById = async (id: number) => {
 
   try {
     const response = await withRetry(() =>
-      api.get(`posts/${id}`, {
+      api.get(`posts/${id}/?_embed`, {
         params: { _embed: true },
       })
     );
@@ -258,6 +260,48 @@ export const getPostsByCategory = async (categoryId: number, page = 1, perPage =
     console.error("Erreur récupération posts par catégorie:", error instanceof AxiosError ? error.message : error);
     const expiredCache = cache.get(cacheKey);
     if (expiredCache) return expiredCache.data;
+    throw error;
+  }
+};
+
+// Fonction pour récupérer les tags
+export const getTags = async () => {
+  const cacheKey = 'tags_all';
+  const cached = getCached<any[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const response = await withRetry(() =>
+      api.get("tags", {
+        params: {
+          per_page: 100,
+          orderby: 'count',
+          order: 'desc',
+        },
+      })
+    );
+    setCache(cacheKey, response.data, CACHE_TTL.categories);
+    return response.data;
+  } catch (error) {
+    console.error("Erreur récupération tags:", error instanceof AxiosError ? error.message : error);
+    const expiredCache = cache.get(cacheKey);
+    if (expiredCache) return expiredCache.data;
+    throw error;
+  }
+};
+
+// Fonction pour récupérer un tag par ID
+export const getTagById = async (id: number) => {
+  const cacheKey = `tag_${id}`;
+  const cached = getCached<any>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const response = await withRetry(() => api.get(`tags/${id}`));
+    setCache(cacheKey, response.data, CACHE_TTL.categories);
+    return response.data;
+  } catch (error) {
+    console.error("Erreur récupération tag:", error instanceof AxiosError ? error.message : error);
     throw error;
   }
 };

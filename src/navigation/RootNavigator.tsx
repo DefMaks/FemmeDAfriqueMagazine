@@ -1,5 +1,5 @@
 // src/navigation/RootNavigator.tsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -17,19 +17,25 @@ import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { Magazine } from '../models/Magazine';
 import { Text, TouchableOpacity } from 'react-native';
+import { analyticsService } from '../services/analytics';
 
 export type RootStackParamList = {
     Main: undefined;
     Checkout: { magazine: Magazine };
     ArticleDetail: { article: Post };
     AllArticles: undefined;
-    CategoryArticles: { categoryId: number; categoryName: string };
+    CategoryArticles: { categoryId: number; categoryName: string; isTag?: boolean };
 };
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator<RootStackParamList>();
 
 function MainTabs() {
+    useEffect(() => {
+        // Tracker la vue de l'écran principal au chargement
+        analyticsService.trackScreenView('MainTabs');
+    }, []);
+
     return (
         <Tab.Navigator
             screenOptions={({ route }) => ({
@@ -58,8 +64,20 @@ function MainTabs() {
                 headerShown: false,
             })}
         >
-            <Tab.Screen name="Accueil" component={HomeScreen} />
-            <Tab.Screen name="Découvrir" component={DiscoverScreen} />
+            <Tab.Screen
+                name="Accueil"
+                component={HomeScreen}
+                listeners={{
+                    focus: () => analyticsService.trackScreenView('Accueil'),
+                }}
+            />
+            <Tab.Screen
+                name="Découvrir"
+                component={DiscoverScreen}
+                listeners={{
+                    focus: () => analyticsService.trackScreenView('Découvrir'),
+                }}
+            />
             <Tab.Screen
                 name="Boutique"
                 component={ShopScreen}
@@ -87,7 +105,7 @@ function MainTabs() {
                             accessibilityState={props.accessibilityState}
                             testID={props.testID}
                             style={{
-                                top: -15,
+                                top: -35,
                                 marginBottom: -15,
                                 backgroundColor: Colors.primary,
                                 borderRadius: 35,
@@ -107,9 +125,24 @@ function MainTabs() {
                         </TouchableOpacity>
                     ),
                 }}
+                listeners={{
+                    focus: () => analyticsService.trackScreenView('Boutique'),
+                }}
             />
-            <Tab.Screen name="Favoris" component={SavedScreen} />
-            <Tab.Screen name="Profil" component={ProfileScreen} />
+            <Tab.Screen
+                name="Favoris"
+                component={SavedScreen}
+                listeners={{
+                    focus: () => analyticsService.trackScreenView('Favoris'),
+                }}
+            />
+            <Tab.Screen
+                name="Profil"
+                component={ProfileScreen}
+                listeners={{
+                    focus: () => analyticsService.trackScreenView('Profil'),
+                }}
+            />
         </Tab.Navigator>
     );
 }
@@ -119,10 +152,50 @@ export default function RootNavigator() {
         <NavigationContainer>
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="Main" component={MainTabs} />
-                <Stack.Screen name="ArticleDetail" component={ArticleDetailScreen} />
-                <Stack.Screen name="Checkout" component={CheckoutScreen} />
-                <Stack.Screen name="AllArticles" component={AllArticlesScreen} />
-                <Stack.Screen name="CategoryArticles" component={DiscoverScreen} />
+                <Stack.Screen
+                    name="ArticleDetail"
+                    component={ArticleDetailScreen}
+                    listeners={{
+                        focus: (e: any) => {
+                            const article = e.route?.params?.article;
+                            if (article) {
+                                analyticsService.trackScreenView('ArticleDetail');
+                                // Tracker l'événement article_viewed personnalisé
+                                analyticsService.trackArticleViewed(
+                                    article.title?.rendered || 'Article sans titre',
+                                    undefined, // Catégorie - peut être ajoutée plus tard
+                                    article.id
+                                );
+                            }
+                        },
+                    }}
+                />
+                <Stack.Screen
+                    name="Checkout"
+                    component={CheckoutScreen}
+                    listeners={{
+                        focus: () => analyticsService.trackScreenView('Checkout'),
+                    }}
+                />
+                <Stack.Screen
+                    name="AllArticles"
+                    component={AllArticlesScreen}
+                    listeners={{
+                        focus: () => analyticsService.trackScreenView('AllArticles'),
+                    }}
+                />
+                <Stack.Screen
+                    name="CategoryArticles"
+                    component={DiscoverScreen}
+                    listeners={{
+                        focus: (e: any) => {
+                            const params = e.route?.params;
+                            const categoryName = params?.categoryName || 'Catégorie';
+                            const isTag = params?.isTag || false;
+                            analyticsService.trackScreenView(`${isTag ? 'Tag' : 'Category'}_${categoryName}`);
+                        },
+                    }}
+                />
             </Stack.Navigator>
         </NavigationContainer>
     );

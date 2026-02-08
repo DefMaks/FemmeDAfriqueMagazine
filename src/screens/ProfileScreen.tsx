@@ -1,21 +1,23 @@
 // src/screens/ProfileScreen.tsx
 import React, { useState, useEffect } from 'react';
-import { 
-    View, 
-    Text, 
-    StyleSheet, 
-    ScrollView, 
-    TouchableOpacity, 
+import {
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    TouchableOpacity,
     Switch,
     Modal,
     TextInput,
-    Alert,
-    Linking
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as WebBrowser from 'expo-web-browser';
-import { Colors } from '../theme/colors';
+import { notificationService } from '../services/notificationService';
+import { analyticsService } from '../services/analytics';
 import { Ionicons } from '@expo/vector-icons';
+import { Colors } from '../theme/colors';
+import { Linking } from 'react-native';
+import { Alert } from 'react-native';
 
 const STORAGE_KEYS = {
     NOTIFICATIONS: '@fda_notifications',
@@ -28,7 +30,7 @@ const STORAGE_KEYS = {
 const ProfileScreen = () => {
     const [notificationsEnabled, setNotificationsEnabled] = useState(true);
     const [showEditModal, setShowEditModal] = useState(false);
-    
+
     // États du formulaire
     const [userEmail, setUserEmail] = useState('');
     const [userPhone, setUserPhone] = useState('243');
@@ -49,8 +51,11 @@ const ProfileScreen = () => {
                 AsyncStorage.getItem(STORAGE_KEYS.SOCIAL_X),
                 AsyncStorage.getItem(STORAGE_KEYS.SOCIAL_FB),
             ]);
-            
-            setNotificationsEnabled(notifications !== 'false');
+
+            // Utiliser le service OneSignal pour charger l'état
+            const notificationState = await notificationService.getNotificationState();
+            setNotificationsEnabled(notificationState);
+
             if (email) setUserEmail(email);
             if (phone) setUserPhone(phone);
             if (x) setSocialX(x);
@@ -63,8 +68,8 @@ const ProfileScreen = () => {
     const handleToggleNotifications = async (value: boolean) => {
         setNotificationsEnabled(value);
         try {
-            await AsyncStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, value.toString());
-            // Ici on pourrait aussi activer/désactiver OneSignal
+            // Utiliser le service OneSignal
+            await notificationService.saveNotificationState(value);
             console.log(`📱 Notifications ${value ? 'activées' : 'désactivées'}`);
         } catch (error) {
             console.error('Erreur sauvegarde notifications:', error);
@@ -114,45 +119,45 @@ const ProfileScreen = () => {
     };
 
     const menuItems = [
-        { 
-            id: '1', 
-            icon: 'person-outline', 
-            title: 'Modifier le profil', 
+        {
+            id: '1',
+            icon: 'person-outline',
+            title: 'Modifier le profil',
             subtitle: 'Email, téléphone, réseaux sociaux',
             action: () => setShowEditModal(true)
         },
-        { 
-            id: '2', 
-            icon: 'notifications-outline', 
-            title: 'Notifications', 
+        {
+            id: '2',
+            icon: 'notifications-outline',
+            title: 'Notifications',
             subtitle: notificationsEnabled ? 'Activées' : 'Désactivées',
             isToggle: true
         },
-        { 
-            id: '3', 
-            icon: 'bookmark-outline', 
-            title: 'Mes favoris', 
+        {
+            id: '3',
+            icon: 'bookmark-outline',
+            title: 'Mes favoris',
             subtitle: 'Articles sauvegardés',
-            action: () => {} // Navigation vers les favoris
+            action: () => { } // Navigation vers les favoris
         },
-        { 
-            id: '4', 
-            icon: 'information-circle-outline', 
-            title: 'À Propos', 
+        {
+            id: '4',
+            icon: 'information-circle-outline',
+            title: 'À Propos',
             subtitle: 'En savoir plus sur FDA',
             action: openAboutPage
         },
-        { 
-            id: '5', 
-            icon: 'chatbubble-ellipses-outline', 
-            title: 'Réclamations', 
+        {
+            id: '5',
+            icon: 'chatbubble-ellipses-outline',
+            title: 'Réclamations',
             subtitle: 'Procédure de réclamation',
             action: openReclamationsPage
         },
-        { 
-            id: '6', 
-            icon: 'help-circle-outline', 
-            title: 'Aide & Support', 
+        {
+            id: '6',
+            icon: 'help-circle-outline',
+            title: 'Aide & Support',
             subtitle: 'Contactez-nous par email',
             action: openSupportEmail
         },
@@ -201,9 +206,9 @@ const ProfileScreen = () => {
 
                 <View style={styles.menuSection}>
                     {menuItems.map((item) => (
-                        <TouchableOpacity 
-                            key={item.id} 
-                            style={styles.menuItem} 
+                        <TouchableOpacity
+                            key={item.id}
+                            style={styles.menuItem}
                             activeOpacity={0.8}
                             onPress={item.action}
                             disabled={item.isToggle}
@@ -270,7 +275,7 @@ const ProfileScreen = () => {
                             />
 
                             <Text style={styles.sectionLabel}>Réseaux sociaux</Text>
-                            
+
                             <View style={styles.socialInputRow}>
                                 <View style={[styles.socialIcon, { backgroundColor: '#000' }]}>
                                     <Ionicons name="logo-twitter" size={20} color="#FFF" />

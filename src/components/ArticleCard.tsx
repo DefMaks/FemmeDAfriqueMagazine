@@ -13,11 +13,11 @@ interface ArticleCardProps {
   showActions?: boolean;
 }
 
-export const ArticleCard: React.FC<ArticleCardProps> = ({ 
-  article, 
-  onPress, 
+export const ArticleCard: React.FC<ArticleCardProps> = ({
+  article,
+  onPress,
   variant = 'horizontal',
-  showActions = true 
+  showActions = true
 }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -51,8 +51,14 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
   const formatTitle = (title: string) => decodeHtmlEntities(title);
 
   const getImageUrl = (): string | null => {
-    if (article.dmks_featured_image?.medium_large?.url) {
-      return article.dmks_featured_image.medium_large.url;
+    if (article.dmks_featured_image?.sizes?.medium_large?.url) {
+      return article.dmks_featured_image.sizes.medium_large.url;
+    }
+    if (article.dmks_featured_image?.sizes?.large?.url) {
+      return article.dmks_featured_image.sizes.large.url;
+    }
+    if (article.dmks_featured_image?.sizes?.medium?.url) {
+      return article.dmks_featured_image.sizes.medium.url;
     }
     if (article.dmks_featured_image?.src) {
       return article.dmks_featured_image.src;

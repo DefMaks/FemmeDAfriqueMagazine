@@ -96,6 +96,7 @@ export const postGuestComment = async (
   authorEmail: string
 ): Promise<Comment | null> => {
   try {
+    // Essayer d'abord sans authentification (commentaires invités)
     const response = await axios.post(
       `${WP_API_URL}/comments`,
       {
@@ -114,6 +115,46 @@ export const postGuestComment = async (
     return response.data;
   } catch (error: any) {
     console.error('Erreur publication commentaire invité:', error.response?.data || error.message);
+    
+    // Si les commentaires invités ne sont pas autorisés, essayer avec un compte invité par défaut
+    if (error.response?.data?.code === 'rest_comment_login_required') {
+      console.log('Tentative avec compte invité par défaut...');
+      
+      try {
+        // Créer un compte invité par défaut (ou utiliser un existant)
+        const guestCredentials = {
+          username: 'invitado_app', // Nom d'utilisateur invité par défaut
+          password: 'TempGuest2024!', // Mot de passe temporaire
+        };
+        
+        // Tenter de se connecter avec le compte invité
+        const { loginWordPress } = await import('./wordpressAuth');
+        const authResponse = await loginWordPress(guestCredentials.username, guestCredentials.password);
+        
+        // Utiliser le token pour poster le commentaire
+        const response = await axios.post(
+          `${WP_API_URL}/comments`,
+          {
+            post: postId,
+            content,
+            author_name: authorName,
+            author_email: authorEmail,
+          },
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authResponse.token}`,
+            },
+          }
+        );
+        
+        return response.data;
+      } catch (guestError: any) {
+        console.error('Erreur avec compte invité par défaut:', guestError.response?.data || guestError.message);
+        throw new Error('Les commentaires invités ne sont pas autorisés sur ce site. Veuillez vous connecter.');
+      }
+    }
+    
     throw new Error(error.response?.data?.message || 'Impossible de publier le commentaire');
   }
 };
