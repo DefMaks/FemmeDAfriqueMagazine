@@ -31,6 +31,9 @@ export default {
     },
     plugins: [
       'expo-font',
+      ['onesignal-expo-plugin', {
+        mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
+      }]
     ],
     web: {
       favicon: "./assets/favicon.png"

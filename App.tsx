@@ -1,129 +1,17 @@
 import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack';
-import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { StyleSheet } from 'react-native';
 
-// Import des écrans originaux
-import HomeScreen from './src/screens/HomeScreen';
-import DiscoverScreen from './src/screens/DiscoverScreen';
-import SavedScreen from './src/screens/SavedScreen';
-import ShopScreen from './src/screens/ShopScreen';
-import ProfileScreen from './src/screens/ProfileScreen';
-import DebugScreen from './src/screens/DebugScreen';
+// Navigation
+import RootNavigator from './src/navigation/RootNavigator';
 
-// Import des services manuels
+// Import des services
 import { oneSignalService } from './src/services/oneSignal.simple';
 import { analyticsService } from './src/services/analytics.simple';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { logger } from './src/utils/logger';
-import { Colors } from './src/theme/colors';
-
-const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator();
-
-function MainTabs() {
-  return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName = 'ellipse';
-          if (route.name === 'Accueil') iconName = focused ? 'home' : 'home-outline';
-          else if (route.name === 'Découvrir') iconName = focused ? 'search' : 'search-outline';
-          else if (route.name === 'Favoris') iconName = focused ? 'bookmark' : 'bookmark-outline';
-          else if (route.name === 'Profil') iconName = focused ? 'person' : 'person-outline';
-          return <Ionicons name={iconName as any} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: '#A93F55',
-        tabBarInactiveTintColor: '#9CA3AF',
-        tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopColor: '#E5E7EB',
-          borderTopWidth: 1,
-          paddingBottom: 8,
-          paddingTop: 8,
-          height: 70,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
-        },
-        headerShown: false,
-      })}
-    >
-      <Tab.Screen
-        name="Accueil"
-        component={HomeScreen}
-        listeners={{
-          focus: () => analyticsService.trackScreenView('Accueil'),
-        }}
-      />
-      <Tab.Screen
-        name="Découvrir"
-        component={DiscoverScreen}
-        listeners={{
-          focus: () => analyticsService.trackScreenView('Découvrir'),
-        }}
-      />
-      <Tab.Screen
-        name="Boutique"
-        component={ShopScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <Ionicons name={focused ? 'bag' : 'bag-outline'} size={26} color="#FFFFFF" />
-          ),
-          tabBarLabel: 'Boutique',
-          tabBarButton: (props) => (
-            <TouchableOpacity
-              onPress={props.onPress}
-              accessibilityLabel={props.accessibilityLabel}
-              accessibilityRole={props.accessibilityRole}
-              accessibilityState={props.accessibilityState}
-              testID={props.testID}
-              style={{
-                top: -35,
-                marginBottom: -15,
-                backgroundColor: '#A93F55',
-                borderRadius: 35,
-                width: 70,
-                height: 70,
-                justifyContent: 'center',
-                alignItems: 'center',
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.25,
-                shadowRadius: 6,
-                elevation: 6,
-                marginHorizontal: 10
-              }}>
-              <Ionicons name="bag" size={26} color="#FFFFFF" />
-            </TouchableOpacity>
-          ),
-        }}
-        listeners={{
-          focus: () => analyticsService.trackScreenView('Boutique'),
-        }}
-      />
-      <Tab.Screen
-        name="Favoris"
-        component={SavedScreen}
-        listeners={{
-          focus: () => analyticsService.trackScreenView('Favoris'),
-        }}
-      />
-      <Tab.Screen
-        name="Profil"
-        component={ProfileScreen}
-        listeners={{
-          focus: () => analyticsService.trackScreenView('Profil'),
-        }}
-      />
-    </Tab.Navigator>
-  );
-}
 
 export default function App() {
   useEffect(() => {
@@ -161,24 +49,12 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <SafeAreaProvider>
-        <StatusBar style="auto" />
-        <NavigationContainer>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Main" component={MainTabs} />
-            <Stack.Screen
-              name="Debug"
-              component={DebugScreen}
-              options={{
-                presentation: 'modal',
-                headerShown: true,
-                headerStyle: { backgroundColor: Colors.primary },
-                headerTintColor: '#FFFFFF',
-              }}
-            />
-          </Stack.Navigator>
-        </NavigationContainer>
-      </SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <StatusBar style="auto" />
+          <RootNavigator />
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
     </ErrorBoundary>
   );
 }

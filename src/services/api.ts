@@ -69,6 +69,113 @@ const withRetry = async <T>(
   }
 };
 
+/**
+ * Fonctions ajoutées pour restaurer la compatibilité avec les écrans existants
+ */
+
+// Récupérer une publicité par ID
+export const getAdById = async (id: number) => {
+  return getPostById(id);
+};
+
+// Récupérer toutes les publicités (fallback sur les derniers articles)
+export const getAds = async () => {
+  try {
+    const url = `${WORDPRESS_API_URL}posts?per_page=50&_embed=true`;
+    return await withRetry(() => apiRequest(url));
+  } catch (error) {
+    console.error("Erreur récupération ads:", error);
+    return [];
+  }
+};
+
+// Récupérer les publicités par Zone ID
+export const getAdsByZoneId = async (zoneId: number) => {
+  try {
+    const ads = await getAds();
+    // Filtrer par zone si la propriété existe
+    return ads.filter((ad: any) =>
+      ad.app_ad_zone && (Array.isArray(ad.app_ad_zone) ? ad.app_ad_zone.includes(zoneId) : ad.app_ad_zone == zoneId)
+    );
+  } catch (error) {
+    console.error(`Erreur récupération ads pour zone ${zoneId}:`, error);
+    return [];
+  }
+};
+
+// Récupérer un tag par son ID
+export const getTagById = async (id: number) => {
+  try {
+    const url = `${WORDPRESS_API_URL}tags/${id}`;
+    return await withRetry(() => apiRequest(url));
+  } catch (error) {
+    console.error("Erreur récupération tag:", error);
+    throw error;
+  }
+};
+
+// Récupérer un média par son ID
+export const getMedia = async (id: number) => {
+  try {
+    const url = `${WORDPRESS_API_URL}media/${id}`;
+    return await withRetry(() => apiRequest(url));
+  } catch (error) {
+    console.error("Erreur récupération media:", error);
+    throw error;
+  }
+};
+
+// Instance compatible Axios pour les appels legacy
+export const api = {
+  get: async (endpoint: string, config: any = {}) => {
+    let url = endpoint.startsWith('http') ? endpoint : `${WORDPRESS_API_URL}${endpoint}`;
+
+    if (config.params) {
+      const params = new URLSearchParams();
+      Object.entries(config.params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value));
+        }
+      });
+      const queryString = params.toString();
+      if (queryString) {
+        url += (url.includes('?') ? '&' : '?') + queryString;
+      }
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), config.timeout || 30000);
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          ...config.headers,
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const data = await response.json();
+
+      // Simuler l'objet de réponse Axios
+      return {
+        data,
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        config,
+        request: {},
+      };
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  }
+};
+
 // Fonction fetch avec timeout et retry
 const apiRequest = async (url: string, options: RequestInit = {}): Promise<any> => {
   const controller = new AbortController();

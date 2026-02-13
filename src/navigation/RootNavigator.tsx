@@ -13,6 +13,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
 import ArticleDetailScreen from '../screens/ArticleDetailScreen';
 import AllArticlesScreen from '../screens/AllArticlesScreen';
+import DebugScreen from '../screens/DebugScreen';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { Magazine } from '../models/Magazine';
@@ -25,6 +26,7 @@ export type RootStackParamList = {
     ArticleDetail: { article: Post };
     AllArticles: undefined;
     CategoryArticles: { categoryId: number; categoryName: string; isTag?: boolean };
+    Debug: undefined;
 };
 
 const Tab = createBottomTabNavigator();
@@ -194,6 +196,16 @@ export default function RootNavigator() {
                             const isTag = params?.isTag || false;
                             analyticsService.trackScreenView(`${isTag ? 'Tag' : 'Category'}_${categoryName}`);
                         },
+                    }}
+                />
+                <Stack.Screen
+                    name="Debug"
+                    component={DebugScreen}
+                    options={{
+                        headerShown: true,
+                        title: 'Debug Logs',
+                        headerStyle: { backgroundColor: Colors.primary },
+                        headerTintColor: '#FFFFFF',
                     }}
                 />
             </Stack.Navigator>
