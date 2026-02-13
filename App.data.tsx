@@ -7,20 +7,20 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
-// Import des écrans originaux
-import HomeScreen from './src/screens/HomeScreen';
-import DiscoverScreen from './src/screens/DiscoverScreen';
-import SavedScreen from './src/screens/SavedScreen';
-import ShopScreen from './src/screens/ShopScreen';
-import ProfileScreen from './src/screens/ProfileScreen';
-import DebugScreen from './src/screens/DebugScreen';
+// Import des écrans avec données réelles
+import HomeScreen from './src/screens/HomeScreen.data';
+import DiscoverScreen from './src/screens/DiscoverScreen.data';
+import SavedScreen from './src/screens/SavedScreen.simple';
+import ShopScreen from './src/screens/ShopScreen.simple';
+import ProfileScreen from './src/screens/ProfileScreen.simple';
 
-// Import des services manuels
-import { oneSignalService } from './src/services/oneSignal.simple';
-import { analyticsService } from './src/services/analytics.simple';
-import ErrorBoundary from './src/components/ErrorBoundary';
-import { logger } from './src/utils/logger';
-import { Colors } from './src/theme/colors';
+// Import des services (sans initialisation)
+import {
+  SUPABASE_CONFIG,
+  WORDPRESS_CONFIG,
+  ONESIGNAL_CONFIG,
+  FIREBASE_CONFIG
+} from './src/config/env';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -54,20 +54,8 @@ function MainTabs() {
         headerShown: false,
       })}
     >
-      <Tab.Screen
-        name="Accueil"
-        component={HomeScreen}
-        listeners={{
-          focus: () => analyticsService.trackScreenView('Accueil'),
-        }}
-      />
-      <Tab.Screen
-        name="Découvrir"
-        component={DiscoverScreen}
-        listeners={{
-          focus: () => analyticsService.trackScreenView('Découvrir'),
-        }}
-      />
+      <Tab.Screen name="Accueil" component={HomeScreen} />
+      <Tab.Screen name="Découvrir" component={DiscoverScreen} />
       <Tab.Screen
         name="Boutique"
         component={ShopScreen}
@@ -103,83 +91,32 @@ function MainTabs() {
             </TouchableOpacity>
           ),
         }}
-        listeners={{
-          focus: () => analyticsService.trackScreenView('Boutique'),
-        }}
       />
-      <Tab.Screen
-        name="Favoris"
-        component={SavedScreen}
-        listeners={{
-          focus: () => analyticsService.trackScreenView('Favoris'),
-        }}
-      />
-      <Tab.Screen
-        name="Profil"
-        component={ProfileScreen}
-        listeners={{
-          focus: () => analyticsService.trackScreenView('Profil'),
-        }}
-      />
+      <Tab.Screen name="Favoris" component={SavedScreen} />
+      <Tab.Screen name="Profil" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
 
 export default function App() {
   useEffect(() => {
-    initializeServices();
+    // Log de vérification des variables d'environnement
+    console.log('🔍 Vérification des variables d\'environnement:');
+    console.log('Supabase URL:', SUPABASE_CONFIG.url ? '✅ Configuré' : '❌ Manquant');
+    console.log('WordPress API:', WORDPRESS_CONFIG.apiUrl ? '✅ Configuré' : '❌ Manquant');
+    console.log('OneSignal App ID:', ONESIGNAL_CONFIG.appId ? '✅ Configuré' : '❌ Manquant');
+    console.log('Firebase Project ID:', FIREBASE_CONFIG.projectId ? '✅ Configuré' : '❌ Manquant');
   }, []);
 
-  const initializeServices = async () => {
-    try {
-      await logger.info('🚀 Début initialisation des services...');
-
-      // Initialiser OneSignal
-      await logger.info('📱 Initialisation OneSignal...');
-      await oneSignalService.initialize();
-      const hasPermission = await oneSignalService.requestPermission();
-      await logger.info(`OneSignal permission: ${hasPermission ? '✅ Accordée' : '❌ Refusée'}`);
-
-      // Récupérer les infos device
-      const deviceInfo = await oneSignalService.getDeviceInfo();
-      await logger.info(`OneSignal Device Info: ${JSON.stringify(deviceInfo)}`);
-
-      // Initialiser Analytics
-      await logger.info('📊 Initialisation Analytics...');
-      await analyticsService.enable();
-      await analyticsService.trackEvent('app_start', {
-        timestamp: new Date().toISOString(),
-        device_id: deviceInfo.userId,
-      });
-
-      await logger.info('✅ Services initialisés avec succès');
-
-    } catch (error) {
-      await logger.error('❌ Erreur critique initialisation services', error);
-    }
-  };
-
   return (
-    <ErrorBoundary>
-      <SafeAreaProvider>
-        <StatusBar style="auto" />
-        <NavigationContainer>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Main" component={MainTabs} />
-            <Stack.Screen
-              name="Debug"
-              component={DebugScreen}
-              options={{
-                presentation: 'modal',
-                headerShown: true,
-                headerStyle: { backgroundColor: Colors.primary },
-                headerTintColor: '#FFFFFF',
-              }}
-            />
-          </Stack.Navigator>
-        </NavigationContainer>
-      </SafeAreaProvider>
-    </ErrorBoundary>
+    <SafeAreaProvider>
+      <StatusBar style="auto" />
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Main" component={MainTabs} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
 

@@ -1,8 +1,8 @@
 // src/services/api.ts
-import axios, { AxiosError } from "axios";
+import { WORDPRESS_CONFIG } from '../config/env';
 
 // Use environment variable for WordPress API URL
-const WORDPRESS_API_URL = process.env.EXPO_PUBLIC_WORDPRESS_API_URL || "https://femmedafrique.net/wp-json/wp/v2/";
+const WORDPRESS_API_URL = WORDPRESS_CONFIG.apiUrl || "https://femmedafrique.net/wp-json/wp/v2/";
 
 // Configuration optimisée
 const TIMEOUT = 30000; // 30 secondes
@@ -51,16 +51,6 @@ export const clearCache = (prefix?: string): void => {
   }
 };
 
-const api = axios.create({
-  baseURL: WORDPRESS_API_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
-  timeout: TIMEOUT,
-});
-
-export { api };
-
 // Fonction de retry avec backoff exponentiel
 const withRetry = async <T>(
   fn: () => Promise<T>,
@@ -70,18 +60,39 @@ const withRetry = async <T>(
   try {
     return await fn();
   } catch (error) {
-    const axiosError = error as AxiosError;
-    
-    // Ne pas retry si c'est une erreur 4xx (sauf timeout)
-    if (axiosError.response?.status && axiosError.response.status >= 400 && axiosError.response.status < 500) {
-      throw error;
-    }
-    
     if (retries > 0) {
       // Attendre avec backoff exponentiel
       await new Promise(resolve => setTimeout(resolve, delay));
       return withRetry(fn, retries - 1, delay * 2);
     }
+    throw error;
+  }
+};
+
+// Fonction fetch avec timeout et retry
+const apiRequest = async (url: string, options: RequestInit = {}): Promise<any> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
     throw error;
   }
 };
@@ -93,19 +104,12 @@ export const getPosts = async (page = 1, perPage = 10) => {
   if (cached) return cached;
 
   try {
-    const response = await withRetry(() => 
-      api.get("posts", {
-        params: {
-          page,
-          per_page: perPage,
-          _embed: true,
-        },
-      })
-    );
-    setCache(cacheKey, response.data, CACHE_TTL.posts);
-    return response.data;
+    const url = `${WORDPRESS_API_URL}posts?page=${page}&per_page=${perPage}&_embed=true`;
+    const response = await withRetry(() => apiRequest(url));
+    setCache(cacheKey, response, CACHE_TTL.posts);
+    return response;
   } catch (error) {
-    console.error("Erreur récupération articles:", error instanceof AxiosError ? error.message : error);
+    console.error("Erreur récupération articles:", error);
     // Retourner cache expiré si disponible en cas d'erreur
     const expiredCache = cache.get(cacheKey);
     if (expiredCache) return expiredCache.data;
@@ -120,15 +124,12 @@ export const getPostById = async (id: number) => {
   if (cached) return cached;
 
   try {
-    const response = await withRetry(() =>
-      api.get(`posts/${id}/?_embed`, {
-        params: { _embed: true },
-      })
-    );
-    setCache(cacheKey, response.data, CACHE_TTL.posts);
-    return response.data;
+    const url = `${WORDPRESS_API_URL}posts/${id}/?_embed=true`;
+    const response = await withRetry(() => apiRequest(url));
+    setCache(cacheKey, response, CACHE_TTL.posts);
+    return response;
   } catch (error) {
-    console.error("Erreur récupération article:", error instanceof AxiosError ? error.message : error);
+    console.error("Erreur récupération article:", error);
     throw error;
   }
 };
@@ -140,57 +141,14 @@ export const getMagazines = async (page = 1, perPage = 10) => {
   if (cached) return cached;
 
   try {
-    const response = await withRetry(() =>
-      api.get("mag", {
-        params: {
-          page,
-          per_page: perPage,
-          _embed: true,
-        },
-      })
-    );
-    setCache(cacheKey, response.data, CACHE_TTL.magazines);
-    return response.data;
+    const url = `${WORDPRESS_API_URL}mag?page=${page}&per_page=${perPage}&_embed=true`;
+    const response = await withRetry(() => apiRequest(url));
+    setCache(cacheKey, response, CACHE_TTL.magazines);
+    return response;
   } catch (error) {
-    console.error("Erreur récupération magazines:", error instanceof AxiosError ? error.message : error);
+    console.error("Erreur récupération magazines:", error);
     const expiredCache = cache.get(cacheKey);
     if (expiredCache) return expiredCache.data;
-    throw error;
-  }
-};
-
-// Fonction pour récupérer un magazine par ID
-export const getMagazineById = async (id: number) => {
-  const cacheKey = `magazine_${id}`;
-  const cached = getCached<any>(cacheKey);
-  if (cached) return cached;
-
-  try {
-    const response = await withRetry(() =>
-      api.get(`mag/${id}`, {
-        params: { _embed: true },
-      })
-    );
-    setCache(cacheKey, response.data, CACHE_TTL.magazines);
-    return response.data;
-  } catch (error) {
-    console.error("Erreur récupération magazine:", error instanceof AxiosError ? error.message : error);
-    throw error;
-  }
-};
-
-// Fonction pour récupérer les détails d'un fichier média (PDF)
-export const getMedia = async (id: number) => {
-  const cacheKey = `media_${id}`;
-  const cached = getCached<any>(cacheKey);
-  if (cached) return cached;
-
-  try {
-    const response = await withRetry(() => api.get(`media/${id}`));
-    setCache(cacheKey, response.data, CACHE_TTL.magazines);
-    return response.data;
-  } catch (error) {
-    console.error("Erreur récupération média:", error instanceof AxiosError ? error.message : error);
     throw error;
   }
 };
@@ -202,62 +160,12 @@ export const getCategories = async () => {
   if (cached) return cached;
 
   try {
-    const response = await withRetry(() =>
-      api.get("categories", {
-        params: {
-          per_page: 100,
-          orderby: 'count',
-          order: 'desc',
-        },
-      })
-    );
-    setCache(cacheKey, response.data, CACHE_TTL.categories);
-    return response.data;
+    const url = `${WORDPRESS_API_URL}categories?per_page=100&orderby=count&order=desc`;
+    const response = await withRetry(() => apiRequest(url));
+    setCache(cacheKey, response, CACHE_TTL.categories);
+    return response;
   } catch (error) {
-    console.error("Erreur récupération catégories:", error instanceof AxiosError ? error.message : error);
-    const expiredCache = cache.get(cacheKey);
-    if (expiredCache) return expiredCache.data;
-    throw error;
-  }
-};
-
-// Fonction pour récupérer une catégorie par ID
-export const getCategoryById = async (id: number) => {
-  const cacheKey = `category_${id}`;
-  const cached = getCached<any>(cacheKey);
-  if (cached) return cached;
-
-  try {
-    const response = await withRetry(() => api.get(`categories/${id}`));
-    setCache(cacheKey, response.data, CACHE_TTL.categories);
-    return response.data;
-  } catch (error) {
-    console.error("Erreur récupération catégorie:", error instanceof AxiosError ? error.message : error);
-    throw error;
-  }
-};
-
-// Fonction pour récupérer les posts d'une catégorie
-export const getPostsByCategory = async (categoryId: number, page = 1, perPage = 10) => {
-  const cacheKey = `posts_cat_${categoryId}_${page}_${perPage}`;
-  const cached = getCached<any[]>(cacheKey);
-  if (cached) return cached;
-
-  try {
-    const response = await withRetry(() =>
-      api.get("posts", {
-        params: {
-          categories: categoryId,
-          page,
-          per_page: perPage,
-          _embed: true,
-        },
-      })
-    );
-    setCache(cacheKey, response.data, CACHE_TTL.posts);
-    return response.data;
-  } catch (error) {
-    console.error("Erreur récupération posts par catégorie:", error instanceof AxiosError ? error.message : error);
+    console.error("Erreur récupération catégories:", error);
     const expiredCache = cache.get(cacheKey);
     if (expiredCache) return expiredCache.data;
     throw error;
@@ -271,37 +179,33 @@ export const getTags = async () => {
   if (cached) return cached;
 
   try {
-    const response = await withRetry(() =>
-      api.get("tags", {
-        params: {
-          per_page: 100,
-          orderby: 'count',
-          order: 'desc',
-        },
-      })
-    );
-    setCache(cacheKey, response.data, CACHE_TTL.categories);
-    return response.data;
+    const url = `${WORDPRESS_API_URL}tags?per_page=100&orderby=count&order=desc`;
+    const response = await withRetry(() => apiRequest(url));
+    setCache(cacheKey, response, CACHE_TTL.categories);
+    return response;
   } catch (error) {
-    console.error("Erreur récupération tags:", error instanceof AxiosError ? error.message : error);
+    console.error("Erreur récupération tags:", error);
     const expiredCache = cache.get(cacheKey);
     if (expiredCache) return expiredCache.data;
     throw error;
   }
 };
 
-// Fonction pour récupérer un tag par ID
-export const getTagById = async (id: number) => {
-  const cacheKey = `tag_${id}`;
-  const cached = getCached<any>(cacheKey);
+// Fonction pour récupérer les posts d'une catégorie
+export const getPostsByCategory = async (categoryId: number, page = 1, perPage = 10) => {
+  const cacheKey = `posts_cat_${categoryId}_${page}_${perPage}`;
+  const cached = getCached<any[]>(cacheKey);
   if (cached) return cached;
 
   try {
-    const response = await withRetry(() => api.get(`tags/${id}`));
-    setCache(cacheKey, response.data, CACHE_TTL.categories);
-    return response.data;
+    const url = `${WORDPRESS_API_URL}posts?categories=${categoryId}&page=${page}&per_page=${perPage}&_embed=true`;
+    const response = await withRetry(() => apiRequest(url));
+    setCache(cacheKey, response, CACHE_TTL.posts);
+    return response;
   } catch (error) {
-    console.error("Erreur récupération tag:", error instanceof AxiosError ? error.message : error);
+    console.error("Erreur récupération posts par catégorie:", error);
+    const expiredCache = cache.get(cacheKey);
+    if (expiredCache) return expiredCache.data;
     throw error;
   }
 };
@@ -313,118 +217,12 @@ export const getPostsByTag = async (tagId: number, page = 1, perPage = 10) => {
   if (cached) return cached;
 
   try {
-    const response = await withRetry(() =>
-      api.get("posts", {
-        params: {
-          tags: tagId,
-          page,
-          per_page: perPage,
-          _embed: true,
-        },
-      })
-    );
-    setCache(cacheKey, response.data, CACHE_TTL.posts);
-    return response.data;
+    const url = `${WORDPRESS_API_URL}posts?tags=${tagId}&page=${page}&per_page=${perPage}&_embed=true`;
+    const response = await withRetry(() => apiRequest(url));
+    setCache(cacheKey, response, CACHE_TTL.posts);
+    return response;
   } catch (error) {
-    console.error("Erreur récupération posts par tag:", error instanceof AxiosError ? error.message : error);
-    throw error;
-  }
-};
-
-// Fonction pour récupérer les ads
-export const getAds = async () => {
-  const cacheKey = 'ads_all';
-  const cached = getCached<any[]>(cacheKey);
-  if (cached) return cached;
-
-  try {
-    const response = await withRetry(() =>
-      api.get("app-ad", {
-        params: { per_page: 10 },
-      })
-    );
-    setCache(cacheKey, response.data, CACHE_TTL.ads);
-    return response.data;
-  } catch (error) {
-    console.error("Erreur récupération ads:", error instanceof AxiosError ? error.message : error);
-    return [];
-  }
-};
-
-// Fonction pour récupérer une pub par ID
-export const getAdById = async (id: number) => {
-  const cacheKey = `ad_${id}`;
-  const cached = getCached<any>(cacheKey);
-  if (cached) return cached;
-
-  try {
-    const response = await withRetry(() => api.get(`app-ad/${id}`));
-    setCache(cacheKey, response.data, CACHE_TTL.ads);
-    return response.data;
-  } catch (error) {
-    console.error("Erreur récupération pub:", error instanceof AxiosError ? error.message : error);
-    return null;
-  }
-};
-
-// Fonction pour récupérer les pubs par zone ID
-export const getAdsByZoneId = async (zoneId: number) => {
-  const cacheKey = `ads_zone_${zoneId}`;
-  const cached = getCached<any[]>(cacheKey);
-  if (cached) return cached;
-
-  try {
-    const response = await withRetry(() =>
-      api.get("app-ad", {
-        params: {
-          app_ad_zone: zoneId,
-          per_page: 10,
-        },
-      })
-    );
-    setCache(cacheKey, response.data, CACHE_TTL.ads);
-    return response.data;
-  } catch (error) {
-    console.error("Erreur récupération pubs zone:", error instanceof AxiosError ? error.message : error);
-    // Retourner cache expiré si disponible
-    const expiredCache = cache.get(cacheKey);
-    if (expiredCache) return expiredCache.data;
-    return [];
-  }
-};
-
-// Fonction pour récupérer les pubs par zone slug
-export const getAdsByZone = async (zoneSlug: string) => {
-  const cacheKey = `ads_zone_slug_${zoneSlug}`;
-  const cached = getCached<any[]>(cacheKey);
-  if (cached) return cached;
-
-  try {
-    const response = await withRetry(() =>
-      api.get("app-ad", {
-        params: { per_page: 10 },
-      })
-    );
-    setCache(cacheKey, response.data, CACHE_TTL.ads);
-    return response.data;
-  } catch (error) {
-    console.error("Erreur récupération pubs zone slug:", error instanceof AxiosError ? error.message : error);
-    return [];
-  }
-};
-
-// Fonction pour récupérer les ad zones
-export const getAdZones = async () => {
-  const cacheKey = 'ad_zones';
-  const cached = getCached<any[]>(cacheKey);
-  if (cached) return cached;
-
-  try {
-    const response = await withRetry(() => api.get("app_ad_zone"));
-    setCache(cacheKey, response.data, CACHE_TTL.ads);
-    return response.data;
-  } catch (error) {
-    console.error("Erreur récupération ad zones:", error instanceof AxiosError ? error.message : error);
+    console.error("Erreur récupération posts par tag:", error);
     throw error;
   }
 };
@@ -432,19 +230,11 @@ export const getAdZones = async () => {
 // Fonction pour rechercher des posts (pas de cache pour la recherche)
 export const searchPosts = async (query: string, page = 1, perPage = 10) => {
   try {
-    const response = await withRetry(() =>
-      api.get("posts", {
-        params: {
-          search: query,
-          page,
-          per_page: perPage,
-          _embed: true,
-        },
-      })
-    );
-    return response.data;
+    const url = `${WORDPRESS_API_URL}posts?search=${encodeURIComponent(query)}&page=${page}&per_page=${perPage}&_embed=true`;
+    const response = await withRetry(() => apiRequest(url));
+    return response;
   } catch (error) {
-    console.error("Erreur recherche:", error instanceof AxiosError ? error.message : error);
+    console.error("Erreur recherche:", error);
     throw error;
   }
 };
