@@ -5,13 +5,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Load directly from environment variables
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 // Validation: Ensure environment variables are set
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.error('⚠️ CRITICAL: Supabase credentials are missing! Please check your .env file.');
 }
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY, {
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,

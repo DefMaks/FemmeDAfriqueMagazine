@@ -126,7 +126,7 @@ class Logger {
 export const logger = new Logger();
 
 // Intercepter les erreurs globales non capturées
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && window.addEventListener) {
   window.addEventListener('error', (event) => {
     logger.error('Erreur globale non capturée', event.error);
   });

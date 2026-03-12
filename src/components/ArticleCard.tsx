@@ -3,7 +3,7 @@ import { View, Text, Image, StyleSheet, TouchableOpacity, Platform, Share } from
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
-import { saveArticle, isArticleSaved, removeArticle } from '../services/savedArticles';
+import { savedArticlesService } from '../services/supabaseService';
 import { decodeHtmlEntities, getShareMessage } from '../utils/textUtils';
 
 interface ArticleCardProps {
@@ -28,7 +28,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
 
   const checkIfSaved = async () => {
     try {
-      const saved = await isArticleSaved(article.id);
+      const saved = await savedArticlesService.isArticleSaved(article.id.toString());
       setIsSaved(saved);
     } catch (error) {
       // Silencieux
@@ -76,10 +76,10 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
     setIsLoading(true);
     try {
       if (isSaved) {
-        await removeArticle(article.id);
+        await savedArticlesService.unsaveArticle(article.id.toString());
         setIsSaved(false);
       } else {
-        await saveArticle(article);
+        await savedArticlesService.saveArticle(article);
         setIsSaved(true);
       }
     } catch (error) {

@@ -51,6 +51,7 @@ export default function App() {
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
+          {/* Expo button */}
           <StatusBar style="auto" />
           <RootNavigator />
         </SafeAreaProvider>

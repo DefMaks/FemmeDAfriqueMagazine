@@ -21,11 +21,8 @@ import { Magazine } from '../models/Magazine';
 import { Colors } from '../theme/colors';
 import {
     initiatePayment,
-    checkPaymentStatus,
     initiateCardPayment,
-    checkCardPaymentStatus,
-    openCardPaymentPageSimple,
-    formatPhoneAndDeduceProvider,
+    checkPaymentStatus,
     generateOrderId,
     handlePaymentError,
     pollPaymentStatus,
@@ -33,18 +30,21 @@ import {
     isPaymentSuccessful,
     isPaymentFailed,
     PaymentMethod,
-    PaymentStatusResponse
+    PaymentStatusResponse,
+    formatPhoneAndDeduceProvider,
+    openCardPaymentPageSimple
 } from '../services/twigaPaie';
-import { recordMagazinePurchase } from '../services/defmaksApi';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../lib/supabase';
 
 const STORAGE_KEY_PHONE = '@fda_user_phone';
 
 // 🧪 Mode test : si true, le prix est de 100 CDF TTC
-const isTest = false;
+const isTest = true;
 const TEST_PRICE_CDF = 100;
+
 
 const ShopScreen = () => {
     const [magazines, setMagazines] = useState<Magazine[]>([]);
@@ -56,11 +56,80 @@ const ShopScreen = () => {
     const [loadingPayment, setLoadingPayment] = useState(false);
     const [showCheckoutModal, setShowCheckoutModal] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+    const [downloadingPdf, setDownloadingPdf] = useState(false);
     const [detectedProvider, setDetectedProvider] = useState<string>('');
     const [showSecurityNotice, setShowSecurityNotice] = useState(false);
     const [currentOrderNumber, setCurrentOrderNumber] = useState<string>('');
     const [paymentStatusMessage, setPaymentStatusMessage] = useState<string>('');
     const [showDownloadPopup, setShowDownloadPopup] = useState(false);
+
+    // Fonction downloadPdf déclarée au début pour éviter l'erreur de scope
+    const downloadPdf = async () => {
+        if (!selectedMagazine) return;
+
+        setDownloadingPdf(true); // Début du téléchargement
+
+        try {
+            console.log(`📄 Début téléchargement PDF pour magazine N°${selectedMagazine.acf.numero}`);
+            console.log(`🔗 PDF ID: ${selectedMagazine.acf.pdf}`);
+
+            const media = await getMedia(selectedMagazine.acf.pdf);
+            const pdfUrl = media.source_url;
+            const filename = `FDA_N${selectedMagazine.acf.numero}.pdf`;
+            const documentDir = FileSystem.documentDirectory || FileSystem.cacheDirectory || '';
+            const localUri = `${documentDir}${filename}`;
+
+            console.log(`📥 Source URL: ${pdfUrl}`);
+            console.log(`💾 Destination: ${localUri}`);
+            console.log(`📁 Document directory: ${documentDir}`);
+
+            // Utilisation de la nouvelle API FileSystem (non deprecated)
+            const downloadResult = await FileSystem.downloadAsync(pdfUrl, localUri);
+            console.log(`📊 Download result status: ${downloadResult.status}`);
+            console.log(`📊 Download result URI: ${downloadResult.uri}`);
+
+            if (downloadResult.status === 200) {
+                console.log('✅ Téléchargement réussi');
+
+                // Alert avec option d'ouverture automatique
+                Alert.alert(
+                    '✅ PDF Téléchargé',
+                    `Le magazine FDA N°${selectedMagazine.acf.numero} a été téléchargé avec succès !`,
+                    [
+                        {
+                            text: 'Ouvrir le PDF',
+                            onPress: async () => {
+                                try {
+                                    await Sharing.shareAsync(localUri);
+                                    console.log('📤 PDF ouvert et partagé');
+                                } catch (shareError) {
+                                    console.error('❌ Erreur ouverture PDF:', shareError);
+                                    Alert.alert('Erreur', 'Impossible d\'ouvrir le PDF');
+                                }
+                            }
+                        },
+                        {
+                            text: 'Plus tard',
+                            style: 'cancel'
+                        }
+                    ]
+                );
+            } else {
+                throw new Error(`Téléchargement échoué avec statut: ${downloadResult.status}`);
+            }
+        } catch (error) {
+            console.error('❌ Erreur PDF:', error);
+            console.error('❌ Détails erreur:', {
+                pdfId: selectedMagazine?.acf.pdf,
+                magazineNumero: selectedMagazine?.acf.numero,
+                errorMessage: (error as any)?.message,
+                errorCode: (error as any)?.code
+            });
+            Alert.alert('Erreur', 'Impossible de télécharger le PDF.');
+        } finally {
+            setDownloadingPdf(false); // Fin du téléchargement
+        }
+    };
 
     useEffect(() => {
         fetchMagazines();
@@ -81,10 +150,18 @@ const ShopScreen = () => {
 
     const fetchMagazines = async () => {
         try {
+            console.log('📚 Chargement des magazines...');
             const data = await getMagazines(1, 10);
+            console.log(`✅ ${data.length} magazines chargés`);
             setMagazines(data);
         } catch (error) {
-            console.error('Erreur:', error);
+            console.error('❌ Erreur chargement magazines:', error);
+            // Afficher un message d'erreur plus clair
+            Alert.alert(
+                'Problème de connexion',
+                'Impossible de charger les magazines. Veuillez vérifier votre connexion et réessayer.',
+                [{ text: 'Réessayer', onPress: fetchMagazines }]
+            );
         } finally {
             setLoading(false);
         }
@@ -98,13 +175,52 @@ const ShopScreen = () => {
     // Devise selon le mode
     const currency = isTest ? 'CDF' : 'USD';
 
-    const handleOpenCheckout = (mag: Magazine) => {
+    const walletId = process.env.wallet_id;
+    const recordMagazinePurchase = async (wallet_id: string, amount: string, currency: string, transaction_type: string, description: string, external_reference: string, transaction_platform: string) => {
+        try {
+            const { data, error } = await supabase
+                .from('transactions')
+                .insert({
+                    wallet_id: wallet_id,
+                    amount: parseFloat(amount), // numeric requis par le schéma
+                    currency: currency,
+                    transaction_type: transaction_type,
+                    description: description,
+                    external_reference: external_reference,
+                    transaction_platform: transaction_platform
+                })
+                .select();
+
+            if (error) {
+                console.error('❌ Erreur enregistrement Supabase:', error);
+                return { success: false, message: (error as any).message, error: 'SUPABASE_ERROR' };
+            }
+
+            console.log('✅ Transaction enregistrée dans Supabase:', data[0]?.id);
+            return { success: true, message: 'Transaction enregistrée', purchase_id: data[0]?.id };
+        } catch (error) {
+            console.error('❌ Erreur enregistrement Supabase:', error);
+            return { success: false, message: (error as any).message, error: 'NETWORK_ERROR' };
+        }
+    };
+
+    const handleOpenCheckout = async (mag: Magazine) => {
+        // Éviter les appels multiples si déjà en cours
+        if (selectedMagazine?.id === mag.id) {
+            console.log('� Modal déjà ouverte pour ce magazine');
+            return;
+        }
+
+        console.log(`� Ouverture modal d'achat pour magazine N°${mag.acf.numero}`);
+
         setSelectedMagazine(mag);
         setShowCheckoutModal(true);
         setShowSecurityNotice(true);
         setPaymentMethod(null);
+
         // Charger le numéro par défaut du profil
         setPhone(defaultPhone || '243');
+
         // Détecter le provider si numéro existant
         if (defaultPhone && defaultPhone.length >= 5) {
             try {
@@ -116,7 +232,16 @@ const ShopScreen = () => {
         } else {
             setDetectedProvider('');
         }
+
         setCurrentOrderNumber('');
+
+        // Récupérer le PDF en parallèle pour optimiser
+        try {
+            const media = await getMedia(mag.acf.pdf);
+            console.log(`📄 PDF Source URL: ${media.source_url}`);
+        } catch (error) {
+            console.error('❌ Erreur chargement PDF:', error);
+        }
     };
 
     const closeCheckout = () => {
@@ -130,6 +255,11 @@ const ShopScreen = () => {
         setCurrentOrderNumber('');
         setShowDownloadPopup(false);
         setPaymentStatusMessage('');
+        // ⚠️ AJOUT DES ÉTATS MANQUANTS POUR RESTAURER LE SCROLL
+        setLoadingPayment(false);
+        setDownloadingPdf(false);
+        // Fermer le clavier si ouvert
+        Keyboard.dismiss();
     };
 
     const handlePhoneChange = (text: string) => {
@@ -162,17 +292,13 @@ const ShopScreen = () => {
             console.log('📝 Enregistrement de l\'achat sur DefMaks...');
 
             const result = await recordMagazinePurchase(
-                orderId,
-                phone,
-                {
-                    id: selectedMagazine.id,
-                    numero: String(selectedMagazine.acf.numero),
-                    title: selectedMagazine.title.rendered,
-                },
+                walletId,
                 totalPrice.toString(),
                 currency,
-                paymentMethodUsed,
-                providerName
+                "DEPOSIT",
+                `Magazine FDA N°${selectedMagazine.acf.numero}`,
+                orderId, // ✅ Utiliser le paramètre orderId
+                paymentMethodUsed === 'emoney' ? 'EMONEY' : 'ECARD' // ✅ Platform dynamique
             );
 
             if (result.success) {
@@ -186,7 +312,7 @@ const ShopScreen = () => {
         }
     };
 
-    // Paiement E-Money avec polling optimisé
+    // Paiement E-Money avec polling optimisé et meilleure gestion des états
     const handleEmoneyPayment = async () => {
         if (!selectedMagazine) return;
 
@@ -196,110 +322,145 @@ const ShopScreen = () => {
         }
 
         setLoadingPayment(true);
-        setPaymentStatusMessage('Initialisation du paiement...');
-        Keyboard.dismiss();
+        setPaymentStatusMessage('');
 
         try {
             const orderId = generateOrderId();
-            setCurrentOrderNumber(orderId);
+            const amount = isTest ? TEST_PRICE_CDF.toString() : (selectedMagazine.acf.prix_mag + selectedMagazine.acf.tva).toString();
 
-            const result = await initiatePayment(
-                phone,
-                totalPrice.toString(),
-                orderId,
-                currency  // CDF en mode test, USD sinon
-            );
+            console.log(`📱 Initiation paiement E-Money: ${orderId} - ${amount} CDF`);
 
-            setPaymentStatusMessage('📱 Veuillez confirmer sur votre téléphone...');
+            const result = await initiatePayment(phone, amount, orderId, 'CDF');
 
-            Alert.alert(
-                '📱 Paiement initié',
-                `Veuillez confirmer le paiement de ${totalPrice} ${currency} sur votre téléphone.\n\nVous recevrez une notification push de votre opérateur mobile.`,
-                [{ text: 'OK, je confirme' }]
-            );
+            if (!result.success) {
+                throw new Error(result.message || 'Échec initiation paiement');
+            }
 
-            // Polling avec mise à jour du statut
+            // Polling avec timeout étendu pour E-Money (nécessite confirmation client)
             setPaymentStatusMessage('🔄 Vérification en cours...');
 
             const finalStatus = await pollPaymentStatus(
                 result.order_id,
-                8,  // 8 tentatives
-                4000,  // 4 secondes entre chaque
-                (status: PaymentStatusResponse) => {
-                    console.log('📊 Statut mis à jour:', status.status);
-                    if (status.status === 'pending') {
-                        setPaymentStatusMessage('⏳ En attente de confirmation...');
-                    }
+                20,  // 20 tentatives (augmenté)
+                6000,  // 6 secondes d'intervalle (augmenté)
+                (status) => {
+                    const message =
+                        status.status === 'pending' ? '🔄 En attente de confirmation sur votre téléphone Airtel...' :
+                            status.status === 'success' ? '✅ Paiement E-Money confirmé !' :
+                                status.status === 'failed' ? '❌ Échec du paiement' :
+                                    status.status === 'cancelled' ? '🚫 Paiement annulé' :
+                                        '🔄 Vérification en cours...';
+
+                    setPaymentStatusMessage(message);
                 }
             );
 
             if (isPaymentSuccessful(finalStatus.status)) {
-                setPaymentStatusMessage('✅ Paiement confirmé !');
-
-                // Enregistrer l'achat sur DefMaks
-                await recordSuccessfulPurchase(result.order_id, 'emoney', detectedProvider);
-
+                setPaymentStatusMessage('✅ Paiement E-Money confirmé avec succès !');
                 setPaymentSuccess(true);
-                setShowDownloadPopup(true);
-            } else if (isPaymentFailed(finalStatus.status)) {
-                setPaymentStatusMessage('');
+                setShowCheckoutModal(false);
+
+                // 1. ENREGISTREMENT DANS SUPABASE (priorité absolue)
+                setPaymentStatusMessage('💾 Enregistrement de la transaction...');
+                try {
+                    console.log('💾 Enregistrement transaction dans Supabase...');
+
+                    const transactionData = {
+                        wallet_id: walletId,
+                        amount: parseFloat(amount), // numeric requis par le schéma
+                        currency: currency,
+                        transaction_type: 'DEPOSIT',
+                        description: `Magazine FDA N°${selectedMagazine.acf.numero}`,
+                        external_reference: result.order_id,
+                        transaction_platform: 'EMONEY'
+                    };
+
+                    console.log('📊 Données transaction Supabase:', JSON.stringify(transactionData, null, 2));
+
+                    const { data, error } = await supabase
+                        .from('transactions')
+                        .insert(transactionData)
+                        .select();
+
+                    if (error) {
+                        console.error('❌ Erreur enregistrement Supabase:', error);
+                        throw error;
+                    }
+
+                    console.log('✅ Transaction enregistrée dans Supabase:', data[0]?.id);
+                    setPaymentStatusMessage('✅ Transaction enregistrée avec succès !');
+                } catch (supabaseError) {
+                    console.error('❌ Erreur critique Supabase:', supabaseError);
+                    setPaymentStatusMessage('⚠️ Paiement réussi mais erreur d\'enregistrement');
+                    Alert.alert('Attention', 'Paiement effectué mais problème lors de l\'enregistrement. Veuillez contacter le support.');
+                }
+
+                // 2. TÉLÉCHARGEMENT PDF (après enregistrement réussi)
+                setPaymentStatusMessage('📄 Téléchargement du magazine...');
+                try {
+                    await downloadPdf();
+                    setPaymentStatusMessage('✅ Paiement effectué et magazine disponible !');
+                } catch (pdfError) {
+                    console.error('❌ Erreur téléchargement PDF:', pdfError);
+                    setPaymentStatusMessage('⚠️ Paiement effectué mais erreur de téléchargement');
+                    Alert.alert('Attention', 'Paiement effectué mais impossible de télécharger le magazine. Vous pouvez le télécharger plus tard.');
+                }
+
+                // 3. Enregistrement DefMaks désactivé (API inexistante)
+                console.log('💾 Transaction enregistrée dans Supabase (source unique)');
+            } else if (finalStatus.status === 'pending') {
+                // Cas spécial : toujours en attente après toutes les tentatives
                 Alert.alert(
-                    '❌ Paiement échoué',
-                    `Le paiement a échoué (${finalStatus.rawStatus || finalStatus.status}). Veuillez réessayer.`,
-                    [{ text: 'OK' }]
-                );
-            } else {
-                // Toujours en attente après le polling
-                setPaymentStatusMessage('');
-                Alert.alert(
-                    '⏳ Paiement en attente',
-                    'Le paiement n\'a pas encore été confirmé.\n\nVeuillez vérifier si vous avez reçu une demande de confirmation sur votre téléphone.',
+                    'Paiement en attente',
+                    'Le paiement n\'a pas encore été confirmé.\n\nVeuillez vérifier si vous avez reçu une demande de confirmation sur votre téléphone Airtel et l\'accepter.\n\nVous pouvez réessayer plus tard.',
                     [
-                        { text: 'Annuler', style: 'cancel' },
-                        { text: 'Revérifier', onPress: () => recheckPayment(result.order_id) }
+                        { text: 'OK', style: 'cancel' },
+                        {
+                            text: 'Revérifier',
+                            onPress: async () => {
+                                try {
+                                    setPaymentStatusMessage('🔄 Nouvelle vérification...');
+                                    const retryStatus = await pollPaymentStatus(result.order_id, 5, 3000);
+                                    if (isPaymentSuccessful(retryStatus.status)) {
+                                        setPaymentStatusMessage('✅ Paiement confirmé !');
+                                        setPaymentSuccess(true);
+                                        setShowCheckoutModal(false);
+
+                                        // Téléchargement PDF
+                                        await downloadPdf();
+
+                                        // Enregistrement DefMaks après succès
+                                        try {
+                                            await recordMagazinePurchase(
+                                                walletId,
+                                                amount,
+                                                'CDF',
+                                                "DEPOSIT",
+                                                `Magazine FDA N°${selectedMagazine.acf.numero}`,
+                                                result.order_id, // Référence TwigaPaie
+                                                "EMONEY" // Platform E-Money
+                                            );
+                                            console.log('📝 Achat enregistré chez DefMaks');
+                                        } catch (recordError) {
+                                            console.error('❌ Erreur enregistrement DefMaks:', recordError);
+                                        }
+                                    }
+                                } catch (error: any) {
+                                    setPaymentStatusMessage('');
+                                    handlePaymentError(error);
+                                } finally {
+                                    setLoadingPayment(false);
+                                }
+                            }
+                        }
                     ]
                 );
+            } else {
+                setPaymentStatusMessage('❌ Échec du paiement ou timeout');
             }
         } catch (error: any) {
             setPaymentStatusMessage('');
             handlePaymentError(error);
-        } finally {
-            setLoadingPayment(false);
-        }
-    };
-
-    const recheckPayment = async (orderId: string) => {
-        setLoadingPayment(true);
-        setPaymentStatusMessage('🔄 Vérification en cours...');
-
-        try {
-            const status = await pollPaymentStatus(orderId, 3, 3000);
-
-            if (isPaymentSuccessful(status.status)) {
-                setPaymentStatusMessage('✅ Paiement confirmé !');
-
-                // Enregistrer l'achat sur DefMaks
-                await recordSuccessfulPurchase(orderId, 'emoney', detectedProvider);
-
-                setPaymentSuccess(true);
-                setShowDownloadPopup(true);
-            } else if (isPaymentFailed(status.status)) {
-                setPaymentStatusMessage('');
-                Alert.alert('❌ Échec', `Le paiement a échoué: ${status.rawStatus || status.status}`);
-            } else {
-                setPaymentStatusMessage('');
-                Alert.alert(
-                    '⏳ En attente',
-                    'Le paiement n\'est pas encore confirmé.\n\nAssurez-vous d\'avoir validé la demande sur votre téléphone.',
-                    [
-                        { text: 'OK' },
-                        { text: 'Réessayer', onPress: () => recheckPayment(orderId) }
-                    ]
-                );
-            }
-        } catch (err) {
-            setPaymentStatusMessage('');
-            handlePaymentError(err);
         } finally {
             setLoadingPayment(false);
         }
@@ -425,47 +586,15 @@ const ShopScreen = () => {
         }
     };
 
-    const downloadPdf = async () => {
-        if (!selectedMagazine) return;
-        try {
-            const media = await getMedia(selectedMagazine.acf.pdf);
-            const pdfUrl = media.source_url;
-            const filename = `FDA_N${selectedMagazine.acf.numero}.pdf`;
-            const documentDir = FileSystem.Paths?.document?.uri || FileSystem.Paths?.cache?.uri || '';
-            const localUri = `${documentDir}/${filename}`;
-
-            // Télécharger le fichier
-            const downloadResult = await FileSystem.downloadAsync(pdfUrl, localUri);
-
-            if (downloadResult.status === 200) {
-                if (await Sharing.isAvailableAsync()) {
-                    await Sharing.shareAsync(localUri);
-                } else {
-                    Alert.alert('Succès', `PDF sauvegardé : ${filename}`);
-                }
-            } else {
-                throw new Error('Téléchargement échoué');
-            }
-        } catch (error) {
-            console.error('Erreur PDF:', error);
-            Alert.alert('Erreur', 'Impossible de télécharger le PDF.');
-        }
-    };
-
     const formatMagazineDate = (dateString: string) => {
-        try {
-            const date = new Date(dateString);
-            const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
-            return `${months[date.getMonth()]} ${date.getFullYear()}`;
-        } catch {
-            return '';
-        }
+        const date = new Date(dateString);
+        return date.toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
     };
 
     const renderMagazine = ({ item }: { item: Magazine }) => {
         const displayPrice = isTest
-            ? `${TEST_PRICE_CDF} CDF TTC`
-            : `$${(item.acf.prix_mag + item.acf.tva).toFixed(2)} TTC*`;
+            ? `${TEST_PRICE_CDF} CDF`
+            : `$${(item.acf.prix_mag + item.acf.tva).toFixed(2)} TTC`;
 
         return (
             <TouchableOpacity

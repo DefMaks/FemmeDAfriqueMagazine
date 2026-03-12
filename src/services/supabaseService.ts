@@ -6,6 +6,7 @@ export interface SavedArticle {
   user_id: string;
   article_id: string;
   article_data: Post;
+  media: string; // Ajout du champ media
   saved_at: string;
   created_at: string;
 }
@@ -31,12 +32,14 @@ export const savedArticlesService = {
   async saveArticle(article: Post): Promise<boolean> {
     try {
       const userId = await getDeviceId();
+      const media = process.env.EXPO_PUBLIC_MEDIA || process.env.media || 'FDA'; // Récupérer depuis .env
       const { error } = await supabase
         .from('saved_articles')
         .insert({
           user_id: userId,
           article_id: article.id.toString(),
           article_data: article,
+          media: media, // Ajout du champ media
         });
 
       if (error) {

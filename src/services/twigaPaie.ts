@@ -23,6 +23,7 @@ export interface PaymentCardRequest {
 }
 
 export interface PaymentResponse {
+  success: boolean;
   status: PaymentStatus;
   order_id: string;
   message: string;
@@ -87,26 +88,28 @@ export const generateOrderId = (): string => {
 /**
  * Normalise le statut de paiement selon la documentation TwigaPaie
  */
-const normalizeStatus = (status: string | undefined): PaymentStatus => {
-  if (!status) return 'pending';
-  const normalized = status.toLowerCase().trim();
+const normalizeStatus = (status: any): PaymentStatus => {
+  if (status === undefined || status === null) return 'pending';
   
-  // Statuts de succès
-  if (['success', 'succeeded', 'completed', 'paid', '0', '1'].includes(normalized)) return 'success';
+  const s = String(status).toLowerCase();
   
-  // Statuts d'échec
-  if (['failed', 'rejected', 'declined', 'error', '2'].includes(normalized)) return 'failed';
+  // SUCCESS : Codes souvent utilisés par TwigaPaie/Providers pour le succès
+  // Statut 2 = paiement confirmé (voir logs avec transaction_id et message "envoye 100.0000 CDF")
+  if (['success', 'completed', '0', '2', '3'].includes(s)) {
+    return 'success';
+  }
   
-  // Statuts d'annulation
-  if (['cancelled', 'canceled'].includes(normalized)) return 'cancelled';
+  // PENDING / PROCESSING : Le code '1' signifie "In Progress" (initié)
+  if (['pending', 'initiated', 'processing', '1', 'in progress'].includes(s)) {
+    return 'pending';
+  }
   
-  // Statuts en cours
-  if (['initiated', 'pending', 'processing', 'in_progress'].includes(normalized)) return 'pending';
+  // FAILED
+  if (['failed', 'error', 'rejected'].includes(s)) {
+    return 'failed';
+  }
   
-  // Statut expiré
-  if (['expired'].includes(normalized)) return 'expired';
-  
-  return 'pending';
+  return 'pending'; // Par défaut
 };
 
 /**
@@ -247,6 +250,7 @@ export const initiatePayment = async (
     }
 
     return {
+      success: data?.success || true, // L'API renvoie success: true même pour status: 1
       status: normalizeStatus(data.status),
       order_id: data.order_id || client_order_id,
       message: data.message || 'Paiement initié avec succès',
@@ -288,16 +292,19 @@ export const checkPaymentStatus = async (order_id: string): Promise<PaymentStatu
       );
     }
 
-    const status = normalizeStatus(data.status);
-    console.log(`📊 Statut normalisé: ${data.status} -> ${status}`);
+    // On extrait le statut depuis data.data (structure vue dans tes logs)
+    const rawStatusFromApi = data.data?.status; 
+    const status = normalizeStatus(rawStatusFromApi);
+    
+    console.log(`📊 Statut extrait: ${rawStatusFromApi} -> Normalisé: ${status}`);
 
     return {
       status,
-      order_id: data.order_id || order_id,
-      amount: data.amount || '0',
-      currency: data.currency || 'USD',
-      transaction_date: data.transaction_date || new Date().toISOString(),
-      rawStatus: data.status,
+      order_id: data.data?.order_id || data.order_id || order_id,
+      amount: data.data?.amount || data.amount || '0',
+      currency: data.data?.currency || data.currency || 'USD',
+      transaction_date: data.data?.service_date_time || data.data?.transaction_date || new Date().toISOString(),
+      rawStatus: String(rawStatusFromApi),
     };
   } catch (error: any) {
     console.error('❌ Erreur TwigaPaie - checkPaymentStatus:', error);
@@ -428,6 +435,7 @@ export const initiateCardPayment = async (
     console.log(`✅ Order Number: ${orderNumber}`);
 
     return {
+      success: true,
       status: 'initiated',
       order_id: orderNumber,
       orderNumber: orderNumber,

@@ -8,7 +8,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
-import { saveArticle, isArticleSaved, removeArticle } from '../services/savedArticles';
+import { savedArticlesService } from '../services/supabaseService';
 import { decodeHtmlEntities, formatArticleTitle, getShareMessage } from '../utils/textUtils';
 import { CommentsSection } from '../components/CommentsSection';
 import { getAds, api } from '../services/api';
@@ -114,7 +114,7 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
 
   // Fonction pour vérifier si l'article est sauvegardé
   const checkIfArticleIsSaved = async () => {
-    const saved = await isArticleSaved(article.id);
+    const saved = await savedArticlesService.isArticleSaved(article.id.toString());
     setIsSaved(saved);
   };
 
@@ -146,17 +146,17 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
   // Les commentaires sont maintenant gérés par CommentsSection
 
   const checkIfSaved = async () => {
-    const saved = await isArticleSaved(article.id);
+    const saved = await savedArticlesService.isArticleSaved(article.id.toString());
     setIsSaved(saved);
   };
 
   const toggleSave = async () => {
     setIsLoading(true);
     if (isSaved) {
-      await removeArticle(article.id);
+      await savedArticlesService.unsaveArticle(article.id.toString());
       setIsSaved(false);
     } else {
-      await saveArticle(article);
+      await savedArticlesService.saveArticle(article);
       setIsSaved(true);
     }
     setIsLoading(false);

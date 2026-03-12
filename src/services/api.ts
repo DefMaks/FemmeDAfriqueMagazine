@@ -20,9 +20,10 @@ const cache = new Map<string, CacheItem<any>>();
 
 const CACHE_TTL = {
   posts: 2 * 60 * 1000,      // 2 minutes pour les posts
-  categories: 10 * 60 * 1000, // 10 minutes pour les catégories
+  categories: 60 * 60 * 1000, // 1 HEURE pour les catégories (était 10min)
   ads: 5 * 60 * 1000,        // 5 minutes pour les pubs
-  magazines: 5 * 60 * 1000,  // 5 minutes pour les magazines
+  magazines: 30 * 60 * 1000,  // 30 minutes pour les magazines (était 5min)
+  media: 60 * 60 * 1000,     // 1 HEURE pour les médias (PDF/images)
 };
 
 // Vérifier si le cache est valide
@@ -75,13 +76,19 @@ const withRetry = async <T>(
 
 // Récupérer une publicité par ID
 export const getAdById = async (id: number) => {
-  return getPostById(id);
+  try {
+    const url = `${WORDPRESS_API_URL}app-ad/${id}?_embed=true`;
+    return await withRetry(() => apiRequest(url));
+  } catch (error) {
+    console.error("Erreur récupération ad by ID:", error);
+    return null;
+  }
 };
 
-// Récupérer toutes les publicités (fallback sur les derniers articles)
+// Récupérer toutes les publicités
 export const getAds = async () => {
   try {
-    const url = `${WORDPRESS_API_URL}posts?per_page=50&_embed=true`;
+    const url = `${WORDPRESS_API_URL}app-ad?per_page=50&_embed=true`;
     return await withRetry(() => apiRequest(url));
   } catch (error) {
     console.error("Erreur récupération ads:", error);
@@ -92,13 +99,10 @@ export const getAds = async () => {
 // Récupérer les publicités par Zone ID
 export const getAdsByZoneId = async (zoneId: number) => {
   try {
-    const ads = await getAds();
-    // Filtrer par zone si la propriété existe
-    return ads.filter((ad: any) =>
-      ad.app_ad_zone && (Array.isArray(ad.app_ad_zone) ? ad.app_ad_zone.includes(zoneId) : ad.app_ad_zone == zoneId)
-    );
+    const url = `${WORDPRESS_API_URL}app-ad?app_ad_zone=${zoneId}&per_page=50&_embed=true`;
+    return await withRetry(() => apiRequest(url));
   } catch (error) {
-    console.error(`Erreur récupération ads pour zone ${zoneId}:`, error);
+    console.error("Erreur récupération ads by zone:", error);
     return [];
   }
 };
@@ -177,9 +181,11 @@ export const api = {
 };
 
 // Fonction fetch avec timeout et retry
+const API_TIMEOUT = 8000; // 8 secondes (était probablement 10s+)
+
 const apiRequest = async (url: string, options: RequestInit = {}): Promise<any> => {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
 
   try {
     const response = await fetch(url, {
@@ -187,6 +193,7 @@ const apiRequest = async (url: string, options: RequestInit = {}): Promise<any> 
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
+        'User-Agent': 'FemmeDAfrique-App/1.0',
         ...options.headers,
       },
     });
@@ -198,8 +205,34 @@ const apiRequest = async (url: string, options: RequestInit = {}): Promise<any> 
     }
 
     return await response.json();
-  } catch (error) {
+  } catch (error: any) {
     clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      console.error(`⏰ Timeout API: ${url} (8s)`);
+      throw new Error('La connexion est trop lente. Veuillez réessayer.');
+    }
+    
+    console.error(`❌ Erreur API: ${url}`, error);
+    throw error;
+  }
+};
+
+// Fonction pour récupérer les magazines (avec cache)
+export const getMagazines = async (page = 1, perPage = 10) => {
+  const cacheKey = `magazines_${page}_${perPage}`;
+  const cached = getCached<any[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const url = `${WORDPRESS_API_URL}mag?page=${page}&per_page=${perPage}&_embed=true`;
+    const response = await withRetry(() => apiRequest(url));
+    setCache(cacheKey, response, CACHE_TTL.magazines);
+    return response;
+  } catch (error) {
+    console.error("Erreur récupération magazines:", error);
+    const expiredCache = cache.get(cacheKey);
+    if (expiredCache) return expiredCache.data;
     throw error;
   }
 };
@@ -219,30 +252,6 @@ export const getPosts = async (page = 1, perPage = 10) => {
     console.error("Erreur récupération articles:", error);
     // Retourner cache expiré si disponible en cas d'erreur
     const expiredCache = cache.get(cacheKey);
-    if (expiredCache) return expiredCache.data;
-    throw error;
-  }
-};
-
-// Fonction pour récupérer un article par ID
-export const getPostById = async (id: number) => {
-  const cacheKey = `post_${id}`;
-  const cached = getCached<any>(cacheKey);
-  if (cached) return cached;
-
-  try {
-    const url = `${WORDPRESS_API_URL}posts/${id}/?_embed=true`;
-    const response = await withRetry(() => apiRequest(url));
-    setCache(cacheKey, response, CACHE_TTL.posts);
-    return response;
-  } catch (error) {
-    console.error("Erreur récupération article:", error);
-    throw error;
-  }
-};
-
-// Fonction pour récupérer les magazines
-export const getMagazines = async (page = 1, perPage = 10) => {
   const cacheKey = `magazines_${page}_${perPage}`;
   const cached = getCached<any[]>(cacheKey);
   if (cached) return cached;
@@ -260,21 +269,54 @@ export const getMagazines = async (page = 1, perPage = 10) => {
   }
 };
 
-// Fonction pour récupérer les catégories (avec long cache)
+// Fonction pour récupérer les catégories (avec localStorage persistant)
 export const getCategories = async () => {
   const cacheKey = 'categories_all';
-  const cached = getCached<any[]>(cacheKey);
-  if (cached) return cached;
-
+  const localStorageKey = 'categories_persistent';
+  
+  // Essayer localStorage d'abord (plus persistant)
   try {
-    const url = `${WORDPRESS_API_URL}categories?per_page=100&orderby=count&order=desc`;
-    const response = await withRetry(() => apiRequest(url));
+    const stored = localStorage.getItem(localStorageKey);
+    if (stored) {
+      const data = JSON.parse(stored);
+      console.log('📂 Catégories chargées depuis localStorage');
+      return data;
+    }
+  } catch (error) {
+    console.log('📂 localStorage non disponible, utilisation du cache');
+  }
+  
+  // Essayer le cache mémoire
+  const cached = getCached<any[]>(cacheKey);
+  if (cached) {
+    console.log('📂 Catégories chargées depuis le cache mémoire');
+    return cached;
+  }
+
+  // Récupérer depuis l'API
+  try {
+    const response = await withRetry(() => apiRequest(`${WORDPRESS_API_URL}categories?per_page=100`));
     setCache(cacheKey, response, CACHE_TTL.categories);
+    
+    // Sauvegarder dans localStorage pour persistance
+    try {
+      localStorage.setItem(localStorageKey, JSON.stringify(response));
+      console.log('💾 Catégories sauvegardées dans localStorage');
+    } catch (error) {
+      console.log('⚠️ Impossible de sauvegarder dans localStorage');
+    }
+    
     return response;
   } catch (error) {
     console.error("Erreur récupération catégories:", error);
+    
+    // Essayer le cache expiré en dernier recours
     const expiredCache = cache.get(cacheKey);
-    if (expiredCache) return expiredCache.data;
+    if (expiredCache) {
+      console.log('🔄 Utilisation du cache expiré comme fallback');
+      return expiredCache.data;
+    }
+    
     throw error;
   }
 };

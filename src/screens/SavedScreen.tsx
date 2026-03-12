@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { getSavedArticles, removeArticle } from '../services/savedArticles';
+import { savedArticlesService } from '../services/supabaseService';
 import { Post } from '../models/Post';
 import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,12 +24,14 @@ const SavedScreen = () => {
   }, []);
 
   const loadSaved = async () => {
-    const posts = await getSavedArticles();
+    const savedArticles = await savedArticlesService.getSavedArticles();
+    // Extraire les Post depuis article_data
+    const posts = savedArticles.map(item => item.article_data);
     setSavedPosts(posts);
   };
 
   const handleRemove = async (id: number) => {
-    await removeArticle(id);
+    await savedArticlesService.unsaveArticle(id.toString());
     setSavedPosts(prev => prev.filter(p => p.id !== id));
   };
 

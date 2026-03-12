@@ -26,7 +26,7 @@ import { SectionHeader } from '../components/SectionHeader';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { RootStackParamList } from '../navigation/RootNavigator';
-import { isArticleSaved } from '../services/savedArticles';
+import { savedArticlesService } from '../services/supabaseService';
 import { analyticsService } from '../services/analytics';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -123,12 +123,12 @@ const HomeScreen = () => {
             );
 
             const statusChecks = allPosts.map(post =>
-                isArticleSaved(post.id).then(saved => ({ id: post.id, saved }))
+                savedArticlesService.isArticleSaved(post.id.toString()).then(saved => ({ id: post.id, saved }))
             );
             const statusResults = await Promise.all(statusChecks);
 
             const status: Record<number, boolean> = {};
-            statusResults.forEach(({ id, saved }) => {
+            statusResults.forEach(({ id, saved }: { id: number; saved: boolean }) => {
                 status[id] = saved;
             });
             setSavedStatus(status);
