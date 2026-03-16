@@ -52,11 +52,28 @@ class AnalyticsService {
   /**
    * Track un événement générique
    */
-  async trackEvent(event: AnalyticsEvent): Promise<boolean> {
+  async trackEvent(eventNameOrEvent: string | AnalyticsEvent, category?: string, label?: string, value?: number): Promise<boolean> {
     if (!this.isEnabled) return false;
 
     try {
       const userId = await getDeviceId();
+      
+      // Gérer les différents formats d'appel
+      let event: AnalyticsEvent;
+      
+      if (typeof eventNameOrEvent === 'object') {
+        // Format: trackEvent(eventObject)
+        event = eventNameOrEvent;
+      } else {
+        // Format: trackEvent(name, category, label, value)
+        event = {
+          event_name: eventNameOrEvent,
+          event_category: category,
+          event_label: label,
+          event_value: value
+        };
+      }
+
       const eventData = {
         ...event,
         user_id: userId,

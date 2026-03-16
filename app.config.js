@@ -1,6 +1,6 @@
 export default {
   expo: {
-    name: "Femme D'Afrique Magazine",
+    name: "Femme d'Afrique Magazine",
     slug: "FemmeDAfriqueMagazine",
     version: "2.0.0",
     orientation: "portrait",

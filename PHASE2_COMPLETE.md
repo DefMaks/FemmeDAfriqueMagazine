@@ -159,7 +159,7 @@ const handlePaymentSuccess = async (orderId: string, amount: number) => {
 
   // 3. Record transaction
   await walletService.createTransaction({
-    wallet_id: wallet.id,
+    WALLET_ID: wallet.id,
     amount,
     currency: 'USD',
     transaction_type: 'PURCHASE',

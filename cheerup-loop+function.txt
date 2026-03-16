@@ -1,0 +1,321 @@
+<?php 
+/**
+ * One Large + X Small Grid listing style for tags, author archives etc.
+ * 
+ * Used for several combination of loops:
+ * 
+ *  - First large then grid
+ *  - First large then list
+ *  - 1 Large + 2 Grid
+ *  - 1 Large + 2 List
+ *  - 1 Overlay Large + 2 Grid 
+ */
+
+// Default vars - define above or via caller to override
+extract(array(
+	'query'  => $wp_query,
+		
+	// Type of posts to display for the "one large" part
+	'large'  => Bunyad::options()->post_large_style,
+		
+	// Type of posts to display for the the small part
+	'type'   => 'grid',
+
+	// Every $number post will be of the large_type, counting from first
+	// post onwards. 0 disables it.
+	'number' => 3,
+
+	'grid_cols'    => 2,
+	'show_excerpt'   => true,
+	'excerpt_length' => '',
+	'show_footer'    => Bunyad::options()->post_footer_grid,
+	
+	'loop' => '',
+	
+), EXTR_SKIP);
+
+// Remove excerpt_length unless valid, since content-xyz templates have defaults set
+if (empty($excerpt_length)) {
+	unset($excerpt_length);
+}
+
+// Content template to use for non-large posts
+$template = 'content-' . sanitize_file_name($type);
+$classes  = array(
+	'posts-dynamic posts-container ts-row', 
+	$type, 
+	'count-' . $number
+);
+
+/**
+ * Grid specific settings
+ */
+if ($type == 'grid') {
+	
+	// Set the grid template
+	$grid_template = 'content-' . sanitize_file_name(Bunyad::options()->post_grid_style);
+	$classes[]     = 'has-grid-' . $grid_cols;
+
+	// Is masonry?
+	if ($type == 'grid' && Bunyad::options()->post_grid_masonry) {
+		$classes[] = 'masonry';
+	}
+}
+
+/**
+ * List specific
+ */
+if ($type == 'list') {
+	$template = 'content-' . sanitize_file_name(Bunyad::options()->post_list_style);
+}
+
+$wrap_open = false;
+$i = 0;
+
+// Mixed Layout?
+if ($number > 0) {
+	$classes[] = 'mixed';
+}
+
+// First large? Add ?first_normal for "load more" pagination
+if (strstr($loop, '1st-')) {
+	$first_normal = true;
+}
+
+?>
+
+	<div <?php Bunyad::markup()->attribs('loop-dynamic', array('class' => $classes)); ?>>
+			
+		<?php while ($query->have_posts()): $query->the_post();
+				
+				$is_large_post = !empty($number) && $i % $number === 0;
+		?>
+			
+			<?php if ($i === 0 OR $is_large_post): // 1st or Large Post ?>
+			
+				<?php
+				// Close wrapper if open
+				if ($wrap_open):
+					$wrap_open = false;
+					echo '</div>';
+				endif; 
+				?>
+			
+				<?php if ($is_large_post): ?>
+				<div class="col-12 large">
+					<?php get_template_part('content-' . sanitize_file_name($large), get_post_format()); ?>
+				</div>
+				<?php endif; ?>
+				
+				<?php
+				// Open wrapper if not the last post
+				// OR if it's one grid/list post 
+				if ($query->current_post + 1 < $query->post_count OR (!$is_large_post && $query->post_count == 1)):
+					$wrap_open = true;
+					echo '<div class="posts-wrap">';
+				endif;
+				?>
+				
+			<?php endif; ?>
+			
+			<?php if (!$is_large_post): // A grid or list post? ?>
+			
+				<?php if ($type == 'grid'): // Grid post next ?>
+				
+					<div class="col-<?php echo (12 / $grid_cols); ?>">	
+						<?php 
+						if (!isset($excerpt_length)) { $excerpt_length = 20; }
+if (!isset($first_normal)) { $first_normal = false; }
+							Bunyad::core()->partial(
+								$grid_template, 
+								compact('show_excerpt', 'excerpt_length', 'grid_cols', 'show_footer')
+							); 
+						?>
+					</div>
+					
+				<?php else: ?>
+				
+					<div class="col-12">
+						<?php 
+						if (!isset($excerpt_length)) { $excerpt_length = 20; }
+if (!isset($first_normal)) { $first_normal = false; }
+							Bunyad::core()->partial(
+								$template, 
+								compact('show_excerpt', 'excerpt_length')
+							); 
+						?>
+					</div>
+					
+				<?php endif; ?>
+					
+			<?php endif; $i++; ?>
+			
+		<?php endwhile; ?>
+		
+		<?php 
+		// Trailing open wrapper? close it
+		if ($wrap_open) {
+			echo '</div>';
+		}
+		?>
+
+	</div>
+	
+	<?php wp_reset_postdata(); ?>
+
+	<?php
+	if (!isset($excerpt_length)) { $excerpt_length = 20; }
+if (!isset($first_normal)) { $first_normal = false; }
+	Bunyad::core()->partial('partials/pagination', compact('query', 'pagination', 'pagination_type', 'first_normal')); ?>
+
+
+	FUNCTIONS
+
+	<?php
+/**
+ * CheerUp Child Theme functions.php
+ * Optimisé pour femmedafrique.net
+ */
+
+// 1. OPTIMISATION CACHE API (Ciblée uniquement sur le JSON)
+add_action('rest_api_init', function() {
+    add_filter('rest_post_dispatch', 'fda_send_cache_headers', 10, 3);
+});
+
+function fda_send_cache_headers($result, $server, $request) {
+    // On n'applique le cache que sur les requêtes GET
+    if ($request->get_method() === 'GET') {
+        $server->send_header('Cache-Control', 'public, max-age=3600');
+        $server->send_header('Expires', gmdate('D, d M Y H:i:s', time() + 3600) . ' GMT');
+    }
+    return $result;
+}
+
+// 2. OPTIMISATION DES REQUÊTES API
+add_filter('rest_post_query', 'fda_optimize_api_query', 10, 2);
+function fda_optimize_api_query($args, $request) {
+    $args['cache_results']          = true;
+    $args['update_post_meta_cache'] = true;
+    $args['update_post_term_cache'] = true;
+    return $args;
+}
+
+// 3. CHARGEMENT DES STYLES
+function my_cheerup_enqueue_parent() {
+    if (class_exists('Bunyad')) {
+        wp_enqueue_style(
+            'cheerup-core', 
+            get_template_directory_uri() . '/style.css', 
+            array(), 
+            Bunyad::options()->get_config('theme_version')
+        );
+    }
+}
+
+function my_cheerup_enqueue_child() {
+    if (class_exists('Bunyad')) {
+        wp_enqueue_style(
+            'cheerup-child', 
+            get_stylesheet_uri(),
+            array('cheerup-core'),
+            Bunyad::options()->get_config('theme_version')
+        );
+    }
+}
+add_action('wp_enqueue_scripts', 'my_cheerup_enqueue_parent', 9);
+add_action('wp_enqueue_scripts', 'my_cheerup_enqueue_child', 11);
+add_filter('bunyad_enqueue_core_css', '__return_false');
+
+// 4. CONFIGURATION CORS (Sécurisée pour l'API REST)
+add_action('rest_api_init', function() {
+    remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
+    add_filter('rest_pre_serve_request', function($value) {
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+        header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Cache-Control');
+        return $value;
+    });
+}, 15);
+
+// 5. ROUTES API PERSONNALISÉES (FDA)
+add_action('rest_api_init', function () {
+    register_rest_route('fda/v1', '/posts/(?P<id>\d+)/views', [
+        'methods'  => 'GET',
+        'callback' => 'get_post_views',
+        'permission_callback' => '__return_true',
+    ]);
+
+    register_rest_route('fda/v1', '/posts/(?P<id>\d+)/increment-views', [
+        'methods'  => 'POST',
+        'callback' => 'increment_post_views',
+        'permission_callback' => '__return_true',
+    ]);
+
+    register_rest_route('custom/v1', '/popular-posts', [
+        'methods'  => 'GET',
+        'callback' => 'get_popular_posts',
+        'permission_callback' => '__return_true',
+    ]);
+});
+
+// Callback functions (simplifiées pour la performance)
+function get_post_views($request) {
+    return (int) get_post_meta($request['id'], 'post_views_count', true);
+}
+
+function increment_post_views($request) {
+    $post_id = $request['id'];
+    $current = (int) get_post_meta($post_id, 'post_views_count', true);
+    update_post_meta($post_id, 'post_views_count', $current + 1);
+    return $current + 1;
+}
+
+function get_popular_posts($request) {
+    $args = [
+        'post_type'      => 'post',
+        'meta_key'       => 'post_views_count',
+        'orderby'        => 'meta_value_num',
+        'order'          => 'DESC',
+        'posts_per_page' => 10
+    ];
+    return get_formatted_posts($args, 'views');
+}
+
+function get_formatted_posts($query_args, $count_field = '') {
+    $query = new WP_Query($query_args);
+    $posts = [];
+    if ($query->have_posts()) {
+        while ($query->have_posts()) {
+            $query->the_post();
+            $posts[] = [
+                'id'             => get_the_ID(),
+                'title'          => get_the_title(),
+                'excerpt'        => get_the_excerpt(),
+                'link'           => get_permalink(),
+                'featured_image' => get_the_post_thumbnail_url(null, 'full'),
+                $count_field     => ($count_field === 'views') ? (int)get_post_meta(get_the_ID(), 'post_views_count', true) : 0
+            ];
+        }
+        wp_reset_postdata();
+    }
+    return $posts;
+}
+
+// Ajout des vues au JSON standard
+add_filter('rest_prepare_post', function($data, $post, $context) {
+    $data->data['views'] = (int) get_post_meta($post->ID, 'post_views_count', true);
+    return $data;
+}, 10, 3);
+
+// Correction pour les erreurs de Walker_Nav_Menu sur PHP 8+
+add_filter('nav_menu_item_args', function($args) {
+    if (!is_object($args)) {
+        $args = new stdClass();
+        $args->before = '';
+        $args->after = '';
+        $args->link_before = '';
+        $args->link_after = '';
+    }
+    return $args;
+}, 10);

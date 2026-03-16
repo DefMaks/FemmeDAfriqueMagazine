@@ -19,21 +19,42 @@ export const useRelatedPosts = (currentArticle: Post, maxPosts: number = 3) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fonction pour récupérer les articles similaires avec retry
+  // Fonction pour récupérer les articles similaires avec retry amélioré
   const fetchRelatedPostsWithRetry = async (url: string, params: any, retries = 2) => {
+    const baseDelay = 800; // 800ms
+    const maxDelay = 2500; // 2.5s maximum
+    
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
-        const response = await api.get(url, { params });
+        // Timeout et AbortController pour éviter les blocages
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500); // 2.5s timeout
+
+        const response = await api.get(url, { 
+          params,
+          timeout: 2500,
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
         return response;
-      } catch (error) {
+        
+      } catch (error: any) {
         console.error(`Tentative ${attempt + 1} échouée:`, error);
+        
+        // Gérer spécifiquement les AbortError
+        if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
+          console.warn('⏱️ Timeout ou requête abortée, nouvelle tentative...');
+        }
         
         if (attempt === retries) {
           throw error;
         }
         
-        // Attendre avant de réessayer (backoff exponentiel)
-        await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt)));
+        // Backoff exponentiel avec jitter pour éviter les thundering herd
+        const delay = Math.min(baseDelay * Math.pow(2, attempt) + Math.random() * 300, maxDelay);
+        console.log(`🔄 Attente ${Math.round(delay)}ms avant nouvelle tentative...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
     throw new Error('Échec après toutes les tentatives');

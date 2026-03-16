@@ -1,0 +1,43 @@
+# Corrections pour ProfileScreen.tsx
+
+## 1. Correction Navigation (ligne ~669)
+Changer :
+navigation.navigate('Favorites');
+En :
+navigation.navigate('Favoris');
+
+## 2. Ajouter Synchronisation Automatique
+Ajouter après la ligne 238 (après useEffect existant) :
+
+// Ajouter la synchronisation automatique pour les nouveaux profils
+useEffect(() => {
+    const checkAndSyncProfile = () => {
+        const registrationTime = localStorage.getItem('@fda_profile_registration_time');
+        if (!registrationTime) {
+            const now = new Date().toISOString();
+            localStorage.setItem('@fda_profile_registration_time', now);
+            console.log('🆕 Nouveau profil détecté, synchronisation forcée...');
+            setTimeout(() => {
+                syncStatsToDatabase();
+            }, 2000);
+            return true;
+        }
+        
+        const registrationDate = new Date(registrationTime);
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        
+        if (registrationDate > fiveMinutesAgo) {
+            console.log('🆕 Profil récent, synchronisation forcée...');
+            syncStatsToDatabase();
+            localStorage.setItem('@fda_profile_registration_time', new Date(Date.now() - 10 * 60 * 1000).toISOString());
+        }
+        
+        return false;
+    };
+    
+    checkAndSyncProfile();
+}, [userEmail]); // Déclencher quand l'email change
+
+## 3. Import AsyncStorage (ligne ~1)
+Ajouter au début du fichier :
+import AsyncStorage from '@react-native-async-storage/async-storage';

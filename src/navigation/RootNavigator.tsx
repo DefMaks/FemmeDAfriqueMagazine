@@ -14,6 +14,7 @@ import CheckoutScreen from '../screens/CheckoutScreen';
 import ArticleDetailScreen from '../screens/ArticleDetailScreen';
 import AllArticlesScreen from '../screens/AllArticlesScreen';
 import DebugScreen from '../screens/DebugScreen';
+import AuthScreen from '../screens/AuthScreen';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { Magazine } from '../models/Magazine';
@@ -22,10 +23,11 @@ import { analyticsService } from '../services/analytics';
 
 export type RootStackParamList = {
     Main: undefined;
+    AuthScreen: undefined;
     Checkout: { magazine: Magazine };
     ArticleDetail: { article: Post };
     AllArticles: undefined;
-    CategoryArticles: { categoryId: number; categoryName: string; isTag?: boolean };
+    CategoryArticles: { categoryId: number; categoryName: string; isTag?: boolean; fromArticle?: boolean };
     Debug: undefined;
 };
 
@@ -154,6 +156,16 @@ export default function RootNavigator() {
         <NavigationContainer>
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="Main" component={MainTabs} />
+                <Stack.Screen
+                    name="AuthScreen"
+                    component={AuthScreen}
+                    options={{
+                        headerShown: true,
+                        title: 'Connexion',
+                        headerStyle: { backgroundColor: Colors.primary },
+                        headerTintColor: '#FFFFFF',
+                    }}
+                />
                 <Stack.Screen
                     name="ArticleDetail"
                     component={ArticleDetailScreen}

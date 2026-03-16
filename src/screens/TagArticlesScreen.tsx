@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { Post } from '../models/Post';
 import { ArticleCard } from '../components/ArticleCard';
-import { getPostsByTag } from '../services/api';
+import { getPostsByTag, getPostsByCategory } from '../services/api';
 import { analyticsService } from '../services/analytics';
 import { Colors } from '../theme/colors';
+import { Ionicons } from '@expo/vector-icons';
 
 type TagArticlesRouteProp = RouteProp<RootStackParamList, 'CategoryArticles'>;
 type TagArticlesNavigationProp = StackNavigationProp<RootStackParamList, 'CategoryArticles'>;
@@ -18,7 +19,7 @@ interface TagArticlesScreenProps {
 }
 
 export const TagArticlesScreen: React.FC<TagArticlesScreenProps> = ({ route, navigation }) => {
-  const { categoryId, categoryName, isTag } = route.params;
+  const { categoryId, categoryName, isTag, fromArticle } = route.params;
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -26,13 +27,26 @@ export const TagArticlesScreen: React.FC<TagArticlesScreenProps> = ({ route, nav
   const [hasMore, setHasMore] = useState(true);
 
   const isTagScreen = isTag === true;
+  const fromArticleScreen = fromArticle === true;
   const screenTitle = categoryName || (isTagScreen ? 'Mots-clés' : 'Catégorie');
+
+  // Debug : Afficher les paramètres reçus
+  console.log('🏷️ TagArticlesScreen params:', { categoryId, categoryName, isTag, isTagScreen, fromArticle, fromArticleScreen });
 
   useEffect(() => {
     navigation.setOptions({
       title: screenTitle,
+      // Ajouter un bouton retour personnalisé si on vient d'un article
+      headerLeft: fromArticleScreen ? () => (
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Ionicons name="arrow-back" size={24} color={Colors.text} />
+        </TouchableOpacity>
+      ) : undefined,
     });
-  }, [navigation, screenTitle]);
+  }, [navigation, screenTitle, fromArticleScreen]);
 
   useEffect(() => {
     loadPosts();
@@ -44,7 +58,29 @@ export const TagArticlesScreen: React.FC<TagArticlesScreenProps> = ({ route, nav
         setLoading(true);
       }
 
-      const newPosts = await getPostsByTag(categoryId, pageNum, 10);
+      // Debug : Afficher quelle fonction va être appelée
+      console.log(`📱 loadPosts appelé: isTagScreen=${isTagScreen}, categoryId=${categoryId}, pageNum=${pageNum}`);
+      console.log(`🔍 Route params complets:`, route.params);
+
+      // Validation des paramètres
+      if (!categoryId) {
+        console.error('❌ categoryId est undefined ou null!');
+        console.log('📋 Route params disponibles:', Object.keys(route.params));
+        return;
+      }
+
+      // Utiliser la bonne fonction selon le type (tag ou catégorie)
+      let newPosts;
+      if (isTagScreen) {
+        console.log(`🏷️ Appel de getPostsByTag avec tagId=${categoryId}`);
+        newPosts = await getPostsByTag(categoryId, pageNum, 10);
+      } else {
+        console.log(`📁 Appel de getPostsByCategory avec categoryId=${categoryId}`);
+        newPosts = await getPostsByCategory(categoryId, pageNum, 10);
+      }
+
+      console.log(`📚 Articles reçus: ${newPosts?.length || 0} articles`);
+      console.log(`📋 Premier article:`, newPosts?.[0] ? { id: newPosts[0].id, title: newPosts[0].title?.rendered?.substring(0, 50) } : 'Aucun');
 
       if (pageNum === 1) {
         setPosts(newPosts || []);
@@ -58,8 +94,9 @@ export const TagArticlesScreen: React.FC<TagArticlesScreenProps> = ({ route, nav
       // 📊 Track tag view
       analyticsService.trackScreenView(isTagScreen ? `Tag: ${categoryName}` : `Category: ${categoryName}`);
 
-    } catch (error) {
-      console.error('Erreur chargement articles:', error);
+    } catch (error: any) {
+      console.error('❌ Erreur chargement articles:', error);
+      console.error('❌ Stack trace:', error?.stack || 'No stack available');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -163,5 +200,9 @@ const styles = StyleSheet.create({
   footerLoader: {
     paddingVertical: 20,
     alignItems: 'center',
+  },
+  backButton: {
+    marginLeft: 8,
+    padding: 8,
   },
 });

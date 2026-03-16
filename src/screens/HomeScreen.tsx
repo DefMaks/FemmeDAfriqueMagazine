@@ -17,6 +17,7 @@ import {
     getPostsByTag,
     getPostsByCategory,
     getAdById,
+    clearCache,
 } from '../services/api';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
@@ -141,9 +142,67 @@ const HomeScreen = () => {
         }
     };
 
-    const onRefresh = () => {
+    const onRefresh = async () => {
         setRefreshing(true);
-        loadAllContent();
+
+        // Refresh optimisé : vider uniquement le cache des posts critiques
+        // pour forcer la récupération fraîche des catégories importantes
+        clearCache('posts');
+
+        try {
+            // Charger les catégories critiques en premier (priorité haute)
+            const [entrepreneuriatData, gastronomieData] = await Promise.all([
+                getPostsByCategory(ENTREPRENEURIAT_ID, 1, 4).catch(() => []),
+                getPostsByCategory(GASTRONOMIE_ID, 1, 4).catch(() => []),
+            ]);
+
+            // Mettre à jour immédiatement l'UI pour les catégories critiques
+            setEntrepreneuriatPosts(entrepreneuriatData);
+            setGastronomiePosts(gastronomieData);
+
+            // Charger le reste en parallèle
+            const [sliderData, espaceTendresseData, latestData] = await Promise.all([
+                getPostsByTag(SLIDER_TAG_ID, 1, 4).catch(() => []),
+                getPostsByCategory(ESPACE_TENDRESSE_ID, 1, 5).catch(() => []),
+                getPosts(1, 4).catch(() => []),
+            ]);
+
+            setSliderPosts(sliderData);
+            setEspaceTendressePosts(espaceTendresseData);
+            setLatestPosts(latestData);
+
+            // Mettre à jour les statuts de sauvegarde
+            const allPosts = [
+                ...sliderData,
+                ...espaceTendresseData,
+                ...entrepreneuriatData,
+                ...gastronomieData,
+                ...latestData,
+            ].filter(post =>
+                post &&
+                typeof post.id === 'number' &&
+                post.title?.rendered
+            );
+
+            const statusChecks = allPosts.map(post =>
+                savedArticlesService.isArticleSaved(post.id.toString()).then(saved => ({ id: post.id, saved }))
+            );
+            const statusResults = await Promise.all(statusChecks);
+
+            const newSavedStatus = statusResults.reduce((acc, { id, saved }) => {
+                acc[id] = saved;
+                return acc;
+            }, {} as Record<number, boolean>);
+
+            setSavedStatus(newSavedStatus);
+
+        } catch (error) {
+            console.error('Erreur lors du refresh:', error);
+        } finally {
+            setRefreshing(false);
+        }
+
+        // Recharger la bannière pub en arrière-plan (non bloquant)
         loadHomeBannerAd();
     };
 
@@ -181,9 +240,10 @@ const HomeScreen = () => {
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
             }
         >
+
             <View style={styles.header}>
                 <Image
-                    source={require('../../assets/logo.png')}
+                    source={require('../../assets/FDA-gradient.png')}
                     style={styles.logo}
                     resizeMode="contain"
                 />

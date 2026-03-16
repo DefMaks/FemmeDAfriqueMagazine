@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, ActivityIndicator, Dimensions, Linking, Share } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import RenderHtml from 'react-native-render-html';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/RootNavigator';
@@ -10,6 +9,7 @@ import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { savedArticlesService } from '../services/supabaseService';
 import { decodeHtmlEntities, formatArticleTitle, getShareMessage } from '../utils/textUtils';
+import RenderHtml from 'react-native-render-html';
 import { CommentsSection } from '../components/CommentsSection';
 import { getAds, api } from '../services/api';
 import { analyticsService } from '../services/analytics';
@@ -58,35 +58,52 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
         return;
       }
 
-      // Fallback: API call avec retry en cas d'erreur 500/502
+      // Fallback: API call avec retry amélioré
       let retries = 0;
-      const maxRetries = 2; // Réduit à 2 pour éviter de surcharger le serveur
+      const maxRetries = 2;
+      const baseDelay = 1000; // 1 seconde
+      const maxDelay = 3000; // 3 secondes maximum
 
       while (retries < maxRetries) {
         try {
+          // Timeout plus court pour éviter les blocages
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+
           const response = await api.get(`posts`, {
             params: {
               author: authorId,
               per_page: 1,
               _fields: 'id'
             },
-            timeout: 5000 // Timeout de 5s pour éviter les blocages
+            timeout: 3000, // Timeout de 3s
+            signal: controller.signal
           });
+
+          clearTimeout(timeoutId);
 
           const totalPosts = response.headers['x-wp-total'];
           setAuthorPostCount(parseInt(totalPosts) || 0);
+          console.log('✅ Nombre d\'articles auteur récupéré:', totalPosts);
           return; // Succès, on sort de la boucle
-        } catch (error) {
+
+        } catch (error: any) {
           retries++;
           console.error(`Tentative ${retries} échouée:`, error);
 
+          // Gérer spécifiquement les AbortError
+          if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
+            console.warn('⏱️ Timeout ou requête abortée, nouvelle tentative...');
+          }
+
           if (retries >= maxRetries) {
             console.error('Erreur récupération nombre d\'articles auteur après', maxRetries, 'tentatives, utilisation du fallback');
-            // Fallback: Afficher une valeur par défaut plutôt que 0
             setAuthorPostCount(null); // null = "Non disponible"
           } else {
-            // Attendre avant de réessayer (backoff exponentiel: 1s, 2s...)
-            await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+            // Backoff exponentiel avec jitter pour éviter les thundering herd
+            const delay = Math.min(baseDelay * Math.pow(2, retries - 1) + Math.random() * 500, maxDelay);
+            console.log(`🔄 Attente ${Math.round(delay)}ms avant nouvelle tentative...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
       }
@@ -141,9 +158,37 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
     // Vérifier si l'article est sauvegardé
     checkIfArticleIsSaved();
 
+    // Incrémenter les articles lus
+    incrementArticlesRead();
+
   }, [article, navigation]);
 
   // Les commentaires sont maintenant gérés par CommentsSection
+
+  // Fonction pour incrémenter les articles lus
+  const incrementArticlesRead = async () => {
+    try {
+      // Importer profileService dynamiquement pour éviter les imports circulaires
+      const { profileService } = await import('../services/profileService');
+
+      const currentProfile = await profileService.getCurrentProfile();
+      if (currentProfile && currentProfile.profile_data) {
+        const profileStats = currentProfile.profile_data.stats || {};
+        const newArticlesRead = (profileStats.articles_read || 0) + 1;
+
+        await profileService.updatePreferences({
+          stats: {
+            ...profileStats,
+            articles_read: newArticlesRead
+          }
+        });
+
+        console.log(`📈 Articles lus: ${newArticlesRead}`);
+      }
+    } catch (error) {
+      console.error('❌ Erreur incrément articles lus:', error);
+    }
+  };
 
   const checkIfSaved = async () => {
     const saved = await savedArticlesService.isArticleSaved(article.id.toString());
@@ -235,12 +280,13 @@ AppStore : Bientôt disponible`;
   const handleTagPress = (tagId: number) => {
     const tagDetails = getTagDetails(tagId);
     if (tagDetails) {
-      // Naviguer vers CategoryArticles avec isTag=true
+      // Naviguer vers CategoryArticles avec isTag=true ET fromArticle=true
       // Le back reviendra automatiquement à l'article
       navigationHook.navigate('CategoryArticles', {
         categoryId: tagId,
         categoryName: tagDetails.name,
-        isTag: true
+        isTag: true,
+        fromArticle: true // Indiquer qu'on vient d'un article
       });
     }
   };
@@ -464,7 +510,7 @@ AppStore : Bientôt disponible`;
           )
         }
 
-        {/* Mots-clés - cliquables */}
+        {/* Mots-clés - temporairement non cliquables */}
         {
           article.tags && article.tags.length > 0 && (
             <View style={styles.keywordsSection}>
@@ -472,15 +518,14 @@ AppStore : Bientôt disponible`;
               <View style={styles.keywordsContainer}>
                 {article.tags.map((tagId: number, index: number) => (
                   (tagId != 184 && (
-                    <TouchableOpacity
+                    <View
                       key={index}
                       style={styles.keywordTag}
-                      onPress={() => handleTagPress(tagId)}
                     >
                       <Text style={styles.keywordText}>
                         {taxonomyLoading ? 'Chargement...' : getTagName(tagId)}
                       </Text>
-                    </TouchableOpacity>
+                    </View>
                   ))
                 ))}
               </View>

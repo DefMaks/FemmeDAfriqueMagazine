@@ -212,7 +212,7 @@ balance_usd: numeric(15,2)
 ### Transactions Table
 ```sql
 id: uuid (PK)
-wallet_id: uuid (FK -> wallets)
+WALLET_ID: uuid (FK -> wallets)
 amount: numeric(15,2)
 currency: enum (CDF, USD, XOF)
 transaction_type: enum (DEPOSIT, WITHDRAWAL, PURCHASE)

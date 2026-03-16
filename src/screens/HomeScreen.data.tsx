@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Colors } from '../theme/colors';
-import { getPosts, getPostsByCategory, generateColor, Post } from '../services/api.simple';
+import { getPosts, getPostsByCategory } from '../services/api';
+import { Post } from '../models/Post';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
@@ -79,6 +80,9 @@ const HomeScreen = () => {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
       <View style={styles.header}>
+        {/* image */}
+        <Image source={require('assets/FDA-gradient.png')} />
+
         <Text style={styles.headerTitle}>Femme D'Afrique</Text>
         <Text style={styles.headerSubtitle}>Magazine</Text>
       </View>
@@ -94,7 +98,7 @@ const HomeScreen = () => {
                 style={styles.sliderItem}
                 onPress={() => handleArticlePress(post)}
               >
-                <View style={[styles.sliderImage, { backgroundColor: generateColor(post.id) }]}>
+                <View style={[styles.sliderImage, { backgroundColor: Colors.primary }]}>
                   <Text style={styles.sliderImageText}>📰</Text>
                 </View>
                 <View style={styles.sliderOverlay}>
@@ -119,7 +123,7 @@ const HomeScreen = () => {
               style={styles.articleCard}
               onPress={() => handleArticlePress(post)}
             >
-              <View style={[styles.articleImage, { backgroundColor: generateColor(post.id) }]}>
+              <View style={[styles.articleImage, { backgroundColor: Colors.primary }]}>
                 <Text style={styles.articleImageText}>📰</Text>
               </View>
               <View style={styles.articleContent}>

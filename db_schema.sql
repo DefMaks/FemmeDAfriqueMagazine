@@ -69,6 +69,19 @@ CREATE TABLE public.advertisements (
   CONSTRAINT advertisements_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES public.admins(id),
   CONSTRAINT fk_advertisement_client FOREIGN KEY (client_id) REFERENCES public.clients(id)
 );
+CREATE TABLE public.analytics_events (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  event_name text NOT NULL,
+  event_category text,
+  event_label text,
+  event_value numeric,
+  user_id text NOT NULL,
+  session_id text,
+  timestamp timestamp with time zone DEFAULT now(),
+  metadata jsonb,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT analytics_events_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.clients (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   company_name text NOT NULL,
@@ -173,6 +186,13 @@ CREATE TABLE public.system_health_checks (
   message text,
   CONSTRAINT system_health_checks_pkey PRIMARY KEY (id)
 );
+CREATE TABLE public.system_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  log_type text NOT NULL,
+  message text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT system_logs_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.transactions (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   wallet_id uuid,
@@ -189,11 +209,55 @@ CREATE TABLE public.transactions (
   CONSTRAINT transactions_pkey PRIMARY KEY (id),
   CONSTRAINT transactions_wallet_id_fkey FOREIGN KEY (wallet_id) REFERENCES public.wallets(id)
 );
+CREATE TABLE public.trust_content (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  key character varying NOT NULL UNIQUE,
+  title character varying NOT NULL,
+  short_message text NOT NULL,
+  modal_title character varying NOT NULL,
+  modal_content text NOT NULL,
+  security_features jsonb DEFAULT '[]'::jsonb,
+  partners jsonb DEFAULT '[]'::jsonb,
+  cta_text character varying NOT NULL DEFAULT 'Je paie en toute confiance'::character varying,
+  cancel_text character varying NOT NULL DEFAULT 'Annuler'::character varying,
+  is_active boolean DEFAULT true,
+  language character varying DEFAULT 'fr'::character varying,
+  app_name character varying,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT trust_content_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.user_coin_balances_mat (
   user_id uuid NOT NULL,
   total_balance bigint NOT NULL DEFAULT 0,
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT user_coin_balances_mat_pkey PRIMARY KEY (user_id)
+);
+CREATE TABLE public.user_profile_media (
+  id uuid NOT NULL DEFAULT uuid_generate_v4(),
+  device_id text NOT NULL,
+  username text NOT NULL UNIQUE,
+  email text UNIQUE,
+  password_hash text NOT NULL,
+  profile_data jsonb DEFAULT '{}'::jsonb,
+  app_name text DEFAULT 'FAM'::text,
+  last_seen timestamp with time zone DEFAULT now(),
+  last_sync timestamp with time zone DEFAULT now(),
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT user_profile_media_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.user_sessions_media (
+  session_id text NOT NULL,
+  user_id uuid,
+  device_id text NOT NULL,
+  created_at timestamp with time zone DEFAULT now(),
+  expires_at timestamp with time zone NOT NULL,
+  last_activity timestamp with time zone DEFAULT now(),
+  is_active boolean DEFAULT true,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  CONSTRAINT user_sessions_media_pkey PRIMARY KEY (session_id),
+  CONSTRAINT user_sessions_media_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.user_profile_media(id)
 );
 CREATE TABLE public.wallets (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),

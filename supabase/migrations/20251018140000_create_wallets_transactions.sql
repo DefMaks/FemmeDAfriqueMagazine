@@ -21,7 +21,7 @@
 
     - `transactions`
       - `id` (uuid, primary key)
-      - `wallet_id` (uuid, foreign key)
+      - `WALLET_ID` (uuid, foreign key)
       - `amount` (numeric)
       - `currency` (currency_type)
       - `transaction_type` (transaction_type)
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS wallets (
 -- Create transactions table
 CREATE TABLE IF NOT EXISTS transactions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  wallet_id uuid,
+  WALLET_ID uuid,
   amount numeric(15, 2) NOT NULL,
   currency currency_type NOT NULL,
   transaction_type transaction_type NOT NULL,
@@ -80,11 +80,11 @@ CREATE TABLE IF NOT EXISTS transactions (
   defmaks_revenue_usd numeric(15, 2) DEFAULT 0,
   transaction_date timestamptz DEFAULT now(),
   created_at timestamptz DEFAULT now(),
-  CONSTRAINT transactions_wallet_id_fkey FOREIGN KEY (wallet_id) REFERENCES wallets (id) ON DELETE CASCADE
+  CONSTRAINT transactions_WALLET_ID_fkey FOREIGN KEY (WALLET_ID) REFERENCES wallets (id) ON DELETE CASCADE
 );
 
 -- Create indexes
-CREATE INDEX IF NOT EXISTS idx_transactions_wallet_id ON transactions(wallet_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_WALLET_ID ON transactions(WALLET_ID);
 CREATE INDEX IF NOT EXISTS idx_transactions_currency ON transactions(currency);
 CREATE INDEX IF NOT EXISTS idx_wallets_profile_id ON wallets(profile_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_device_id ON profiles(device_id);
@@ -127,24 +127,24 @@ BEGIN
       UPDATE wallets
       SET balance_usd = balance_usd + NEW.amount,
           updated_at = now()
-      WHERE id = NEW.wallet_id;
+      WHERE id = NEW.WALLET_ID;
     ELSIF NEW.currency = 'CDF' THEN
       UPDATE wallets
       SET balance_cdf = balance_cdf + NEW.amount,
           updated_at = now()
-      WHERE id = NEW.wallet_id;
+      WHERE id = NEW.WALLET_ID;
     END IF;
   ELSIF NEW.transaction_type = 'WITHDRAWAL' THEN
     IF NEW.currency = 'USD' THEN
       UPDATE wallets
       SET balance_usd = balance_usd - NEW.amount,
           updated_at = now()
-      WHERE id = NEW.wallet_id;
+      WHERE id = NEW.WALLET_ID;
     ELSIF NEW.currency = 'CDF' THEN
       UPDATE wallets
       SET balance_cdf = balance_cdf - NEW.amount,
           updated_at = now()
-      WHERE id = NEW.wallet_id;
+      WHERE id = NEW.WALLET_ID;
     END IF;
   END IF;
 
