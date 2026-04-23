@@ -6,6 +6,12 @@ export default {
     orientation: "portrait",
     icon: "./assets/icon.png",
     userInterfaceStyle: "light",
+    updates: {
+      url: "https://u.expo.dev/2226573c-1349-4d26-953b-92f717a4efb5"
+    },
+    runtimeVersion: {
+      policy: "appVersion"
+    },
     splash: {
       image: "./assets/splash-icon.png",
       resizeMode: "cover",
