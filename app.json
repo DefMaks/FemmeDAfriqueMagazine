@@ -36,10 +36,12 @@
     },
     "plugins": [
       "expo-font",
+      "expo-asset",
+      "expo-web-browser",
       [
         "onesignal-expo-plugin",
         {
-          "mode": "development"
+          "mode": "production"
         }
       ]
     ],
