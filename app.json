@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "Femme d'Afrique Magazine",
+    "slug": "FemmeDAfriqueMagazine",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "updates": {
+      "url": "https://u.expo.dev/2226573c-1349-4d26-953b-92f717a4efb5"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "bundleIdentifier": "com.defmaks.fda",
+      "supportsTablet": true,
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Cette application n'utilise pas votre position. Certaines bibliothèques externes peuvent y faire référence, mais aucune donnée de localisation n'est collectée ni utilisée.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.defmaks.fda",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "onesignal-expo-plugin",
+        {
+          "mode": "development"
+        }
+      ]
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2226573c-1349-4d26-953b-92f717a4efb5"
+      }
+    }
+  }
+}
