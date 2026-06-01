@@ -1,6 +1,6 @@
 // src/navigation/RootNavigator.tsx
 import React, { useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -151,9 +151,36 @@ function MainTabs() {
     );
 }
 
+const linking: LinkingOptions<RootStackParamList> = {
+    prefixes: [
+        'femmedafrique://',
+        'https://femmedafrique.net',
+        'http://femmedafrique.net',
+    ],
+    config: {
+        screens: {
+            Main: {
+                screens: {
+                    Accueil: '',
+                    'Découvrir': 'decouvrir',
+                    Boutique: 'boutique',
+                    Favoris: 'favoris',
+                    Profil: 'profil',
+                },
+            },
+            ArticleDetail: 'article/:id',
+            AllArticles: 'articles',
+            CategoryArticles: 'categorie/:categoryId',
+            AuthScreen: 'connexion',
+            Checkout: 'checkout',
+            Debug: 'debug',
+        },
+    },
+};
+
 export default function RootNavigator() {
     return (
-        <NavigationContainer>
+        <NavigationContainer linking={linking}>
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="Main" component={MainTabs} />
                 <Stack.Screen

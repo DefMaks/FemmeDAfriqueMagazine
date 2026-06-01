@@ -115,13 +115,13 @@ class OptimizedApiService {
     }
 
     const url = `${baseUrl}${config.endpoint}`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...config.headers
+    };
     const fullConfig = {
       method: config.method || 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'FDA-App/1.0',
-        ...config.headers
-      },
+      headers,
       body: config.body ? JSON.stringify(config.body) : undefined
     };
 

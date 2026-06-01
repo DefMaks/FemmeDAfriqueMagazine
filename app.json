@@ -17,10 +17,12 @@
       "resizeMode": "cover",
       "backgroundColor": "#ffffff"
     },
+    "scheme": "femmedafrique",
     "ios": {
       "bundleIdentifier": "com.defmaks.fda",
       "supportsTablet": true,
       "googleServicesFile": "./GoogleService-Info.plist",
+      "associatedDomains": ["applinks:femmedafrique.net"],
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Cette application n'utilise pas votre position. Certaines bibliothèques externes peuvent y faire référence, mais aucune donnée de localisation n'est collectée ni utilisée.",
         "ITSAppUsesNonExemptEncryption": false
@@ -32,7 +34,21 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "femmedafrique.net",
+              "pathPrefix": "/"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "plugins": [
       "expo-font",
