@@ -1,6 +1,6 @@
-# Femme D'Afrique Magazine
+# Femme d'Afrique Magazine
 
-Application mobile React Native/Expo pour Femme D'Afrique Magazine.
+Application mobile React Native/Expo pour le magazine Femme d'Afrique.
 
 ## 🚀 Démarrage Rapide
 
@@ -8,11 +8,17 @@ Application mobile React Native/Expo pour Femme D'Afrique Magazine.
 # Installer les dépendances
 npm install
 
-# Démarrer en développement
+# Démarrer en développement (web)
+npx expo start --web --port 5000
+
+# Démarrer sur appareil/émulateur
 npx expo start
 
-# Build Android
+# Build Android (APK interne)
 eas build --platform android --profile preview
+
+# Build Android (Google Play)
+eas build --platform android --profile production
 
 # Build iOS
 eas build --platform ios --profile preview
@@ -20,159 +26,149 @@ eas build --platform ios --profile preview
 
 ## 📱 Fonctionnalités
 
-- 📰 **Articles WordPress** : Récupération et affichage des articles
-- 🏷️ **Catégories & Tags** : Navigation par catégories et tags
-- 🛍️ **Boutique** : E-commerce intégré
-- ❤️ **Favoris** : Sauvegarde des articles préférés
-- 👤 **Profil** : Gestion du compte utilisateur
-- 🔔 **Notifications** : OneSignal manuel
-- 📊 **Analytics** : Tracking des événements
-- 🐛 **Debug** : Logs d'erreurs intégrés
+- 📰 **Articles WordPress** : Récupération, cache et affichage des articles avec circuit breaker
+- 🏷️ **Catégories & Tags** : Navigation filtrée par catégorie et tag
+- 🛍️ **Boutique** : E-commerce via TwigaPaie (Mobile Money + carte)
+- ❤️ **Favoris** : Sauvegarde des articles (Supabase)
+- 👤 **Profil** : Compte utilisateur WordPress JWT
+- 🔔 **Notifications** : OneSignal push (mode production)
+- 📊 **Analytics** : Firebase GA4 + tracking custom
+- 📴 **Mode hors-ligne** : Lecture des articles sans connexion
+- 🔗 **Deep Links** : `femmedafrique://` + `https://femmedafrique.net`
+- 🐛 **Debug** : Écran de logs et état des services
 
 ## 🛠️ Stack Technique
 
 - **Framework** : React Native 0.76.9
-- **Plateforme** : Expo SDK 52
-- **Navigation** : React Navigation v7
-- **API** : WordPress REST API
-- **Base de données** : Supabase
-- **Notifications** : OneSignal (manuel)
-- **Analytics** : Service custom
-- **HTTP Client** : Fetch natif (pas d'axios)
+- **Plateforme** : Expo SDK **54**
+- **Navigation** : React Navigation v7 (Stack + BottomTabs)
+- **API contenu** : WordPress REST API v2
+- **Base de données** : Supabase (PostgreSQL)
+- **Paiements** : TwigaPaie / FlexPay (Mobile Money, carte)
+- **Notifications** : OneSignal (implémentation manuelle, sans plugin)
+- **Analytics** : Firebase GA4
+- **HTTP Client** : `fetch` natif (pas d'axios)
 
-## 🔧 Configuration
+## 🔧 Variables d'environnement
 
-### Variables d'environnement requises
+Les variables sont préfixées `EXPO_PUBLIC_` et configurées dans `eas.json` pour les builds EAS.
 
 ```bash
 # WordPress
-EXPO_PUBLIC_WORDPRESS_API_URL=https://votresite.com/wp-json/wp/v2/
+EXPO_PUBLIC_WORDPRESS_API_URL=https://femmedafrique.net/wp-json/wp/v2/
 
 # Supabase
-EXPO_PUBLIC_SUPABASE_URL=votre_url_supabase
-EXPO_PUBLIC_SUPABASE_ANON_KEY=votre_cle_supabase
-
-# OneSignal
-EXPO_PUBLIC_ONESIGNAL_APP_ID=votre_app_id_onesignal
-
-# Firebase
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=votre_project_id
-EXPO_PUBLIC_FIREBASE_API_KEY=votre_api_key
-EXPO_PUBLIC_FIREBASE_APP_ID=votre_app_id
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=votre_bucket
-EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=votre_measurement_id
+EXPO_PUBLIC_SUPABASE_URL=
+EXPO_PUBLIC_SUPABASE_ANON_KEY=
 
 # TwigaPaie
-EXPO_PUBLIC_TWIGAPAIE_API_URL=votre_url_twigapaie
-EXPO_PUBLIC_TWIGAPAIE_API_KEY=votre_cle_twigapaie
+EXPO_PUBLIC_TWIGAPAIE_API_URL=
+EXPO_PUBLIC_TWIGAPAIE_API_KEY=
+EXPO_PUBLIC_WALLET_ID=
 
-# Analytics
-EXPO_PUBLIC_GA4_API_SECRET=votre_secret_ga4
+# OneSignal
+EXPO_PUBLIC_ONESIGNAL_APP_ID=
+
+# Firebase
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=
+EXPO_PUBLIC_FIREBASE_API_KEY=
+EXPO_PUBLIC_FIREBASE_APP_ID=
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=
+EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID=
+EXPO_PUBLIC_GA4_API_SECRET=
+
+# Uploadcare
+EXPO_PUBLIC_UPLOADCARE_API_KEY=
+
+# Interne
+EXPO_PUBLIC_MEDIA=FDA
+EXPO_PUBLIC_AGENT=
+EXPO_PUBLIC_AGENT_PASS=
 ```
 
-## 🐛 Débogage
+## 🔗 Deep Links
 
-### Logs d'erreurs
+L'app supporte l'ouverture directe sur n'importe quel écran.
 
-L'application inclut un système de logging complet :
+| URL | Écran |
+|---|---|
+| `femmedafrique://article/123` | Article |
+| `femmedafrique://categorie/20` | Catégorie |
+| `femmedafrique://articles` | Tous les articles |
+| `femmedafrique://connexion` | Authentification |
+| `femmedafrique://checkout` | Paiement |
+| `https://femmedafrique.net/article/123` | Article (Universal/App Link) |
 
-1. **Accès aux logs** : Profil → 🔍 Logs d'erreur
-2. **Logs automatiques** : Toutes les erreurs sont capturées
-3. **Export des logs** : Partage possible avec le support
-
-### Commandes utiles
-
-```bash
-# Vider les logs
-# Via l'app : Profil → Logs d'erreur → 🗑️ Effacer
-
-# Logs Android
-adb logcat | grep "FemmeDAfriqueMagazine"
-
-# Logs EAS Build
-# Voir les logs sur : https://expo.dev/accounts/defmaks/projects/FemmeDAfriqueMagazine/builds
-```
+> **Note** : Les Universal Links iOS et App Links Android nécessitent des fichiers
+> de vérification sur le serveur. Voir `CONTEXT.md` et `AUDIT.md` pour les détails.
 
 ## 🏗️ Architecture
 
 ```
 src/
-├── components/          # Composants réutilisables
-├── config/             # Configuration (env, couleurs)
-├── navigation/         # Navigation React Navigation
-├── screens/           # Écrans de l'application
-├── services/          # Services (API, OneSignal, Analytics)
-├── utils/             # Utilitaires (logger, helpers)
-└── theme/             # Thème (couleurs, fonts)
+├── components/     # Composants réutilisables (ArticleCard, AdBanner, etc.)
+├── config/         # Configuration et validation des env vars
+├── lib/            # Clients initialisés (Supabase)
+├── navigation/     # NavigationContainer + deep links (RootNavigator.tsx)
+├── screens/        # Écrans de l'application
+├── services/       # API, paiements, notifications, analytics, cache
+├── theme/          # Couleurs et constantes de style
+└── utils/          # Logger, helpers
 ```
 
-## 🔧 Résolution de Problèmes
-
-### Crash au démarrage - ✅ RÉSOLU
-
-**Problème** : React 19 incompatible avec React Native 0.81.5 + axios utilisant `crypto`
-
-**Solution** :
-- Downgrade React 19 → 18.3.1
-- Expo SDK 54 → 52 (stable)
-- Remplacement d'axios par fetch natif
-- Versions compatibles pour toutes les dépendances
-
-**Fichiers modifiés** :
-- `package.json` : Versions mises à jour
-- `src/services/api.ts` : Remplacement axios → fetch
-- `src/services/api.simple.ts` : Service API avec fetch
-
-### OneSignal Plugin - ✅ RÉSOLU
-
-**Problème** : `onesignal-expo-plugin` causait des builds
-
-**Solution** :
-- Suppression du plugin problématique
-- Implémentation manuelle de OneSignal
-- Service `oneSignal.simple.ts` sans dépendance externe
-
-### Variables d'environnement EAS
-
-Pour les builds EAS, configurez les variables sur :
-https://expo.dev/accounts/defmaks/projects/FemmeDAfriqueMagazine/variables
-
-## 📦 Déploiement
-
-### Build Preview
+## 🏗️ Builds EAS
 
 ```bash
+# Développement (dev client, distribution interne)
+eas build --platform android --profile development
+
+# Preview (APK, distribution interne)
 eas build --platform android --profile preview
-eas build --platform ios --profile preview
-```
 
-### Build Production
-
-```bash
+# Production (AAB, Google Play)
 eas build --platform android --profile production
-eas build --platform ios --profile production
+
+# Soumettre sur Google Play
+eas submit --platform android --profile production
 ```
 
-## 🤝 Contribution
+Dashboard EAS : https://expo.dev/accounts/defmaks/projects/FemmeDAfriqueMagazine
 
-1. Fork le projet
-2. Créer une branche feature
-3. Commit les changements
-4. Push la branche
-5. Créer une Pull Request
+## 🐛 Débogage
+
+### Logs in-app
+Profil → 🔍 Logs d'erreur
+
+### Logs Android
+```bash
+adb logcat | grep "FemmeDAfriqueMagazine"
+```
+
+### Tester les deep links
+```bash
+# Android (appareil connecté)
+adb shell am start -W -a android.intent.action.VIEW \
+  -d "femmedafrique://article/23064" com.defmaks.fda
+
+# iOS Simulator
+xcrun simctl openurl booted "femmedafrique://article/23064"
+```
+
+### Logs EAS Build
+https://expo.dev/accounts/defmaks/projects/FemmeDAfriqueMagazine/builds
+
+## ⚠️ Problèmes connus
+
+### Preview web vide
+Le preview dans un navigateur ne charge pas les articles WordPress à cause de headers CORS dupliqués côté serveur. **Les builds Android/iOS natifs fonctionnent normalement.** Voir `AUDIT.md`.
 
 ## 📄 Licence
 
 0BSD
 
-## 📞 Support
-
-Pour toute question ou problème :
-- Logs d'erreur : Profil → 🔍 Logs d'erreur
-- Support technique : [Contacter l'équipe]
-
 ---
 
-**Dernière mise à jour** : Février 2026  
-**Version** : 1.0.0  
-**Statut** : ✅ Stable et fonctionnel
+**Dernière mise à jour** : Juin 2026
+**Version app** : 1.0.0
+**Expo SDK** : 54
+**Statut** : ✅ Prêt pour Google Play
