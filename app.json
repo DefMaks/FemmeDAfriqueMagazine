@@ -53,13 +53,7 @@
     "plugins": [
       "expo-font",
       "expo-asset",
-      "expo-web-browser",
-      [
-        "onesignal-expo-plugin",
-        {
-          "mode": "production"
-        }
-      ]
+      "expo-web-browser"
     ],
     "web": {
       "favicon": "./assets/favicon.png"

@@ -1,6 +1,4 @@
-// src/services/wordpressAuth.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
 
 const WP_API_URL = (process.env.EXPO_PUBLIC_WORDPRESS_API_URL || 'https://femmedafrique.net/wp-json/wp/v2').replace(/\/$/, '');
 const JWT_AUTH_URL = WP_API_URL.replace('/wp/v2', '/jwt-auth/v1');
@@ -33,12 +31,20 @@ let cachedUser: WPUser | null = null;
  */
 export const loginWordPress = async (username: string, password: string): Promise<AuthResponse> => {
   try {
-    const response = await axios.post(`${JWT_AUTH_URL}/token`, {
-      username,
-      password,
+    const response = await fetch(`${JWT_AUTH_URL}/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ username, password }),
     });
 
-    const data = response.data;
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
     
     // Sauvegarder le token
     await AsyncStorage.setItem(STORAGE_KEYS.JWT_TOKEN, data.token);
@@ -52,8 +58,8 @@ export const loginWordPress = async (username: string, password: string): Promis
     
     return data;
   } catch (error: any) {
-    console.error('Erreur login WordPress:', error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Échec de la connexion');
+    console.error('Erreur login WordPress:', error.message);
+    throw new Error(error.message || 'Échec de la connexion');
   }
 };
 
@@ -65,15 +71,18 @@ export const validateToken = async (): Promise<boolean> => {
     const token = await getToken();
     if (!token) return false;
 
-    const response = await axios.post(
-      `${JWT_AUTH_URL}/token/validate`,
-      {},
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+    const response = await fetch(`${JWT_AUTH_URL}/token/validate`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+    });
 
-    return response.data.code === 'jwt_auth_valid_token';
+    if (!response.ok) return false;
+
+    const data = await response.json();
+    return data.code === 'jwt_auth_valid_token';
   } catch (error) {
     console.log('Token invalide ou expiré');
     await logout();

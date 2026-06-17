@@ -19,7 +19,7 @@ import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { Magazine } from '../models/Magazine';
 import { Text, TouchableOpacity } from 'react-native';
-import { analyticsService } from '../services/analytics';
+import { analyticsService } from '../services/analytics.simple';
 
 export type RootStackParamList = {
     Main: undefined;

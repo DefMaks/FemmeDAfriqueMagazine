@@ -1,6 +1,4 @@
-// src/services/wordpressInteractions.ts
-import axios from 'axios';
-import { getToken, getAuthHeaders, isLoggedIn } from './wordpressAuth';
+import { getToken, getAuthHeaders } from './wordpressAuth';
 
 // Nettoyer l'URL (enlever le / final si présent)
 const WP_API_URL = (process.env.EXPO_PUBLIC_WORDPRESS_API_URL || 'https://femmedafrique.net/wp-json/wp/v2').replace(/\/$/, '');
@@ -36,18 +34,16 @@ export interface NewComment {
  */
 export const getComments = async (postId: number, page: number = 1, perPage: number = 20): Promise<Comment[]> => {
   try {
-    const response = await axios.get(`${WP_API_URL}/comments`, {
-      params: {
-        post: postId,
-        page,
-        per_page: perPage,
-        order: 'desc',
-        orderby: 'date',
-      },
-    });
-    return response.data;
+    const url = `${WP_API_URL}/comments?post=${postId}&page=${page}&per_page=${perPage}&order=desc&orderby=date`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
   } catch (error: any) {
-    console.error('Erreur récupération commentaires:', error.response?.data || error.message);
+    console.error('Erreur récupération commentaires:', error.message);
     return [];
   }
 };
@@ -64,25 +60,28 @@ export const postComment = async (comment: NewComment): Promise<Comment | null> 
       throw new Error('Vous devez être connecté pour commenter');
     }
 
-    const response = await axios.post(
-      `${WP_API_URL}/comments`,
-      {
+    const response = await fetch(`${WP_API_URL}/comments`, {
+      method: 'POST',
+      headers: {
+        ...authHeaders,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         post: comment.post,
         content: comment.content,
         parent: comment.parent || 0,
-      },
-      {
-        headers: {
-          ...authHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+      }),
+    });
 
-    return response.data;
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
   } catch (error: any) {
-    console.error('Erreur publication commentaire:', error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Impossible de publier le commentaire');
+    console.error('Erreur publication commentaire:', error.message);
+    throw new Error(error.message || 'Impossible de publier le commentaire');
   }
 };
 
@@ -97,27 +96,27 @@ export const postGuestComment = async (
 ): Promise<Comment | null> => {
   try {
     // Essayer d'abord sans authentification (commentaires invités)
-    const response = await axios.post(
-      `${WP_API_URL}/comments`,
-      {
+    const response = await fetch(`${WP_API_URL}/comments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         post: postId,
         content,
         author_name: authorName,
         author_email: authorEmail,
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+      }),
+    });
 
-    return response.data;
-  } catch (error: any) {
-    console.error('Erreur publication commentaire invité:', error.response?.data || error.message);
-    
+    if (response.ok) {
+        return await response.json();
+    }
+
+    const errorData = await response.json().catch(() => ({}));
+
     // Si les commentaires invités ne sont pas autorisés, essayer avec un compte invité par défaut
-    if (error.response?.data?.code === 'rest_comment_login_required') {
+    if (errorData.code === 'rest_comment_login_required') {
       console.log('Tentative avec compte invité par défaut...');
       
       try {
@@ -132,30 +131,36 @@ export const postGuestComment = async (
         const authResponse = await loginWordPress(guestCredentials.username, guestCredentials.password);
         
         // Utiliser le token pour poster le commentaire
-        const response = await axios.post(
-          `${WP_API_URL}/comments`,
-          {
+        const responseAuth = await fetch(`${WP_API_URL}/comments`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authResponse.token}`,
+          },
+          body: JSON.stringify({
             post: postId,
             content,
             author_name: authorName,
             author_email: authorEmail,
-          },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${authResponse.token}`,
-            },
-          }
-        );
+          }),
+        });
+
+        if (!responseAuth.ok) {
+            const errorDataAuth = await responseAuth.json().catch(() => ({}));
+            throw new Error(errorDataAuth.message || `HTTP ${responseAuth.status}: ${responseAuth.statusText}`);
+        }
         
-        return response.data;
+        return await responseAuth.json();
       } catch (guestError: any) {
-        console.error('Erreur avec compte invité par défaut:', guestError.response?.data || guestError.message);
+        console.error('Erreur avec compte invité par défaut:', guestError.message);
         throw new Error('Les commentaires invités ne sont pas autorisés sur ce site. Veuillez vous connecter.');
       }
     }
     
-    throw new Error(error.response?.data?.message || 'Impossible de publier le commentaire');
+    throw new Error(errorData.message || 'Impossible de publier le commentaire');
+  } catch (error: any) {
+    console.error('Erreur publication commentaire invité:', error.message);
+    throw error;
   }
 };
 
@@ -164,10 +169,10 @@ export const postGuestComment = async (
  */
 export const getCommentCount = async (postId: number): Promise<number> => {
   try {
-    const response = await axios.head(`${WP_API_URL}/comments`, {
-      params: { post: postId },
+    const response = await fetch(`${WP_API_URL}/comments?post=${postId}`, {
+      method: 'HEAD',
     });
-    return parseInt(response.headers['x-wp-total'] || '0', 10);
+    return parseInt(response.headers.get('x-wp-total') || '0', 10);
   } catch (error) {
     return 0;
   }
@@ -176,9 +181,6 @@ export const getCommentCount = async (postId: number): Promise<number> => {
 // ============================================
 // ❤️ LIKES (via plugin ou custom endpoint)
 // ============================================
-
-// Note: WordPress n'a pas de système de likes natif.
-// Ceci utilise un endpoint custom ou un plugin comme "WP ULike"
 
 const LIKES_API_URL = `${WP_API_URL.replace('/wp/v2', '')}/fda/v1`;
 
@@ -196,21 +198,22 @@ export const likePost = async (postId: number): Promise<LikeResponse> => {
   try {
     const authHeaders = await getAuthHeaders();
     
-    const response = await axios.post(
-      `${LIKES_API_URL}/like`,
-      { post_id: postId },
-      {
-        headers: {
-          ...authHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const response = await fetch(`${LIKES_API_URL}/like`, {
+      method: 'POST',
+      headers: {
+        ...authHeaders,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ post_id: postId }),
+    });
 
-    return response.data;
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
   } catch (error: any) {
-    console.error('Erreur like:', error.response?.data || error.message);
-    // Fallback si l'endpoint n'existe pas
+    console.error('Erreur like:', error.message);
     return { success: false, likes: 0, liked: false, message: 'Fonctionnalité non disponible' };
   }
 };
@@ -222,20 +225,22 @@ export const unlikePost = async (postId: number): Promise<LikeResponse> => {
   try {
     const authHeaders = await getAuthHeaders();
     
-    const response = await axios.post(
-      `${LIKES_API_URL}/unlike`,
-      { post_id: postId },
-      {
-        headers: {
-          ...authHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    const response = await fetch(`${LIKES_API_URL}/unlike`, {
+      method: 'POST',
+      headers: {
+        ...authHeaders,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ post_id: postId }),
+    });
 
-    return response.data;
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
   } catch (error: any) {
-    console.error('Erreur unlike:', error.response?.data || error.message);
+    console.error('Erreur unlike:', error.message);
     return { success: false, likes: 0, liked: false, message: 'Fonctionnalité non disponible' };
   }
 };
@@ -247,11 +252,15 @@ export const getLikeStatus = async (postId: number): Promise<{ likes: number; li
   try {
     const authHeaders = await getAuthHeaders();
     
-    const response = await axios.get(`${LIKES_API_URL}/likes/${postId}`, {
-      headers: authHeaders,
+    const response = await fetch(`${LIKES_API_URL}/likes/${postId}`, {
+      headers: authHeaders as any,
     });
 
-    return response.data;
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
   } catch (error) {
     return { likes: 0, liked: false };
   }
@@ -282,9 +291,13 @@ export const submitDraftPost = async (post: NewPost): Promise<any> => {
       throw new Error('Vous devez être connecté pour soumettre un article');
     }
 
-    const response = await axios.post(
-      `${WP_API_URL}/posts`,
-      {
+    const response = await fetch(`${WP_API_URL}/posts`, {
+      method: 'POST',
+      headers: {
+        ...authHeaders,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         title: post.title,
         content: post.content,
         excerpt: post.excerpt,
@@ -292,19 +305,18 @@ export const submitDraftPost = async (post: NewPost): Promise<any> => {
         tags: post.tags,
         featured_media: post.featured_media,
         status: 'pending', // En attente de modération
-      },
-      {
-        headers: {
-          ...authHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+      }),
+    });
 
-    return response.data;
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
   } catch (error: any) {
-    console.error('Erreur soumission article:', error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Impossible de soumettre l\'article');
+    console.error('Erreur soumission article:', error.message);
+    throw new Error(error.message || 'Impossible de soumettre l\'article');
   }
 };
 
@@ -331,20 +343,24 @@ export const uploadMedia = async (uri: string, filename: string): Promise<number
       type: 'image/jpeg',
     } as any);
 
-    const response = await axios.post(
-      `${WP_API_URL}/media`,
-      formData,
-      {
-        headers: {
-          ...authHeaders,
-          'Content-Type': 'multipart/form-data',
-        },
-      }
-    );
+    const response = await fetch(`${WP_API_URL}/media`, {
+      method: 'POST',
+      headers: {
+        ...authHeaders,
+        // FormData set Content-Type automatically with boundary
+      } as any,
+      body: formData,
+    });
 
-    return response.data.id;
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.id;
   } catch (error: any) {
-    console.error('Erreur upload média:', error.response?.data || error.message);
-    throw new Error(error.response?.data?.message || 'Impossible d\'uploader l\'image');
+    console.error('Erreur upload média:', error.message);
+    throw new Error(error.message || 'Impossible d\'uploader l\'image');
   }
 };
