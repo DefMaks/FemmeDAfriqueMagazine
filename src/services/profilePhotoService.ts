@@ -2,7 +2,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { profileService } from './profileService';
-import { analyticsService } from './analyticsService';
+import { analyticsService } from './analytics.simple';
 
 export interface ProfilePhotoData {
   uuid: string;

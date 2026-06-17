@@ -19,7 +19,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { notificationService } from '../services/notificationService';
 import { profileService } from '../services/profileService';
 import { profilePhotoService } from '../services/profilePhotoService';
-import { analyticsService } from '../services/analytics';
+import { analyticsService } from '../services/analytics.simple';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { Linking } from 'react-native';

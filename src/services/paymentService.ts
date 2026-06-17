@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { supabase, getDeviceId } from '../lib/supabase';
 
 // Use environment variables for TwigaPaie configuration
@@ -37,17 +36,21 @@ export interface PaymentStatusResponse {
 export const twigaPaieService = {
   async initiatePayment(payload: PaymentPayload): Promise<PaymentResponse> {
     try {
-      const response = await axios.post(
-        `${TWIGAPAIE_API_URL}/payments/payment-service`,
-        payload,
-        {
-          headers: {
-                  'Authorization': 'Bearer ' +TWIGAPAIE_API_KEY || '',
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      return response.data;
+      const response = await fetch(`${TWIGAPAIE_API_URL}/payments/payment-service`, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + TWIGAPAIE_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
     } catch (error) {
       console.error('TwigaPaie payment error:', error);
       throw error;
@@ -56,17 +59,21 @@ export const twigaPaieService = {
 
   async checkPaymentStatus(orderId: string): Promise<PaymentStatusResponse> {
     try {
-      const response = await axios.post(
-        `${TWIGAPAIE_API_URL}/payments/payment-check`,
-        { order_id: orderId },
-        {
-          headers: {
-                  'Authorization': 'Bearer ' +TWIGAPAIE_API_KEY || '',
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      return response.data;
+      const response = await fetch(`${TWIGAPAIE_API_URL}/payments/payment-check`, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + TWIGAPAIE_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ order_id: orderId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
     } catch (error) {
       console.error('TwigaPaie status check error:', error);
       throw error;

@@ -27,7 +27,7 @@ import { ErrorMessage } from '../components/ErrorMessage';
 import { ArticleCard } from '../components/ArticleCard';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import CategoryCard from '../components/CategoryCard';
-import { analyticsService } from '../services/analytics';
+import { analyticsService } from '../services/analytics.simple';
 
 type DiscoverScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type DiscoverScreenRouteProps = {

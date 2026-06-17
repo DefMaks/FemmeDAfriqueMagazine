@@ -12,7 +12,7 @@ import { decodeHtmlEntities, formatArticleTitle, getShareMessage } from '../util
 import RenderHtml from 'react-native-render-html';
 import { CommentsSection } from '../components/CommentsSection';
 import { getAds, api } from '../services/api';
-import { analyticsService } from '../services/analytics';
+import { analyticsService } from '../services/analytics.simple';
 import { useTaxonomyMapping } from '../hooks/useTaxonomyMapping';
 // import { useRelatedPosts } from '../hooks/useRelatedPosts';
 import { InlineAdBanner } from '../components/InlineAdBanner';

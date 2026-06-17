@@ -6,7 +6,7 @@ import { RootStackParamList } from '../navigation/RootNavigator';
 import { Post } from '../models/Post';
 import { ArticleCard } from '../components/ArticleCard';
 import { getPostsByTag, getPostsByCategory } from '../services/api';
-import { analyticsService } from '../services/analytics';
+import { analyticsService } from '../services/analytics.simple';
 import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 

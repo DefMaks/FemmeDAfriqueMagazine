@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { profileService } from '../services/profileService';
 import { sessionService } from '../services/sessionService';
-import { analyticsService } from '../services/analyticsService';
+import { analyticsService } from '../services/analytics.simple';
 
 type AuthMode = 'login' | 'register';
 

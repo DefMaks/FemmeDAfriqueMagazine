@@ -28,7 +28,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { savedArticlesService } from '../services/supabaseService';
-import { analyticsService } from '../services/analytics';
+import { analyticsService } from '../services/analytics.simple';
 
 const { width: screenWidth } = Dimensions.get('window');
 const AD_BANNER_HEIGHT = ((screenWidth - 32) * 406) / 1300; // Ratio 1300x406

@@ -20,7 +20,7 @@ import { getMedia } from '../services/api';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { RootStackParamList } from '../navigation/RootNavigator';
-import { analyticsService } from '../services/analytics';
+import { analyticsService } from '../services/analytics.simple';
 
 type CheckoutScreenProps = NativeStackScreenProps<RootStackParamList, 'Checkout'>;
 
