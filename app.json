@@ -50,11 +50,7 @@
         }
       ]
     },
-    "plugins": [
-      "expo-font",
-      "expo-asset",
-      "expo-web-browser"
-    ],
+    "plugins": [],
     "web": {
       "favicon": "./assets/favicon.png"
     },
