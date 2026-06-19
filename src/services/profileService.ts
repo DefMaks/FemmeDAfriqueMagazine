@@ -1,11 +1,11 @@
 // src/services/profileService.ts
 import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import bcrypt from 'bcryptjs';
+import bcrypt from 'react-native-bcrypt';
 import { getDeviceId } from '../lib/supabase';
 
 // Configurer le fallback crypto pour React Native
-bcrypt.setRandomFallback((len: number): number[] => {
+bcrypt.setRandomFallback bcrypt.setRandomFallbackbcrypt.setRandomFallback bcrypt.setRandomFallback((len: number): number[] => {
   const randomBytes = new Array(len);
   for (let i = 0; i < len; i++) {
     randomBytes[i] = Math.floor(Math.random() * 256);
