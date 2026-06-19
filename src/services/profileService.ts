@@ -5,13 +5,15 @@ import bcrypt from 'react-native-bcrypt';
 import { getDeviceId } from '../lib/supabase';
 
 // Configurer le fallback crypto pour React Native
-bcrypt.setRandomFallback bcrypt.setRandomFallbackbcrypt.setRandomFallback bcrypt.setRandomFallback((len: number): number[] => {
-  const randomBytes = new Array(len);
-  for (let i = 0; i < len; i++) {
-    randomBytes[i] = Math.floor(Math.random() * 256);
-  }
-  return randomBytes;
-});
+if (bcrypt && typeof bcrypt.setRandomFallback === 'function') {
+  bcrypt.setRandomFallback((len: number): number[] => {
+    const randomBytes = new Array(len);
+    for (let i = 0; i < len; i++) {
+      randomBytes[i] = Math.floor(Math.random() * 256);
+    }
+    return randomBytes;
+  });
+}
 
 // Identifiants de l'agent pour contourner RLS
 const AGENT_EMAIL = process.env.EXPO_PUBLIC_AGENT || 'agent@defmaks.com';
@@ -132,7 +134,7 @@ export class ProfileService {
           const salt = await bcrypt.genSalt(10);
           console.log('✅ Salt généré:', typeof salt, salt.length);
           
-          passwordHash = await bcrypt.hash(cleanPassword, salt);
+          passwordHash = await bcrypt.hashSync(cleanPassword, salt);
           console.log('✅ Password hashé avec succès, longueur:', passwordHash.length);
           console.log('✅ Type du hash:', typeof passwordHash);
           
@@ -276,7 +278,7 @@ export class ProfileService {
       
       let passwordMatch: boolean;
       try {
-        passwordMatch = await bcrypt.compare(cleanPassword, profile.password_hash);
+        passwordMatch = bcrypt.compareSync(cleanPassword, profile.password_hash);
         console.log('🔍 Résultat comparaison passwords:', passwordMatch);
       } catch (bcryptError: any) {
         console.error('❌ Erreur bcrypt.compare:', bcryptError);
@@ -357,7 +359,7 @@ export class ProfileService {
       
       const cleanPassword = trimmedPassword.replace(/[^\x00-\x7F]/g, '');
       const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash(cleanPassword, salt);
+      const passwordHash = bcrypt.hashSync(cleanPassword, salt);
       
       // Créer un profil local avec ID temporaire
       const tempProfile: UserProfile = {
@@ -464,7 +466,7 @@ export class ProfileService {
         const salt = await bcrypt.genSalt(10);
         console.log('✅ Salt généré:', typeof salt, salt.length);
         
-        passwordHash = await bcrypt.hash(cleanPassword, salt);
+        passwordHash = bcrypt.hashSync(cleanPassword, salt);
         console.log('✅ Password hashé avec succès, longueur:', passwordHash.length);
         console.log('✅ Type du hash:', typeof passwordHash);
         
