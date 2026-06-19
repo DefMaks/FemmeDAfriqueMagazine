@@ -36,7 +36,7 @@ import {
     formatPhoneAndDeduceProvider,
     openCardPaymentPageSimple
 } from '../services/twigaPaie';
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 import { centralPaymentService, PaymentRequest } from '../services/centralPaymentService';
