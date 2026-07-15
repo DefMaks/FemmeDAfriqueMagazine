@@ -1,0 +1,48 @@
+Résumé rapide — comment l'app charge les articles et données
+- Point d'entrée réseau : src/services/optimizedApiService.ts (service "optimisé") ; src/services/api.ts expose getArticles/getArticle/getPosts/etc. qui utilisent d'abord optimizedApiService puis basculent vers des fonctions "legacy" (getArticlesLegacy / getArticleLegacy) en cas d'échec.
+- Mécanismes implémentés : cache mémoire (Map), cache centralisé via cacheService (optimisé), retries avec backoff (withRetry), timeout via AbortController, circuit breaker + adaptive timeout, monitoring des métriques, détection du mode offline (networkService.isOnline) et persistance offline via offlineService.savePostsOffline.
+- Comportement concret : pour récupérer la liste d'articles l'app appelle getPosts (src/services/api.ts) → vérifie cache mémoire → vérifie connectivité → appel réseau (apiRequest) → met en cache, sauvegarde offline et renvoie les données. Pour les appels optimisés la logique passe par optimizedApiService.request qui encapsule cacheService, circuit breaker et monitoring.
+
+Observations importantes et points à corriger / vérifier (prioritaires)
+1. Usage de localStorage (incompatible React Native)
+   - Le code utilise localStorage.getItem / setItem comme fallback (ex. getCategories et dans le catch de getPosts). Sur un vrai device React Native, localStorage n'existe : cela provoquera des ReferenceError s'il n'est pas protégé. Ici ces accès sont entourés de try/catch, donc ils ne plantent, mais la persistance attendue (categories persistées, fallback posts) ne fonctionnera pas. Remplacer par AsyncStorage (@react-native-async-storage/async-storage) pour la persistance native.
+   - Fichiers à vérifier : src/services/api.ts (lignes où localStorage est utilisé).
+
+2. Inconstance dans la vérification de response.ok / parsing JSON
+   - Dans certains appels legacy (getArticlesLegacy, getArticleLegacy) le code fait await response.json() puis if (!response.ok) throw. Idéalement vérifier response.ok avant de parser (pour éviter throw sur JSON inattendu ou erreurs silencieuses). Normaliser pour utiliser la même stratégie que apiRequest (vérifier response.ok d'abord).
+   - Fichiers/codes concernés : src/services/api.ts (getArticlesLegacy/getArticleLegacy).
+
+3. Durées et retry / timeouts
+   - Deux jeux de timeouts existent : TIMEOUT = 30s pour les legacy, API_TIMEOUT = 45s pour apiRequest, et optimizedApiService ajoute sa logique adaptative. Ces valeurs longues peuvent donner l'impression de "chargement long" côté UI. Confirmer que les écrans affichent un indicateur de timeout/erreur plutôt qu'un spinner infini.
+   - Le nombre de retries (MAX_RETRIES = 2) et le backoff peuvent rallonger l'attente globale. Ajuster si UX priorise la réactivité.
+
+4. Cache mémoire non persistant
+   - Le cache en mémoire (Map) est réinitialisé au redémarrage de l'app. L'app tente néanmoins de sauvegarder offline via offlineService, mais vérifier que offlineService.getOfflinePosts renvoie bien ce qui est attendu (et utilise AsyncStorage ou DB native).
+   - Fichiers : src/services/cacheService.ts (et src/services/offlineService.ts).
+
+5. CORS / web preview
+   - Le README signale que la preview web n'affiche pas les articles à cause de headers CORS côté serveur. Sur appareil natif (Expo) cela ne pose pas problème. Pour tests web, config côté WordPress ou un proxy est nécessaire.
+
+Vérifications rapides à faire sur l'app (tests pratiques)
+- Sur appareil/simulateur : ouvrir DebugScreen / MonitoringScreen (existants) et lancer une récupération d'articles ; observer les logs console (adb logcat / Expo logs).
+- Ajouter des console.log temporaires dans getPosts pour confirmer l'URL appelée et la valeur retournée (déjà présent : "🌐 Récupération posts: ...").
+- Tester offline : mettre le device en mode avion, lancer getPosts et vérifier offlineService.getOfflinePosts et affichage.
+- Tester comportement en cas d'erreur HTTP (ex. forcer 500) pour s'assurer que withRetry et le fallback fonctionnement renvoient bien un tableau vide ou cache expiré.
+
+Suggestions de correctifs rapides (prioritaires)
+1. Remplacer toutes les utilisations de localStorage par AsyncStorage et un utilitaire wrapper (try/catch + feature-detect).
+2. Standardiser le flux de parsing : vérifier response.ok avant response.json() pour les legacy ou centraliser via apiRequest.
+3. Exposer des logs plus explicites côté UI (code erreur / durée) afin d'indiquer à l'utilisateur que l'appel a échoué ou est en retry.
+4. Vérifier que networkService.isOnline fonctionne sur tous les environnements (simulator, device, debug).
+5. Optionnel UX : réduire API_TIMEOUT ou afficher un message d'erreur après la première tentative + bouton "réessayer" plutôt que laisser retries silencieux.
+
+Fichiers et endroits clés à lire/contrôler (référence)
+- src/services/api.ts — getPosts, getArticles, getCategories, gestion du cache et fallback localStorage
+- src/services/optimizedApiService.ts — orchestration cacheService / circuit breaker / adaptive timeout
+- src/services/offlineService.ts — sauvegarde et lecture des posts offline
+- src/services/networkService.ts — détection online/offline
+- src/services/cacheService.ts — comportement de cache persistant
+- src/screens/* (HomeScreen.tsx, AllArticlesScreen.tsx, ArticleDetailScreen.tsx) — comment les écrans consomment getPosts/getArticle et affichent loaders / erreurs
+
+Conclusion
+L'application a une architecture réseau robuste : cache multi-couches, retries, circuit breaker et offline support. Les points les plus susceptibles de causer des "chargements qui ne s'affichent pas" sont (1) l'utilisation de localStorage en environnement natif, (2) timeouts/trials trop longs ou mal gérés côté UI, et (3) le comportement divergant entre optimizedApiService et les paths legacy. Corriger la persistance (AsyncStorage) et uniformiser la gestion des réponses HTTP (vérifier response.ok avant parse) devrait résoudre la majorité des problèmes de chargement visibles en natif.
