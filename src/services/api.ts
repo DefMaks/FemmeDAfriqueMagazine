@@ -3,6 +3,7 @@ import { WORDPRESS_CONFIG } from '../config/env';
 import { offlineService } from './offlineService';
 import { networkService } from './networkService';
 import { optimizedApiService } from './optimizedApiService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Use environment variable for WordPress API URL
 const WORDPRESS_API_URL = WORDPRESS_CONFIG.apiUrl || "https://femmedafrique.net/wp-json/wp/v2/";
@@ -505,17 +506,17 @@ export const getPosts = async (page = 1, perPage = 10, category?: number, tag?: 
       return offlinePosts;
     }
     
-    // 3. Essayer localStorage (fallback)
+    // 3. Essayer AsyncStorage (fallback natif)
     const localStorageKey = `posts_offline_${page}_${perPage}`;
     try {
-      const stored = localStorage.getItem(localStorageKey);
+      const stored = await AsyncStorage.getItem(localStorageKey);
       if (stored) {
         const data = JSON.parse(stored);
-        console.log(`💾 Utilisation localStorage fallback: ${data?.length || 0} articles`);
+        console.log(`💾 Utilisation AsyncStorage fallback: ${data?.length || 0} articles`);
         return data;
       }
     } catch (localError) {
-      console.log("⚠️ Erreur lecture localStorage:", localError);
+      console.log("⚠️ Erreur lecture AsyncStorage:", localError);
     }
     
     // 3. Retourner tableau vide pour éviter le crash
@@ -524,23 +525,23 @@ export const getPosts = async (page = 1, perPage = 10, category?: number, tag?: 
   }
 };
 
-// Fonction pour récupérer les catégories (avec localStorage persistant)
+// Fonction pour récupérer les catégories (avec AsyncStorage persistant)
 export const getCategories = async () => {
   const cacheKey = 'categories_all';
-  const localStorageKey = 'categories_persistent';
-  
-  // Essayer localStorage d'abord (plus persistant)
+  const asyncStorageKey = '@fda_categories_persistent';
+
+  // Essayer AsyncStorage d'abord (plus persistant, fonctionne en natif)
   try {
-    const stored = localStorage.getItem(localStorageKey);
+    const stored = await AsyncStorage.getItem(asyncStorageKey);
     if (stored) {
       const data = JSON.parse(stored);
-      console.log('📂 Catégories chargées depuis localStorage');
+      console.log('📂 Catégories chargées depuis AsyncStorage');
       return data;
     }
   } catch (error) {
-    console.log('📂 localStorage non disponible, utilisation du cache');
+    console.log('📂 AsyncStorage non disponible, utilisation du cache');
   }
-  
+
   // Essayer le cache mémoire
   const cached = getCached<any[]>(cacheKey);
   if (cached) {
@@ -552,13 +553,13 @@ export const getCategories = async () => {
   try {
     const response = await withRetry(() => apiRequest(`${WORDPRESS_API_URL}categories?per_page=100`));
     setCache(cacheKey, response, CACHE_TTL.categories);
-    
-    // Sauvegarder dans localStorage pour persistance
+
+    // Sauvegarder dans AsyncStorage pour persistance native
     try {
-      localStorage.setItem(localStorageKey, JSON.stringify(response));
-      console.log('💾 Catégories sauvegardées dans localStorage');
+      await AsyncStorage.setItem(asyncStorageKey, JSON.stringify(response));
+      console.log('💾 Catégories sauvegardées dans AsyncStorage');
     } catch (error) {
-      console.log('⚠️ Impossible de sauvegarder dans localStorage');
+      console.log('⚠️ Impossible de sauvegarder dans AsyncStorage');
     }
     
     return response;
