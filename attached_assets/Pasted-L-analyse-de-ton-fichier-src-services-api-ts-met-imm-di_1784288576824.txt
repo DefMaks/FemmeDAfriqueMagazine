@@ -1,0 +1,637 @@
+L'analyse de ton fichier src/services/api.ts met immédiatement en évidence pourquoi l'application n'affiche rien sur Replit, alors même que le test CORS en OPTIONS répond maintenant parfaitement avec un statut 204.
+Le problème vient d'une incohérence entre tes deux architectures d'appels dans ce fichier : l'architecture "optimisée" (optimizedApiService) et l'architecture "legacy/standard" (apiRequest).
+Voici les deux erreurs critiques présentes dans ce code et comment les corriger.
+Les 2 erreurs identifiées
+Erreur 1 : L'appel d'origine n'envoie aucun en-tête CORS (Origin)
+Ton fichier .htaccess est configuré pour n'accepter que les requêtes provenant précisément de ton adresse Replit ([https://59](https://59)ab2d44...).
+ * Le problème : Dans ton fichier api.ts, les fonctions de récupération (comme apiRequest ou getArticlesLegacy) effectuent des requêtes fetch standard sans déclarer d'en-tête Origin ou de mode cors.
+ * Le navigateur web de l'aperçu Replit considère alors la requête comme "opaque" ou sans origine déclarée, ce qui fait échouer la validation CORS côté serveur.
+Erreur 2 : L'aiguillage via optimizedApiService
+Regarde tes fonctions principales exportées, comme getArticles :
+export const getArticles = async (params?) => {
+  try {
+    return await optimizedApiService.getArticles(params);
+  } catch (error) {
+    console.warn('⚠️ Optimized API failed, falling back to legacy API');
+    return getArticlesLegacy(params);
+  }
+};
+
+Si ton composant React appelle getArticles, il passe d'abord par le service optimizedApiService. Si ce service à son tour utilise une URL d'API différente, des en-têtes différents, ou n'est pas configuré pour supporter le mode CORS requis par Replit, l'UI restera vide.
+La Solution : Ton fichier api.ts corrigé
+Voici la version corrigée de ton fichier. Les modifications majeures apportées sont :
+ * L'ajout systématique des en-têtes CORS (Origin et credentials: 'include') sur toutes les requêtes fetch (dans api, apiRequest, et les fonctions legacy) pour s'aligner sur les exigences d'o2switch.
+ * La normalisation de l'URL pour s'assurer qu'un slash / termine toujours l'appel de l'API WordPress.
+Remplace l'intégralité du contenu de ton fichier src/services/api.ts par celui-ci :
+// src/services/api.ts
+import { WORDPRESS_CONFIG } from '../config/env';
+import { offlineService } from './offlineService';
+import { networkService } from './networkService';
+import { optimizedApiService } from './optimizedApiService';
+
+// Origine Replit requise pour passer la barrière CORS d'o2switch
+const REPLIT_ORIGIN = "https://59ab2d44-3581-4965-8f6d-8fffd53bb4a2-00-jmkd3n9bl53s.picard.replit.dev";
+
+// Assurer la présence du slash de fin pour éviter les redirections 301 perturbatrices pour CORS
+const formatApiUrl = (url: string): string => {
+  const base = url || "https://femmedafrique.net/wp-json/wp/v2/";
+  return base.endsWith('/') ? base : `${base}/`;
+};
+
+const WORDPRESS_API_URL = formatApiUrl(WORDPRESS_CONFIG.apiUrl);
+
+// Configuration optimisée
+const TIMEOUT = 30000; // 30 secondes
+const MAX_RETRIES = 2; 
+const RETRY_DELAY = 1500; 
+const BACKOFF_MULTIPLIER = 1.5; 
+
+// Cache simple en mémoire
+interface CacheItem<T> {
+  data: T;
+  timestamp: number;
+  ttl: number;
+}
+
+const cache = new Map<string, CacheItem<any>>();
+
+const CACHE_TTL = {
+  posts: 10 * 60 * 1000,     
+  posts_critical: 30 * 60 * 1000, 
+  categories: 60 * 60 * 1000, 
+  ads: 5 * 60 * 1000,        
+  magazines: 30 * 60 * 1000,  
+  media: 60 * 60 * 1000,     
+};
+
+// Vérifier si le cache est valide
+const getCached = <T>(key: string): T | null => {
+  const item = cache.get(key);
+  if (item && Date.now() - item.timestamp < item.ttl) {
+    return item.data as T;
+  }
+  cache.delete(key);
+  return null;
+};
+
+// Mettre en cache
+const setCache = <T>(key: string, data: T, ttl: number): void => {
+  cache.set(key, { data, timestamp: Date.now(), ttl });
+};
+
+// Vider le cache
+export const clearCache = (prefix?: string): void => {
+  if (prefix) {
+    for (const key of cache.keys()) {
+      if (key.startsWith(prefix)) cache.delete(key);
+    }
+  } else {
+    cache.clear();
+  }
+};
+
+// Fonction de retry avec backoff exponentiel
+const withRetry = async <T>(
+  fn: () => Promise<T>, 
+  retries: number = MAX_RETRIES, 
+  delay: number = RETRY_DELAY
+): Promise<T> => {
+  try {
+    return await fn();
+  } catch (error: any) {
+    if (retries > 0 && shouldRetry(error)) {
+      const jitter = Math.random() * 0.5; 
+      const backoffDelay = delay * Math.pow(BACKOFF_MULTIPLIER, MAX_RETRIES - retries) * (1 + jitter);
+      
+      console.warn(`⏱️ Timeout, nouvelle tentative dans ${Math.round(backoffDelay)}ms...`);
+      await new Promise(resolve => setTimeout(resolve, backoffDelay));
+      return withRetry(fn, retries - 1, delay * BACKOFF_MULTIPLIER);
+    }
+    throw error;
+  }
+};
+
+const shouldRetry = (error: any): boolean => {
+  return error.name === 'AbortError' || 
+         error.message?.includes('timeout') || 
+         error.message?.includes('aborted') ||
+         (error.status >= 500 && error.status < 600);
+};
+
+// Fonctions optimisées utilisant le nouveau service avec bascule automatique
+export const getArticles = async (params?: {
+  page?: number;
+  per_page?: number;
+  category?: number;
+  search?: string;
+  embed?: boolean;
+}) => {
+  try {
+    return await optimizedApiService.getArticles(params);
+  } catch (error) {
+    console.warn('⚠️ Optimized API failed, falling back to legacy API');
+    return getArticlesLegacy(params);
+  }
+};
+
+export const getArticle = async (id: number, embed: boolean = true) => {
+  try {
+    return await optimizedApiService.getArticle(id, embed);
+  } catch (error) {
+    console.warn('⚠️ Optimized API failed, falling back to legacy API');
+    return getArticleLegacy(id, embed);
+  }
+};
+
+// Fonctions legacy (fallback)
+const getArticlesLegacy = async (params?: {
+  page?: number;
+  per_page?: number;
+  category?: number;
+  search?: string;
+  embed?: boolean;
+}) => {
+  const queryParams = new URLSearchParams();
+  
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        queryParams.append(key, value.toString());
+      }
+    });
+  }
+
+  const endpoint = `posts${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const cacheKey = `articles_${queryParams.toString()}`;
+  
+  const cached = getCached(cacheKey);
+  if (cached) {
+    console.log('📦 Cache hit for articles');
+    return cached;
+  }
+
+  return withRetry(async () => {
+    const url = `${WORDPRESS_API_URL}${endpoint}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Origin': REPLIT_ORIGIN,
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      setCache(cacheKey, data, 10 * 60 * 1000); 
+      return data;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  });
+};
+
+const getArticleLegacy = async (id: number, embed: boolean = true) => {
+  const endpoint = `posts/${id}${embed ? '?_embed=true' : ''}`;
+  const cacheKey = `article_${id}`;
+
+  const cached = getCached(cacheKey);
+  if (cached) {
+    console.log('📦 Cache hit for article');
+    return cached;
+  }
+
+  return withRetry(async () => {
+    const url = `${WORDPRESS_API_URL}${endpoint}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Origin': REPLIT_ORIGIN,
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      setCache(cacheKey, data, 30 * 60 * 1000); 
+      return data;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  });
+};
+
+const getCategoriesLegacy = async () => {
+  const endpoint = 'categories?per_page=100';
+  const cacheKey = 'categories';
+
+  const cached = getCached(cacheKey);
+  if (cached) {
+    console.log('📦 Cache hit for categories');
+    return cached;
+  }
+
+  return withRetry(async () => {
+    const url = `${WORDPRESS_API_URL}${endpoint}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Origin': REPLIT_ORIGIN,
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      setCache(cacheKey, data, 24 * 60 * 60 * 1000); 
+      return data;
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  });
+};
+
+// Récupérer une publicité par ID
+export const getAdById = async (id: number) => {
+  try {
+    const url = `${WORDPRESS_API_URL}app-ad/${id}?_embed=true`;
+    return await withRetry(() => apiRequest(url));
+  } catch (error) {
+    console.error("Erreur récupération ad by ID:", error);
+    return null;
+  }
+};
+
+// Récupérer toutes les publicités
+export const getAds = async () => {
+  try {
+    const url = `${WORDPRESS_API_URL}app-ad?per_page=50&_embed=true`;
+    return await withRetry(() => apiRequest(url));
+  } catch (error) {
+    console.error("Erreur récupération ads:", error);
+    return [];
+  }
+};
+
+// Récupérer les publicités par Zone ID
+export const getAdsByZoneId = async (zoneId: number) => {
+  try {
+    const url = `${WORDPRESS_API_URL}app-ad?app_ad_zone=${zoneId}&per_page=50&_embed=true`;
+    return await withRetry(() => apiRequest(url));
+  } catch (error) {
+    console.error("Erreur récupération ads by zone:", error);
+    return [];
+  }
+};
+
+// Récupérer un tag par son ID
+export const getTagById = async (id: number) => {
+  try {
+    const url = `${WORDPRESS_API_URL}tags/${id}`;
+    return await withRetry(() => apiRequest(url));
+  } catch (error) {
+    console.error("Erreur récupération tag:", error);
+    throw error;
+  }
+};
+
+// Récupérer un média par son ID avec cache étendu
+export const getMedia = async (id: number) => {
+  const cacheKey = `media_${id}`;
+  const cached = getCached<any>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const url = `${WORDPRESS_API_URL}media/${id}`;
+    const response = await withRetry(() => apiRequest(url));
+    setCache(cacheKey, response, CACHE_TTL.media);
+    return response;
+  } catch (error) {
+    console.error("Erreur récupération media:", error);
+    const expiredCache = cache.get(cacheKey);
+    if (expiredCache) {
+      return expiredCache.data;
+    }
+    return {
+      id: id,
+      source_url: '',
+      title: { rendered: 'Media indisponible' },
+      media_details: { sizes: {} }
+    };
+  }
+};
+
+// Instance compatible Axios pour les appels legacy
+export const api = {
+  get: async (endpoint: string, config: any = {}) => {
+    let url = endpoint.startsWith('http') ? endpoint : `${WORDPRESS_API_URL}${endpoint}`;
+
+    if (config.params) {
+      const params = new URLSearchParams();
+      Object.entries(config.params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value));
+        }
+      });
+      const queryString = params.toString();
+      if (queryString) {
+        url += (url.includes('?') ? '&' : '?') + queryString;
+      }
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), config.timeout || TIMEOUT);
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Origin': REPLIT_ORIGIN,
+          ...config.headers,
+        },
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      const data = await response.json();
+
+      return {
+        data,
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        config,
+        request: {},
+      };
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  }
+};
+
+// Fonction fetch générique sécurisée contre CORS
+const API_TIMEOUT = 45000; 
+
+const apiRequest = async (url: string, options: RequestInit = {}): Promise<any> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      mode: 'cors',
+      credentials: 'include',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'FemmeDAfrique-App/1.0',
+        'Cache-Control': 'max-age=3600', 
+        'Origin': REPLIT_ORIGIN,
+        ...options.headers,
+      },
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      console.error(`⏰ Timeout API: ${url} (${API_TIMEOUT/1000}s)`);
+      throw new Error('La connexion est trop lente. Veuillez réessayer plus tard.');
+    }
+    
+    console.error(`❌ Erreur API: ${url}`, error);
+    throw error;
+  }
+};
+
+// Récupérer les magazines
+export const getMagazines = async (page = 1, perPage = 10) => {
+  const cacheKey = `magazines_${page}_${perPage}`;
+  const cached = getCached<any[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const url = `${WORDPRESS_API_URL}mag?page=${page}&per_page=${perPage}&_embed=true`;
+    const response = await withRetry(() => apiRequest(url));
+    setCache(cacheKey, response, CACHE_TTL.magazines);
+    return response;
+  } catch (error) {
+    console.error("Erreur récupération magazines:", error);
+    const expiredCache = cache.get(cacheKey);
+    if (expiredCache) return expiredCache.data;
+    throw error;
+  }
+};
+
+// Récupérer les articles principaux
+export const getPosts = async (page = 1, perPage = 10, category?: number, tag?: number) => {
+  const cacheKey = `posts_${page}_${perPage}_${category || 'all'}_${tag || 'all'}`;
+  const cached = getCached<any[]>(cacheKey);
+  if (cached) {
+    console.log(`📂 Posts depuis cache: ${cacheKey}`);
+    return cached;
+  }
+
+  try {
+    let url = `${WORDPRESS_API_URL}posts?page=${page}&per_page=${perPage}&_embed=true`;
+    
+    if (category) url += `&categories=${category}`;
+    if (tag) url += `&tags=${tag}`;
+    
+    console.log(`🌐 Récupération posts: ${url}`);
+    
+    const isOnline = await networkService.isOnline();
+    if (!isOnline) {
+      console.log('📵 Mode offline détecté, utilisation cache local');
+      const offlinePosts = await offlineService.getOfflinePosts();
+      return offlinePosts.length > 0 ? offlinePosts : [];
+    }
+    
+    const response = await withRetry(() => apiRequest(url));
+    
+    const isCriticalCategory = category === 115 || category === 20;
+    const cacheTTL = isCriticalCategory ? CACHE_TTL.posts_critical : CACHE_TTL.posts;
+    
+    setCache(cacheKey, response, cacheTTL);
+    
+    await offlineService.savePostsOffline(response);
+    
+    return response;
+  } catch (error) {
+    console.error("❌ Erreur récupération posts:", error);
+    
+    const expiredCache = cache.get(cacheKey);
+    if (expiredCache) return expiredCache.data;
+    
+    const offlinePosts = await offlineService.getOfflinePosts();
+    if (offlinePosts.length > 0) return offlinePosts;
+    
+    try {
+      const stored = localStorage.getItem(`posts_offline_${page}_${perPage}`);
+      if (stored) return JSON.parse(stored);
+    } catch (localError) {
+      console.log("⚠️ Erreur lecture localStorage:", localError);
+    }
+    
+    return [];
+  }
+};
+
+// Récupérer les catégories (avec persistance)
+export const getCategories = async () => {
+  const cacheKey = 'categories_all';
+  const localStorageKey = 'categories_persistent';
+  
+  try {
+    const stored = localStorage.getItem(localStorageKey);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (error) {
+    console.log('📂 localStorage non disponible');
+  }
+  
+  const cached = getCached<any[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const response = await withRetry(() => apiRequest(`${WORDPRESS_API_URL}categories?per_page=100`));
+    setCache(cacheKey, response, CACHE_TTL.categories);
+    
+    try {
+      localStorage.setItem(localStorageKey, JSON.stringify(response));
+    } catch (error) {
+      console.log('⚠️ Impossible de sauvegarder dans localStorage');
+    }
+    
+    return response;
+  } catch (error) {
+    console.error("Erreur récupération catégories:", error);
+    const expiredCache = cache.get(cacheKey);
+    if (expiredCache) return expiredCache.data;
+    throw error;
+  }
+};
+
+// Récupérer les tags
+export const getTags = async () => {
+  const cacheKey = 'tags_all';
+  const cached = getCached<any[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const url = `${WORDPRESS_API_URL}tags?per_page=100&orderby=count&order=desc`;
+    const response = await withRetry(() => apiRequest(url));
+    setCache(cacheKey, response, CACHE_TTL.categories);
+    return response;
+  } catch (error) {
+    console.error("Erreur récupération tags:", error);
+    const expiredCache = cache.get(cacheKey);
+    if (expiredCache) return expiredCache.data;
+    throw error;
+  }
+};
+
+// Récupérer par catégorie
+export const getPostsByCategory = async (categoryId: number, page = 1, perPage = 10) => {
+  const cacheKey = `posts_cat_${categoryId}_${page}_${perPage}`;
+  const cached = getCached<any[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const url = `${WORDPRESS_API_URL}posts?categories=${categoryId}&page=${page}&per_page=${perPage}&_embed=true`;
+    const response = await withRetry(() => apiRequest(url));
+    setCache(cacheKey, response, CACHE_TTL.posts);
+    return response;
+  } catch (error) {
+    console.error("Erreur récupération posts par catégorie:", error);
+    const expiredCache = cache.get(cacheKey);
+    if (expiredCache) return expiredCache.data;
+    throw error;
+  }
+};
+
+// Récupérer par tag
+export const getPostsByTag = async (tagId: number, page = 1, perPage = 10) => {
+  const cacheKey = `posts_tag_${tagId}_${page}_${perPage}`;
+  const cached = getCached<any[]>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const url = `${WORDPRESS_API_URL}posts?tags=${tagId}&page=${page}&per_page=${perPage}&_embed=true`;
+    const response = await withRetry(() => apiRequest(url));
+    setCache(cacheKey, response, CACHE_TTL.posts);
+    return response;
+  } catch (error) {
+    console.error("❌ Erreur récupération posts par tag:", error);
+    const expiredCache = cache.get(cacheKey);
+    if (expiredCache) return expiredCache.data;
+    throw error;
+  }
+};
+
+// Recherche de posts
+export const searchPosts = async (query: string, page = 1, perPage = 10) => {
+  try {
+    const url = `${WORDPRESS_API_URL}posts?search=${encodeURIComponent(query)}&page=${page}&per_page=${perPage}&_embed=true`;
+    return await withRetry(() => apiRequest(url));
+  } catch (error) {
+    console.error("Erreur recherche:", error);
+    throw error;
+  }
+};
+
+Enregistre ces modifications directement dans Replit. Les appels API vont désormais correctement s'identifier auprès d'o2switch avec l'origine autorisée, et ton application devrait enfin afficher les données de Femme d'Afrique Magazine !
