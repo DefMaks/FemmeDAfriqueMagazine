@@ -22,6 +22,10 @@ const isTest = true;
 const TEST_PRICE_CDF = 100;
 const STORAGE_KEY_PHONE = '@fda_user_phone';
 
+
+const agent_email = Constants?.expoConfig?.extra?.EXPO_PUBLIC_AGENT;
+const agent_password = Constants?.expoConfig?.extra?.EXPO_PUBLIC_AGENT_PASS;
+
 export interface PaymentRequest {
   magazineId: string;
   magazineNumber: string;
@@ -78,6 +82,7 @@ class CentralPaymentService {
     try {
       console.log('🔄 Début processus paiement centralisé:', request);
 
+
       // 1. Validation des données
       if (request.paymentMethod === 'emoney' && !request.phone) {
         return { success: false, message: 'Numéro de téléphone requis pour E-Money', error: 'MISSING_PHONE' };
@@ -107,7 +112,7 @@ class CentralPaymentService {
         amount: request.amount,
         currency: request.currency as 'CDF' | 'USD' | 'XOF',
         transaction_type: 'DEPOSIT',
-        description: `Magazine FDA N°${request.magazineNumber}`,
+        description: `Achat Magazine FDA N°${request.magazineNumber}`,
         external_reference: paymentResult.orderId,
         transaction_platform: request.paymentMethod === 'emoney' ? 'EMONEY' : 'ECARD',
       };
@@ -130,7 +135,7 @@ class CentralPaymentService {
       // Afficher une alerte de remerciement
       Alert.alert(
         '✅ Paiement réussi',
-        'Merci pour votre paiement, le magazine est en cours de téléchargement',
+        'Merci pour votre achat ! Votre contenu est désormais accessible.', // ✅
         [{ text: 'OK' }]
       );
 
@@ -242,13 +247,16 @@ class CentralPaymentService {
   /**
    * Enregistre une transaction dans Supabase
    */
+
   private async recordTransaction(transactionData: TransactionData): Promise<PaymentResult> {
     try {
-      console.log('💾 Enregistrement transaction Supabase:', transactionData);
+      console.log('Données agent: ', agent_email, agent_password);
+      console.log('💾 Enregistrement transaction via Edge Function:', transactionData);
 
-      // Validation finale du wallet_id
-      if (!this.walletId || this.walletId === '00000000-0000-0000-0000-000000000000') {
-        console.warn('⚠️ Wallet ID fallback détecté, enregistrement annulé');
+      // 1. Validation du wallet_id
+      const targetWalletId = transactionData.wallet_id || this.walletId;
+      if (!targetWalletId || targetWalletId === '00000000-0000-0000-0000-000000000000') {
+        console.warn('⚠️ Wallet ID invalide ou introuvable, enregistrement annulé');
         return {
           success: false,
           message: 'Configuration du wallet invalide. Veuillez contacter le support.',
@@ -256,30 +264,140 @@ class CentralPaymentService {
         };
       }
 
-      console.log('transactionData: ', transactionData);
+      // 2. Récupération de la session ou connexion automatique avec le compte Agent
 
-      const { data, error } = await supabase
-        .from('transactions')
-        .insert(transactionData)
-        .select();
+      let { data: sessionData } = await supabase.auth.getSession();
+      let userToken = sessionData?.session?.access_token;
 
-      if (error) {
-        console.error('❌ Erreur enregistrement Supabase:', error);
-        return { success: false, message: error.message, error: 'SUPABASE_ERROR' };
+      if (!userToken) {
+        console.log('🔑 Aucune session active. Connexion automatique agent...');
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: agent_email,
+          password: agent_password,
+        });
+
+        if (authError) {
+          console.error('❌ Échec connexion automatique agent:', authError);
+
+        } else {
+          userToken = authData.session?.access_token;
+          console.log('Données agent: ', agent_email, agent_password, userToken);
+
+          console.log('✅ Session agent établie avec succès !');
+        }
       }
 
-      console.log('✅ Transaction enregistrée:', data[0]?.id);
+      // 3. Récupération des informations des parts et fees (get_cuts)
+      const appWalletId = Constants.expoConfig?.extra?.EXPO_PUBLIC_WALLET_ID;
+      console.log("=> Getting cuts for wallet:", appWalletId);
+
+      let defmaksRevenueCdf = 0;
+      let defmaksRevenueUsd = 0;
+
+      try {
+        const { data: cutsData, error: cutsError } = await supabase.rpc("get_cuts", {
+          p_wallet_id: appWalletId
+        });
+
+        if (cutsError) {
+          console.error("❌ Erreur lors de la récupération des cuts:", cutsError);
+        } else if (cutsData && cutsData.length > 0) {
+          console.log("📊 Cuts récupérés:", cutsData[0]);
+          const cuts = cutsData[0];
+
+          // Détermination dynamique des fees selon la monnaie courante
+          if (transactionData.currency === 'CDF') {
+            defmaksRevenueCdf = cuts.defmaks_fees_cdf ?? 0;
+          } else {
+            defmaksRevenueUsd = cuts.defmaks_fees_usd ?? 0.5;
+          }
+        }
+      } catch (err) {
+        console.error("⚠️ Exception lors de l'appel RPC get_cuts:", err);
+      }
+
+      // 4. Préparation dynamique du Payload
+      const isCDF = (transactionData.currency || 'CDF') === 'CDF';
+
+      const payload: Record<string, any> = {
+        wallet_id: targetWalletId,
+        amount: transactionData.amount,
+        currency: transactionData.currency || 'CDF',
+        transaction_type: transactionData.transaction_type || 'DEPOSIT',
+        description: transactionData.description || 'Achat Magazine',
+        external_reference: transactionData.external_reference || `ref-${Date.now()}`,
+        transaction_platform: transactionData.transaction_platform || 'EMONEY',
+        transaction_date: new Date().toISOString(),
+      };
+
+      // Injection de la clé de revenus appropriée selon la monnaie
+      if (isCDF) {
+        payload.defmaks_revenue_cdf = defmaksRevenueCdf;
+      } else {
+        payload.defmaks_revenue_usd = defmaksRevenueUsd;
+      }
+
+      console.log("📤 Payload transaction envoyé à l'Edge Function:", payload);
+
+      // 5. Clés et jetons d'authentification HTTP
+      const publishableKey = Constants?.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+        || Constants?.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+      const authToken = userToken || publishableKey;
+
+      if (!publishableKey) {
+        console.error("❌ Aucune clé Supabase Publishable / Anon trouvée dans les configurations.");
+        return {
+          success: false,
+          message: "Erreur de configuration client Supabase.",
+          error: "MISSING_API_KEY"
+        };
+      }
+
+      // 6. Appel HTTP natif (fetch) direct vers l'Edge Function
+      const url = 'https://hcpogyjdbtcxndzpyjvd.supabase.co/functions/v1/create-defmaks-transaction';
+
+      console.log("📤 Envoi HTTP Fetch direct vers Edge Function...");
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': publishableKey,
+          'Authorization': `Bearer ${authToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        console.error(`❌ Erreur Edge Function [${response.status}]:`, responseData);
+        return {
+          success: false,
+          message: responseData.error || responseData.message || 'Erreur lors de la création de la transaction',
+          error: 'EDGE_FUNCTION_ERROR'
+        };
+      }
+
+      console.log('✅ Transaction enregistrée avec succès via Edge Function:', responseData);
+
       return {
         success: true,
-        transactionId: data[0]?.id,
+        transactionId: responseData?.id || responseData?.transaction_id || responseData?.data?.id,
         message: 'Transaction enregistrée avec succès'
       };
 
-    } catch (error) {
-      console.error('❌ Erreur enregistrement transaction:', error);
-      return { success: false, message: (error as any).message, error: 'NETWORK_ERROR' };
+    } catch (error: any) {
+      console.error('❌ Erreur exécution enregistrement transaction:', error);
+      return {
+        success: false,
+        message: error.message || 'Erreur de connexion lors de l\'enregistrement',
+        error: 'NETWORK_ERROR'
+      };
     }
   }
+
 
   /**
    * Vérifie le statut d'un paiement
