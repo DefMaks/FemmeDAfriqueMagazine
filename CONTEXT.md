@@ -13,7 +13,7 @@
 | Navigation | React Navigation | v7 (Stack + BottomTabs) |
 | Contenu | WordPress REST API | v2 |
 | Base de données | Supabase | latest |
-| Paiements | TwigaPaie / FlexPay | gateway Railway |
+| Paiements | TwigaPaie / FlexPaie | gateway Railway |
 | Notifications | OneSignal | manual (pas de plugin Expo) |
 | Analytics | Firebase GA4 + custom | — |
 | Upload média | Uploadcare | — |

@@ -40,6 +40,7 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { Ionicons } from '@expo/vector-icons';
 import { centralPaymentService, PaymentRequest } from '../services/centralPaymentService';
+import Constants from 'expo-constants';
 
 const STORAGE_KEY_PHONE = '@fda_user_phone';
 
@@ -247,7 +248,7 @@ const ShopScreen = () => {
     // Devise selon le mode
     const currency = isTest ? 'CDF' : 'USD';
 
-    const walletId = process.env.WALLET_ID;
+    const walletId = Constants.expoConfig?.extra?.WALLET_ID;
 
     const handleOpenCheckout = async (mag: Magazine) => {
         // Éviter les appels multiples si déjà en cours
@@ -647,7 +648,7 @@ const ShopScreen = () => {
                                             </View>
                                             <View style={styles.paymentOptionText}>
                                                 <Text style={styles.paymentOptionTitle}>E-Card</Text>
-                                                <Text style={styles.paymentOptionSubtitle}>Visa, Mastercard via FlexPay</Text>
+                                                <Text style={styles.paymentOptionSubtitle}>Visa, Mastercard via FlexPaie</Text>
                                             </View>
                                             <Ionicons name="chevron-forward" size={20} color="#888" />
                                         </TouchableOpacity>
@@ -717,7 +718,7 @@ const ShopScreen = () => {
 
                                         <Text style={styles.sectionTitle}>Paiement par Carte</Text>
                                         <Text style={styles.cardInfo}>
-                                            Vous serez redirigé vers la page de paiement sécurisée FlexPay pour entrer vos informations de carte.
+                                            Vous serez redirigé vers la page de paiement sécurisée FlexPaie pour entrer vos informations de carte.
                                         </Text>
 
                                         <View style={styles.cardIcons}>

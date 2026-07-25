@@ -1,4 +1,5 @@
 // src/services/profileService.ts
+import Constants from 'expo-constants';
 import { supabase } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import bcrypt from 'react-native-bcrypt';
@@ -16,8 +17,8 @@ if (bcrypt && typeof bcrypt.setRandomFallback === 'function') {
 }
 
 // Identifiants de l'agent pour contourner RLS
-const AGENT_EMAIL = process.env.EXPO_PUBLIC_AGENT || 'agent@defmaks.com';
-const AGENT_PASSWORD = process.env.EXPO_PUBLIC_AGENT_PASS || 'DefMaks!';
+const AGENT_EMAIL = Constants.expoConfig?.extra?.EXPO_PUBLIC_AGENT || 'agent@defmaks.com';
+const AGENT_PASSWORD = Constants.expoConfig?.extra?.EXPO_PUBLIC_AGENT_PASS || 'DefMaks!';
 
 // Interfaces
 export interface UserProfile {
@@ -78,7 +79,7 @@ export class ProfileService {
   async createProfileViaAgent(username: string, email: string, password: string): Promise<UserProfile> {
     try {
       console.log('🔐 Connexion en tant qu\'agent pour contourner RLS...');
-      
+
       // 1. Se connecter en tant qu'agent
       const { data: agentData, error: agentError } = await supabase.auth.signInWithPassword({
         email: AGENT_EMAIL,
@@ -88,7 +89,7 @@ export class ProfileService {
       if (agentError) {
         console.error('❌ Erreur connexion agent:', agentError);
         console.warn('⚠️ Agent non disponible, création profil temporaire local...');
-        
+
         // Fallback: créer un profil temporaire local
         return await this.createTemporaryProfile(username, email, password);
       }
@@ -98,51 +99,51 @@ export class ProfileService {
       try {
         // 2. Créer le profil utilisateur sous la session agent
         const deviceId = await getDeviceId();
-        
+
         // Hasher le mot de passe
         console.log('🔍 Type du password:', typeof password);
         console.log('🔍 Valeur du password:', password);
         console.log('🔍 Longueur du password:', password?.length);
-        
+
         if (!password || typeof password !== 'string') {
           throw new Error('Le mot de passe doit être une chaîne de caractères non vide');
         }
-        
+
         const trimmedPassword = String(password).trim();
         if (trimmedPassword === '') {
           throw new Error('Le mot de passe ne peut pas être vide');
         }
-        
+
         // Validation supplémentaire pour bcrypt
         if (trimmedPassword.length > 72) {
           throw new Error('Le mot de passe est trop long (max 72 caractères)');
         }
-        
+
         // S'assurer que le password est une string pure
         const cleanPassword = trimmedPassword.replace(/[^\x00-\x7F]/g, '');
         if (cleanPassword.length !== trimmedPassword.length) {
           console.warn('⚠️ Caractères non-ASCII détectés, nettoyage appliqué');
         }
-        
+
         console.log('🔍 Password final à hasher:', cleanPassword);
         console.log('🔍 Type final:', typeof cleanPassword);
         console.log('🔍 Longueur finale:', cleanPassword.length);
-        
+
         let passwordHash: string;
         try {
           // Utiliser genSalt puis hash pour plus de contrôle
           const salt = await bcrypt.genSalt(10);
           console.log('✅ Salt généré:', typeof salt, salt.length);
-          
+
           passwordHash = await bcrypt.hashSync(cleanPassword, salt);
           console.log('✅ Password hashé avec succès, longueur:', passwordHash.length);
           console.log('✅ Type du hash:', typeof passwordHash);
-          
+
           // Validation du hash
           if (!passwordHash || typeof passwordHash !== 'string' || passwordHash.length < 50) {
             throw new Error('Hash invalide généré');
           }
-          
+
         } catch (bcryptError: any) {
           console.error('❌ Erreur bcrypt.hash:', bcryptError);
           console.error('❌ Détails erreur:', {
@@ -171,7 +172,7 @@ export class ProfileService {
         };
 
         console.log('👤 Création profil utilisateur via agent:', { deviceId, username });
-        
+
         // 3. Insérer le profil utilisateur sous la session agent
         const { data, error } = await supabase
           .from('user_profile_media')
@@ -224,7 +225,7 @@ export class ProfileService {
   async login(credentials: LoginCredentials): Promise<UserProfile> {
     try {
       const deviceId = await getDeviceId();
-      
+
       console.log('🔐 Tentative de connexion:', credentials.email);
 
       // 1. Récupérer le profil depuis Supabase par email
@@ -247,35 +248,35 @@ export class ProfileService {
       console.log('🔍 Type du password dans login:', typeof credentials.password);
       console.log('🔍 Valeur du password dans login:', credentials.password);
       console.log('🔍 Type du password_hash dans DB:', typeof profile.password_hash);
-      
+
       if (!credentials.password || typeof credentials.password !== 'string') {
         throw new Error('Le mot de passe doit être une chaîne de caractères non vide');
       }
-      
+
       const trimmedPassword = String(credentials.password).trim();
       if (trimmedPassword === '') {
         throw new Error('Le mot de passe ne peut pas être vide');
       }
-      
+
       // Validation supplémentaire pour bcrypt
       if (trimmedPassword.length > 72) {
         throw new Error('Le mot de passe est trop long (max 72 caractères)');
       }
-      
+
       // S'assurer que le password est une string pure
       const cleanPassword = trimmedPassword.replace(/[^\x00-\x7F]/g, '');
       if (cleanPassword.length !== trimmedPassword.length) {
         console.warn('⚠️ Caractères non-ASCII détectés, nettoyage appliqué');
       }
-      
+
       console.log('🔍 Password final à comparer:', cleanPassword);
       console.log('🔍 Hash de la DB:', profile.password_hash?.substring(0, 20) + '...');
-      
+
       // Validation du hash dans la DB
       if (!profile.password_hash || typeof profile.password_hash !== 'string' || profile.password_hash.length < 50) {
         throw new Error('Hash de mot de passe invalide dans la base de données');
       }
-      
+
       let passwordMatch: boolean;
       try {
         passwordMatch = bcrypt.compareSync(cleanPassword, profile.password_hash);
@@ -289,7 +290,7 @@ export class ProfileService {
         });
         throw new Error(`Erreur de comparaison: ${bcryptError.message}`);
       }
-      
+
       if (!passwordMatch) {
         throw new Error('Mot de passe incorrect');
       }
@@ -300,17 +301,17 @@ export class ProfileService {
           old: profile.device_id,
           new: deviceId
         });
-        
+
         // Mettre à jour le device_id
         const { error: updateError } = await supabase
           .from('user_profile_media')
-          .update({ 
+          .update({
             device_id: deviceId,
             updated_at: new Date().toISOString(),
             last_seen: new Date().toISOString()
           })
           .eq('id', profile.id);
-          
+
         if (updateError) {
           console.error('❌ Erreur mise à jour device_id:', updateError);
         } else {
@@ -348,19 +349,19 @@ export class ProfileService {
   async createTemporaryProfile(username: string, email: string, password: string): Promise<UserProfile> {
     try {
       console.log('📦 Création profil temporaire local...');
-      
+
       const deviceId = await getDeviceId();
-      
+
       // Hasher le mot de passe
       const trimmedPassword = String(password).trim();
       if (trimmedPassword === '') {
         throw new Error('Le mot de passe ne peut pas être vide');
       }
-      
+
       const cleanPassword = trimmedPassword.replace(/[^\x00-\x7F]/g, '');
       const salt = await bcrypt.genSalt(10);
       const passwordHash = bcrypt.hashSync(cleanPassword, salt);
-      
+
       // Créer un profil local avec ID temporaire
       const tempProfile: UserProfile = {
         id: `temp_${Date.now()}`,
@@ -382,19 +383,19 @@ export class ProfileService {
         last_sync: new Date().toISOString(),
         app_name: 'FAM'
       };
-      
+
       // Sauvegarder localement
       await this.saveProfileLocally(tempProfile);
-      
+
       // Mettre en cache
       this.profileCache = tempProfile;
       this.cacheTimestamp = Date.now();
-      
+
       console.log('✅ Profil temporaire créé localement:', tempProfile.id);
       console.log('ℹ️ Le profil sera synchronisé quand RLS/Agent sera configuré');
-      
+
       return tempProfile;
-      
+
     } catch (error) {
       console.error('❌ Erreur création profil temporaire:', error);
       throw error;
@@ -430,51 +431,51 @@ export class ProfileService {
   async createProfileNormal(username: string, email: string, password: string): Promise<UserProfile> {
     try {
       const deviceId = await getDeviceId();
-      
+
       // Hasher le mot de passe
       console.log('🔍 Type du password:', typeof password);
       console.log('🔍 Valeur du password:', password);
       console.log('🔍 Longueur du password:', password?.length);
-      
+
       if (!password || typeof password !== 'string') {
         throw new Error('Le mot de passe doit être une chaîne de caractères non vide');
       }
-      
+
       const trimmedPassword = String(password).trim();
       if (trimmedPassword === '') {
         throw new Error('Le mot de passe ne peut pas être vide');
       }
-      
+
       // Validation supplémentaire pour bcrypt
       if (trimmedPassword.length > 72) {
         throw new Error('Le mot de passe est trop long (max 72 caractères)');
       }
-      
+
       // S'assurer que le password est une string pure
       const cleanPassword = trimmedPassword.replace(/[^\x00-\x7F]/g, '');
       if (cleanPassword.length !== trimmedPassword.length) {
         console.warn('⚠️ Caractères non-ASCII détectés, nettoyage appliqué');
       }
-      
+
       console.log('🔍 Password final à hasher:', cleanPassword);
       console.log('🔍 Type final:', typeof cleanPassword);
       console.log('🔍 Longueur finale:', cleanPassword.length);
-      
+
       let passwordHash: string;
       try {
         // Utiliser genSalt puis hash pour plus de contrôle
         const salt = await bcrypt.genSalt(10);
         console.log('✅ Salt généré:', typeof salt, salt.length);
-        
+
         passwordHash = bcrypt.hashSync(cleanPassword, salt);
         console.log('✅ Password hashé avec succès, longueur:', passwordHash.length);
         console.log('✅ Type du hash:', typeof passwordHash);
-        
+
         // Validation du hash
         if (!passwordHash || typeof passwordHash !== 'string' || passwordHash.length < 50) {
           throw new Error('Hash invalide généré');
         }
-        
+
       } catch (bcryptError: any) {
         console.error('❌ Erreur bcrypt.hash:', bcryptError);
         console.error('❌ Détails erreur:', {
@@ -555,7 +556,7 @@ export class ProfileService {
       }
 
       const deviceId = await getDeviceId();
-      
+
       // Utiliser maybeSingle() au lieu de single() pour éviter PGRST116
       const { data, error } = await supabase
         .from('user_profile_media')
@@ -717,10 +718,10 @@ export class ProfileService {
   async updatePreferences(preferences: Partial<UserProfile['profile_data']>): Promise<void> {
     try {
       const deviceId = await getDeviceId();
-      
+
       // Récupérer le profil existant
       const existingProfile = await this.getCurrentProfile();
-      
+
       if (!existingProfile) {
         throw new Error('Aucun profil trouvé');
       }

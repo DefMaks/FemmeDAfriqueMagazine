@@ -1,20 +1,21 @@
 import { supabase } from '../lib/supabase';
-import { 
-  initiatePayment, 
-  initiateCardPayment, 
+import {
+  initiatePayment,
+  initiateCardPayment,
   checkPaymentStatus as twigaCheckPaymentStatus,
   generateOrderId,
-  pollPaymentStatus, 
-  pollCardPaymentStatus, 
-  isPaymentSuccessful, 
-  isPaymentFailed, 
-  PaymentStatusResponse, 
-  formatPhoneAndDeduceProvider, 
-  openCardPaymentPageSimple 
+  pollPaymentStatus,
+  pollCardPaymentStatus,
+  isPaymentSuccessful,
+  isPaymentFailed,
+  PaymentStatusResponse,
+  formatPhoneAndDeduceProvider,
+  openCardPaymentPageSimple
 } from './twigaPaie';
 import { getDeviceId } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
+import Constants from 'expo-constants';
 
 // Configuration
 const isTest = true;
@@ -53,12 +54,12 @@ class CentralPaymentService {
   private walletId: string;
 
   constructor() {
-    const envWalletId = process.env.EXPO_PUBLIC_WALLET_ID || '';
+    const envWalletId = Constants.expoConfig?.extra?.EXPO_PUBLIC_WALLET_ID || '';
     console.log('Wallet ID from env:', envWalletId);
-    
+
     // Validation du format UUID
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    
+
     if (envWalletId && uuidRegex.test(envWalletId)) {
       this.walletId = envWalletId;
       console.log('✅ Wallet ID valide:', this.walletId);
@@ -125,14 +126,14 @@ class CentralPaymentService {
       }
 
       console.log('✅ Processus paiement terminé avec succès');
-      
+
       // Afficher une alerte de remerciement
       Alert.alert(
         '✅ Paiement réussi',
         'Merci pour votre paiement, le magazine est en cours de téléchargement',
         [{ text: 'OK' }]
       );
-      
+
       return {
         success: true,
         transactionId: supabaseResult.transactionId,
@@ -248,14 +249,14 @@ class CentralPaymentService {
       // Validation finale du wallet_id
       if (!this.walletId || this.walletId === '00000000-0000-0000-0000-000000000000') {
         console.warn('⚠️ Wallet ID fallback détecté, enregistrement annulé');
-        return { 
-          success: false, 
-          message: 'Configuration du wallet invalide. Veuillez contacter le support.', 
-          error: 'INVALID_WALLET_ID' 
+        return {
+          success: false,
+          message: 'Configuration du wallet invalide. Veuillez contacter le support.',
+          error: 'INVALID_WALLET_ID'
         };
       }
 
-      console.log('transactionData: ',transactionData);
+      console.log('transactionData: ', transactionData);
 
       const { data, error } = await supabase
         .from('transactions')

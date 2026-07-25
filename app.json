@@ -22,7 +22,9 @@
       "bundleIdentifier": "com.defmaks.fda",
       "supportsTablet": true,
       "googleServicesFile": "./GoogleService-Info.plist",
-      "associatedDomains": ["applinks:femmedafrique.net"],
+      "associatedDomains": [
+        "applinks:femmedafrique.net"
+      ],
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Cette application n'utilise pas votre position. Certaines bibliothèques externes peuvent y faire référence, mais aucune donnée de localisation n'est collectée ni utilisée.",
         "ITSAppUsesNonExemptEncryption": false
@@ -46,7 +48,10 @@
               "pathPrefix": "/"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -57,7 +62,25 @@
     "extra": {
       "eas": {
         "projectId": "2226573c-1349-4d26-953b-92f717a4efb5"
-      }
+      },
+      "EXPO_PUBLIC_SUPABASE_URL": "https://hcpogyjdbtcxndzpyjvd.supabase.co",
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjcG9neWpkYnRjeG5kenB5anZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI4ODc2NjIsImV4cCI6MjA2ODQ2MzY2Mn0.Y-V4hPt_c1rl2ffYZ9nG53R4VuhzrmBIseJSlqJvaNo",
+      "EXPO_PUBLIC_TWIGAPAIE_API_URL": "https://api-gateway-production-9ad5.up.railway.app/api",
+      "EXPO_PUBLIC_TWIGAPAIE_API_KEY": "e50a2ac295a93b465266ae176ba462c272a3072eff7cea910219cccf88e716c6",
+      "EXPO_PUBLIC_WORDPRESS_API_URL": "https://femmedafrique.net/wp-json/wp/v2/",
+      "EXPO_PUBLIC_ONESIGNAL_APP_ID": "d8f5f3e0-4b2a-4a0b-9e1d-2c3d4e5f6a7b",
+      "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "mes-app-defmaks",
+      "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "mes-app-defmaks.firebasestorage.app",
+      "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDnqVHVgVXZ0hKwk3uJIwWFtfYggTIaBxc",
+      "EXPO_PUBLIC_FIREBASE_APP_ID": "1:10629175114:android:93371f5d861a3c2479d3b3",
+      "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-Z8MDVWCRMW",
+      "EXPO_PUBLIC_GA4_API_SECRET": "bwIfUw34Tqmjx8me_jExrQ",
+      "EXPO_PUBLIC_MEDIA": "FDA",
+      "EXPO_PUBLIC_AGENT": "agent@defmaks.com",
+      "EXPO_PUBLIC_AGENT_PASS": "DefMaks!",
+      "EXPO_PUBLIC_WALLET_ID": "840e8cd1-d4b2-4bdf-afb7-d5fe5f35bfc9",
+      "EXPO_PUBLIC_UPLOADCARE_API_KEY": "6bc8aff457485b40878e",
+      "EXPO_PUBLIC_IS_PROD": true
     }
   }
 }

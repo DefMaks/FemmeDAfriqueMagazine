@@ -1,8 +1,9 @@
+import Constants from 'expo-constants';
 import { supabase, getDeviceId } from '../lib/supabase';
 
 // Use environment variables for TwigaPaie configuration
-const TWIGAPAIE_API_URL = process.env.EXPO_PUBLIC_TWIGAPAIE_API_URL || '';
-const TWIGAPAIE_API_KEY = process.env.EXPO_PUBLIC_TWIGAPAIE_API_KEY || '';
+const TWIGAPAIE_API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_TWIGAPAIE_API_URL || '';
+const TWIGAPAIE_API_KEY = Constants.expoConfig?.extra?.EXPO_PUBLIC_TWIGAPAIE_API_KEY || '';
 
 // Validation: Ensure API URL and key are configured
 if (!TWIGAPAIE_API_URL) {

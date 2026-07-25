@@ -39,18 +39,25 @@ const defaultContent: TrustContent = {
       description: 'Solution de paiement principale développée par DefMaks'
     },
     {
-      name: 'AvadPay',
+      name: 'AvadaPay',
       type: 'mobile_money',
-      description: 'Traitement des paiements Mobile Money'
+      description: 'Traitement des paiements Mobile Money (E-Money)'
     },
     {
-      name: 'Flexpay',
+      name: 'FlexPaie',
       type: 'ecard',
-      description: 'Traitement des paiements E-Card'
+      description: 'Traitement des paiements Carte Bancaire (E-Card)'
     }
   ],
   ctaText: 'Compris !',
-  cancelText: 'Annuler'
+  cancelText: 'Annuler',
+  id: '',
+  key: '',
+  language: '',
+  appName: '',
+  isActive: false,
+  createdAt: '',
+  updatedAt: ''
 };
 
 const TrustBadge: React.FC<TrustBadgeProps> = ({
@@ -183,7 +190,7 @@ const TrustBadge: React.FC<TrustBadgeProps> = ({
               <View style={styles.warningBox}>
                 <Ionicons name="information-circle" size={20} color={Colors.warning} />
                 <Text style={styles.warningText}>
-                  Ne soyez pas surpris si vous voyez apparaître les noms TwigaPaie, AvadPay ou Flexpay
+                  Ne soyez pas surpris si vous voyez apparaître les noms TwigaPaie, AvadaPay ou FlexPaie
                   dans vos notifications SMS ou relevés bancaires. Cela confirme que votre paiement
                   est bien pris en charge par notre écosystème sécurisé.
                 </Text>

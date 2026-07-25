@@ -1,4 +1,5 @@
 // src/services/twigaPaie.ts
+import Constants from 'expo-constants';
 import { Alert, Platform, Linking } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -62,8 +63,8 @@ export class PaymentError extends Error {
 
 // --- Configuration API ---
 
-const API_URL = process.env.EXPO_PUBLIC_TWIGAPAIE_API_URL || '';
-const API_KEY = process.env.EXPO_PUBLIC_TWIGAPAIE_API_KEY || '';
+const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_TWIGAPAIE_API_URL || '';
+const API_KEY = Constants.expoConfig?.extra?.EXPO_PUBLIC_TWIGAPAIE_API_KEY || '';
 
 const headers = {
   'Authorization': `Bearer ${API_KEY}`,
@@ -71,9 +72,9 @@ const headers = {
   'Accept': 'application/json',
 };
 
-// --- URLs de callback pour FlexPay ---
+// --- URLs de callback pour FlexPaie ---
 const CALLBACK_URLS = {
-  callback_url: 'https://femmedafrique.net/api/webhooks/flexpay/callback',
+  callback_url: 'https://femmedafrique.net/api/webhooks/FlexPaie/callback',
   approve_url: 'https://femmedafrique.net/payment/success',
   cancel_url: 'https://femmedafrique.net/payment/cancel',
   decline_url: 'https://femmedafrique.net/payment/declined',
@@ -90,25 +91,25 @@ export const generateOrderId = (): string => {
  */
 const normalizeStatus = (status: any): PaymentStatus => {
   if (status === undefined || status === null) return 'pending';
-  
+
   const s = String(status).toLowerCase();
-  
+
   // SUCCESS : Codes souvent utilisés par TwigaPaie/Providers pour le succès
   // Statut 2 = paiement confirmé (voir logs avec transaction_id et message "envoye 100.0000 CDF")
   if (['success', 'completed', '0', '2', '3'].includes(s)) {
     return 'success';
   }
-  
+
   // PENDING / PROCESSING : Le code '1' signifie "In Progress" (initié)
   if (['pending', 'initiated', 'processing', '1', 'in progress'].includes(s)) {
     return 'pending';
   }
-  
+
   // FAILED
   if (['failed', 'error', 'rejected'].includes(s)) {
     return 'failed';
   }
-  
+
   return 'pending'; // Par défaut
 };
 
@@ -150,7 +151,7 @@ interface PhoneFormatResult {
 export const formatPhoneAndDeduceProvider = (rawPhone: string): PhoneFormatResult => {
   // Nettoyer le numéro (espaces, tirets, parenthèses)
   const phone = rawPhone.replace(/\s|-|\(|\)/g, '');
-  
+
   // Normaliser le numéro (enlever le préfixe pays)
   let normalizedPhone = phone;
   if (normalizedPhone.startsWith('+243')) {
@@ -158,18 +159,18 @@ export const formatPhoneAndDeduceProvider = (rawPhone: string): PhoneFormatResul
   } else if (normalizedPhone.startsWith('243')) {
     normalizedPhone = normalizedPhone.substring(3);
   }
-  
+
   // Supprimer le zéro initial s'il existe
   if (normalizedPhone.startsWith('0')) {
     normalizedPhone = normalizedPhone.substring(1);
   }
-  
+
   if (normalizedPhone.length < 8) {
     throw new PaymentError('Numéro de téléphone trop court.', 'FORMAT_ERROR', {}, false);
   }
-  
+
   const prefix = normalizedPhone.substring(0, 2);
-  
+
   let formattedPhone: string;
   let providerId: string;
   let providerName: string;
@@ -216,12 +217,12 @@ export const initiatePayment = async (
 ): Promise<PaymentResponse> => {
   try {
     const { formattedPhone, providerId, providerName } = formatPhoneAndDeduceProvider(customer_phone);
-    
+
     console.log(`📱 Initiation paiement ${providerName}`);
     console.log(`   📞 Numéro formaté: ${formattedPhone}`);
     console.log(`   💰 Montant: ${amount} ${currency}`);
     console.log(`   🆔 Order ID: ${client_order_id}`);
-    
+
     const requestBody = {
       customer_phone: formattedPhone,
       amount,
@@ -229,9 +230,9 @@ export const initiatePayment = async (
       client_order_id,
       metadata: { provider_id: providerId },
     };
-    
+
     console.log('📤 Request body:', JSON.stringify(requestBody, null, 2));
-    
+
     const response = await fetch(`${API_URL}/payments/payment-service`, {
       method: 'POST',
       headers,
@@ -240,7 +241,7 @@ export const initiatePayment = async (
 
     const data = await response.json();
     console.log('📥 Response:', JSON.stringify(data, null, 2));
-    
+
     if (!response.ok) {
       throw new PaymentError(
         data?.error?.message || data?.message || 'Erreur lors du paiement',
@@ -275,7 +276,7 @@ export const initiatePayment = async (
 export const checkPaymentStatus = async (order_id: string): Promise<PaymentStatusResponse> => {
   try {
     console.log(`🔍 Vérification statut paiement E-Money: ${order_id}`);
-    
+
     const response = await fetch(`${API_URL}/payments/payment-check`, {
       method: 'POST',
       headers,
@@ -284,7 +285,7 @@ export const checkPaymentStatus = async (order_id: string): Promise<PaymentStatu
 
     const data = await response.json();
     console.log('📥 Statut E-Money Response:', JSON.stringify(data, null, 2));
-    
+
     if (!response.ok) {
       throw new PaymentError(
         data?.error?.message || data?.message || 'Erreur vérification statut',
@@ -293,9 +294,9 @@ export const checkPaymentStatus = async (order_id: string): Promise<PaymentStatu
     }
 
     // On extrait le statut depuis data.data (structure vue dans tes logs)
-    const rawStatusFromApi = data.data?.status; 
+    const rawStatusFromApi = data.data?.status;
     const status = normalizeStatus(rawStatusFromApi);
-    
+
     console.log(`📊 Statut extrait: ${rawStatusFromApi} -> Normalisé: ${status}`);
 
     return {
@@ -326,27 +327,27 @@ export const pollPaymentStatus = async (
   onStatusChange?: (status: PaymentStatusResponse) => void
 ): Promise<PaymentStatusResponse> => {
   console.log(`🔄 Début polling paiement E-Money: ${order_id} (max ${maxAttempts} tentatives)`);
-  
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       console.log(`   Tentative ${attempt}/${maxAttempts}...`);
-      
+
       const statusResponse = await checkPaymentStatus(order_id);
-      
+
       if (onStatusChange) {
         onStatusChange(statusResponse);
       }
-      
+
       if (isPaymentSuccessful(statusResponse.status)) {
         console.log(`✅ Paiement confirmé après ${attempt} tentative(s)`);
         return statusResponse;
       }
-      
+
       if (isPaymentFailed(statusResponse.status)) {
         console.log(`❌ Paiement échoué: ${statusResponse.status}`);
         return statusResponse;
       }
-      
+
       // Attendre avant la prochaine tentative si ce n'est pas la dernière
       if (attempt < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, intervalMs));
@@ -357,7 +358,7 @@ export const pollPaymentStatus = async (
       await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
   }
-  
+
   // Retourner le dernier statut (pending) si toutes les tentatives sont épuisées
   return {
     status: 'pending',
@@ -368,11 +369,11 @@ export const pollPaymentStatus = async (
   };
 };
 
-// --- Services E-Card (FlexPay) ---
+// --- Services E-Card (FlexPaie) ---
 
 /**
- * Initialise un paiement par carte via FlexPay
- * Endpoint: POST /api/flexpay/payment-service
+ * Initialise un paiement par carte via FlexPaie
+ * Endpoint: POST /api/FlexPaie/payment-service
  */
 export const initiateCardPayment = async (
   amount: string,
@@ -381,46 +382,46 @@ export const initiateCardPayment = async (
   client_order_id: string
 ): Promise<CardPaymentResponse> => {
   try {
-    console.log('💳 Initiation paiement par carte FlexPay');
+    console.log('💳 Initiation paiement par carte FlexPaie');
     console.log(`   💰 Montant: ${amount} ${currency}`);
     console.log(`   📝 Description: ${description}`);
     console.log(`   🆔 Order ID: ${client_order_id}`);
-    
+
     const requestBody = {
       amount,
       currency,
       description,
       ...CALLBACK_URLS,
     };
-    
+
     console.log('📤 Request body:', JSON.stringify(requestBody, null, 2));
-    console.log('📤 API URL:', `${API_URL}/flexpay/payment-service`);
-    
-    const response = await fetch(`${API_URL}/flexpay/payment-service`, {
+    console.log('📤 API URL:', `${API_URL}/FlexPaie/payment-service`);
+
+    const response = await fetch(`${API_URL}/FlexPaie/payment-service`, {
       method: 'POST',
       headers,
       body: JSON.stringify(requestBody),
     });
 
     const data = await response.json();
-    console.log('📥 FlexPay Response:', JSON.stringify(data, null, 2));
-    
+    console.log('📥 FlexPaie Response:', JSON.stringify(data, null, 2));
+
     // Extraire l'URL de redirection selon la structure de réponse
     const redirectUrl = data.url || data.redirect_url || data.data?.url;
     const orderNumber = data.orderNumber || data.order_number || data.data?.orderNumber || client_order_id;
-    
+
     if (!response.ok || data.success === false || data.code === '-1') {
-      console.error('❌ FlexPay API Error:', data);
+      console.error('❌ FlexPaie API Error:', data);
       const errorMessage = data?.message || data?.error?.message || 'Erreur initialisation paiement carte';
-      
+
       throw new PaymentError(
         errorMessage,
-        data?.code || data?.error?.code || 'FLEXPAY_ERROR',
+        data?.code || data?.error?.code || 'FlexPaie_ERROR',
         data,
         false
       );
     }
-    
+
     if (!redirectUrl) {
       console.error('❌ No redirect URL in response:', data);
       throw new PaymentError(
@@ -454,21 +455,21 @@ export const initiateCardPayment = async (
 };
 
 /**
- * Vérifie le statut d'un paiement par carte FlexPay
- * Endpoint: GET /api/flexpay/payment-check?order_number=xxx
+ * Vérifie le statut d'un paiement par carte FlexPaie
+ * Endpoint: GET /api/FlexPaie/payment-check?order_number=xxx
  */
 export const checkCardPaymentStatus = async (order_number: string): Promise<PaymentStatusResponse> => {
   try {
-    console.log(`🔍 Vérification statut paiement FlexPay: ${order_number}`);
-    
-    const response = await fetch(`${API_URL}/flexpay/payment-check?order_number=${encodeURIComponent(order_number)}`, {
+    console.log(`🔍 Vérification statut paiement FlexPaie: ${order_number}`);
+
+    const response = await fetch(`${API_URL}/FlexPaie/payment-check?order_number=${encodeURIComponent(order_number)}`, {
       method: 'GET',
       headers,
     });
 
     const data = await response.json();
-    console.log('📥 Statut FlexPay Response:', JSON.stringify(data, null, 2));
-    
+    console.log('📥 Statut FlexPaie Response:', JSON.stringify(data, null, 2));
+
     if (!response.ok) {
       throw new PaymentError(
         data?.error?.message || data?.message || 'Erreur vérification paiement carte',
@@ -480,9 +481,9 @@ export const checkCardPaymentStatus = async (order_number: string): Promise<Paym
     const result = data.data || data;
     const rawStatus = result.status || data.status;
     const status = normalizeStatus(rawStatus);
-    
-    console.log(`📊 Statut FlexPay: ${rawStatus} -> ${status}`);
-    
+
+    console.log(`📊 Statut FlexPaie: ${rawStatus} -> ${status}`);
+
     return {
       status,
       order_id: result.orderNumber || order_number,
@@ -502,7 +503,7 @@ export const checkCardPaymentStatus = async (order_number: string): Promise<Paym
 };
 
 /**
- * Polling pour vérifier le statut d'un paiement FlexPay avec tentatives multiples
+ * Polling pour vérifier le statut d'un paiement FlexPaie avec tentatives multiples
  */
 export const pollCardPaymentStatus = async (
   order_number: string,
@@ -510,28 +511,28 @@ export const pollCardPaymentStatus = async (
   intervalMs: number = 3000,
   onStatusChange?: (status: PaymentStatusResponse) => void
 ): Promise<PaymentStatusResponse> => {
-  console.log(`🔄 Début polling paiement FlexPay: ${order_number} (max ${maxAttempts} tentatives)`);
-  
+  console.log(`🔄 Début polling paiement FlexPaie: ${order_number} (max ${maxAttempts} tentatives)`);
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       console.log(`   Tentative ${attempt}/${maxAttempts}...`);
-      
+
       const statusResponse = await checkCardPaymentStatus(order_number);
-      
+
       if (onStatusChange) {
         onStatusChange(statusResponse);
       }
-      
+
       if (isPaymentSuccessful(statusResponse.status)) {
         console.log(`✅ Paiement carte confirmé après ${attempt} tentative(s)`);
         return statusResponse;
       }
-      
+
       if (isPaymentFailed(statusResponse.status)) {
         console.log(`❌ Paiement carte échoué: ${statusResponse.status}`);
         return statusResponse;
       }
-      
+
       // Attendre avant la prochaine tentative si ce n'est pas la dernière
       if (attempt < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, intervalMs));
@@ -542,7 +543,7 @@ export const pollCardPaymentStatus = async (
       await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
   }
-  
+
   // Retourner le dernier statut (pending) si toutes les tentatives sont épuisées
   return {
     status: 'pending',
@@ -561,7 +562,7 @@ export interface CardPaymentBrowserResult {
 }
 
 /**
- * Ouvre la page de paiement FlexPay dans le navigateur in-app
+ * Ouvre la page de paiement FlexPaie dans le navigateur in-app
  * Le navigateur se fermera automatiquement lors de la redirection vers approve_url, cancel_url ou decline_url
  */
 export const openCardPaymentPage = async (
@@ -570,7 +571,7 @@ export const openCardPaymentPage = async (
 ): Promise<CardPaymentBrowserResult> => {
   try {
     console.log(`🌐 Ouverture page de paiement: ${url}`);
-    
+
     const result = await WebBrowser.openAuthSessionAsync(
       url,
       'femmedafrique://',  // URL scheme pour le retour
@@ -579,13 +580,13 @@ export const openCardPaymentPage = async (
         preferEphemeralSession: false,
       }
     );
-    
+
     console.log('📱 Résultat navigateur:', result);
-    
+
     if (result.type === 'success' && result.url) {
       // Analyser l'URL de retour pour déterminer le statut
       const returnUrl = result.url.toLowerCase();
-      
+
       if (returnUrl.includes('success') || returnUrl.includes('approve')) {
         return { type: 'success', orderNumber };
       } else if (returnUrl.includes('cancel')) {
@@ -594,10 +595,10 @@ export const openCardPaymentPage = async (
         return { type: 'cancel', orderNumber };
       }
     }
-    
+
     // Par défaut, considérer comme dismiss (fermeture manuelle)
     return { type: 'dismiss', orderNumber };
-    
+
   } catch (error) {
     console.error('❌ Erreur ouverture navigateur:', error);
     throw new PaymentError('Impossible d\'ouvrir la page de paiement', 'BROWSER_ERROR');
@@ -610,12 +611,12 @@ export const openCardPaymentPage = async (
 export const openCardPaymentPageSimple = async (url: string): Promise<WebBrowser.WebBrowserResult> => {
   try {
     console.log(`🌐 Ouverture page de paiement (simple): ${url}`);
-    
+
     const result = await WebBrowser.openBrowserAsync(url, {
       showTitle: true,
       enableBarCollapsing: true,
     });
-    
+
     console.log('📱 Résultat navigateur:', result);
     return result;
   } catch (error) {
@@ -634,7 +635,7 @@ export const handlePaymentError = (error: any): string => {
 
   if (error instanceof PaymentError) {
     errorMessage = error.message;
-    
+
     switch (error.code) {
       case 'TIMEOUT_ERROR':
         errorMessage = 'Délai de connexion dépassé. Veuillez réessayer.';
@@ -646,7 +647,7 @@ export const handlePaymentError = (error: any): string => {
       case 'FORMAT_ERROR':
         errorTitle = '⚠️ Erreur de Validation';
         break;
-      case 'FLEXPAY_ERROR':
+      case 'FlexPaie_ERROR':
         errorTitle = '💳 Erreur Paiement Carte';
         errorMessage = 'Le service de paiement par carte est temporairement indisponible. Veuillez utiliser le paiement mobile money ou réessayer plus tard.';
         break;
@@ -660,7 +661,7 @@ export const handlePaymentError = (error: any): string => {
   }
 
   Alert.alert(errorTitle, errorMessage);
-  
+
   return errorMessage;
 };
 

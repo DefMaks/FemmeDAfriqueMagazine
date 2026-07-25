@@ -1,5 +1,6 @@
 // src/services/adsService.ts
 import { supabase, getDeviceId } from '../lib/supabase';
+import Constants from 'expo-constants';
 
 export interface Advertisement {
   id: number;
@@ -15,7 +16,7 @@ export interface Advertisement {
   target: string[] | null;
 }
 
-const SUPABASE_STORAGE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_STORAGE_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL || '';
 
 /**
  * Récupère les publicités ciblées FDA
@@ -49,10 +50,10 @@ export const getFDAAdvertisements = async (): Promise<Advertisement[]> => {
     // Transformer les URLs d'images de manière sécurisée
     return data.map(ad => ({
       ...ad,
-      image_url: ad.image_url 
-        ? (ad.image_url.startsWith('http') 
-            ? ad.image_url 
-            : `${SUPABASE_STORAGE_URL}/storage/v1/object/public/${ad.image_url}`)
+      image_url: ad.image_url
+        ? (ad.image_url.startsWith('http')
+          ? ad.image_url
+          : `${SUPABASE_STORAGE_URL}/storage/v1/object/public/${ad.image_url}`)
         : ''
     })).filter(ad => ad.image_url); // Filtrer les pubs sans image
   } catch (error) {
@@ -68,7 +69,7 @@ export const getFDAAdvertisements = async (): Promise<Advertisement[]> => {
 export const trackAdView = async (adId: number, zone: string = 'home'): Promise<void> => {
   // Tracking suspendu temporairement
   console.log(`👁️ Ad view (tracking suspendu): ${adId}, zone: ${zone}`);
-  
+
   /* INSERTIONS SUSPENDUES
   try {
     await supabase
@@ -93,7 +94,7 @@ export const trackAdView = async (adId: number, zone: string = 'home'): Promise<
 export const trackAdClick = async (adId: number, zone: string = 'home'): Promise<void> => {
   // Tracking suspendu temporairement
   console.log(`👆 Ad click (tracking suspendu): ${adId}, zone: ${zone}`);
-  
+
   /* INSERTIONS SUSPENDUES
   try {
     await supabase

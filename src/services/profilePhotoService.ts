@@ -1,4 +1,5 @@
 // src/services/profilePhotoService.ts
+import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import { profileService } from './profileService';
@@ -28,7 +29,7 @@ export interface UploadResult {
 
 class ProfilePhotoService {
   private readonly UPLOADCARE_URL = 'https://upload.uploadcare.com/base/';
-  private readonly UPLOADCARE_API_KEY = process.env.EXPO_PUBLIC_UPLOADCARE_API_KEY || '';
+  private readonly UPLOADCARE_API_KEY = Constants.expoConfig?.extra?.EXPO_PUBLIC_UPLOADCARE_API_KEY || '';
   private readonly STORAGE_KEY = '@fda_profile_photo';
 
   /**
@@ -42,17 +43,17 @@ class ProfilePhotoService {
       const response = await fetch(imageUri);
       const blob = await response.blob();
       const reader = new FileReader();
-      
+
       return new Promise((resolve) => {
         reader.onloadend = async () => {
           try {
             const base64data = reader.result as string;
-            
+
             // Vérifier que le base64 est valide
             if (!base64data || typeof base64data !== 'string' || !base64data.startsWith('data:')) {
               throw new Error('Base64 invalide ou vide');
             }
-            
+
             // 2. Créer le formulaire pour Uploadcare
             const formData = new FormData();
             formData.append('file', base64data);
@@ -157,7 +158,7 @@ class ProfilePhotoService {
   private async updateProfilePhotoInSupabase(photoData: ProfilePhotoData): Promise<void> {
     try {
       const currentProfile = await profileService.getCurrentProfile();
-      
+
       if (!currentProfile) {
         throw new Error('Aucun profil trouvé');
       }
@@ -204,7 +205,7 @@ class ProfilePhotoService {
       const currentProfile = await profileService.getCurrentProfile();
       if (currentProfile?.profile_data?.profile_photo) {
         const photoData = currentProfile.profile_data.profile_photo as any;
-        
+
         // Créer un objet ProfilePhotoData complet avec les champs manquants
         const completePhotoData: ProfilePhotoData = {
           uuid: photoData.uuid || '',
@@ -215,10 +216,10 @@ class ProfilePhotoService {
           created_at: photoData.created_at || new Date().toISOString(),
           metadata: photoData.metadata || {}
         };
-        
+
         // Sauvegarder localement pour usage futur
         await this.savePhotoLocally(completePhotoData);
-        
+
         return completePhotoData;
       }
 
@@ -236,7 +237,7 @@ class ProfilePhotoService {
   async deleteProfilePhoto(): Promise<boolean> {
     try {
       const currentPhoto = await this.getCurrentProfilePhoto();
-      
+
       if (!currentPhoto) {
         console.warn('⚠️ Aucune photo à supprimer');
         return false;
@@ -289,7 +290,7 @@ class ProfilePhotoService {
   async getStorageInfo(): Promise<{ count: number; totalSize: number }> {
     try {
       const photo = await this.getCurrentProfilePhoto();
-      
+
       if (!photo) {
         return { count: 0, totalSize: 0 };
       }

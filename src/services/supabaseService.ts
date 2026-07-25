@@ -1,3 +1,4 @@
+import Constants from 'expo-constants';
 import { supabase, getDeviceId } from '../lib/supabase';
 import { Post } from '../models/Post';
 
@@ -32,7 +33,7 @@ export const savedArticlesService = {
   async saveArticle(article: Post): Promise<boolean> {
     try {
       const userId = await getDeviceId();
-      const media = process.env.EXPO_PUBLIC_MEDIA || process.env.media || 'FDA'; // Récupérer depuis .env
+      const media = Constants.expoConfig?.extra?.EXPO_PUBLIC_MEDIA || Constants.expoConfig?.extra?.media || 'FDA'; // Récupérer depuis .env
       const { error } = await supabase
         .from('saved_articles')
         .insert({

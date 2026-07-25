@@ -1,7 +1,8 @@
+import Constants from 'expo-constants';
 import { getToken, getAuthHeaders } from './wordpressAuth';
 
 // Nettoyer l'URL (enlever le / final si présent)
-const WP_API_URL = (process.env.EXPO_PUBLIC_WORDPRESS_API_URL || 'https://femmedafrique.net/wp-json/wp/v2').replace(/\/$/, '');
+const WP_API_URL = (Constants.expoConfig?.extra?.EXPO_PUBLIC_WORDPRESS_API_URL || 'https://femmedafrique.net/wp-json/wp/v2').replace(/\/$/, '');
 
 // ============================================
 // 💬 COMMENTAIRES
@@ -38,7 +39,7 @@ export const getComments = async (postId: number, page: number = 1, perPage: num
     const response = await fetch(url);
 
     if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     return await response.json();
@@ -55,7 +56,7 @@ export const postComment = async (comment: NewComment): Promise<Comment | null> 
   try {
     const authHeaders = await getAuthHeaders();
     const token = await getToken();
-    
+
     if (!token) {
       throw new Error('Vous devez être connecté pour commenter');
     }
@@ -74,8 +75,8 @@ export const postComment = async (comment: NewComment): Promise<Comment | null> 
     });
 
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
     }
 
     return await response.json();
@@ -110,7 +111,7 @@ export const postGuestComment = async (
     });
 
     if (response.ok) {
-        return await response.json();
+      return await response.json();
     }
 
     const errorData = await response.json().catch(() => ({}));
@@ -118,18 +119,18 @@ export const postGuestComment = async (
     // Si les commentaires invités ne sont pas autorisés, essayer avec un compte invité par défaut
     if (errorData.code === 'rest_comment_login_required') {
       console.log('Tentative avec compte invité par défaut...');
-      
+
       try {
         // Créer un compte invité par défaut (ou utiliser un existant)
         const guestCredentials = {
           username: 'invitado_app', // Nom d'utilisateur invité par défaut
           password: 'TempGuest2024!', // Mot de passe temporaire
         };
-        
+
         // Tenter de se connecter avec le compte invité
         const { loginWordPress } = await import('./wordpressAuth');
         const authResponse = await loginWordPress(guestCredentials.username, guestCredentials.password);
-        
+
         // Utiliser le token pour poster le commentaire
         const responseAuth = await fetch(`${WP_API_URL}/comments`, {
           method: 'POST',
@@ -146,17 +147,17 @@ export const postGuestComment = async (
         });
 
         if (!responseAuth.ok) {
-            const errorDataAuth = await responseAuth.json().catch(() => ({}));
-            throw new Error(errorDataAuth.message || `HTTP ${responseAuth.status}: ${responseAuth.statusText}`);
+          const errorDataAuth = await responseAuth.json().catch(() => ({}));
+          throw new Error(errorDataAuth.message || `HTTP ${responseAuth.status}: ${responseAuth.statusText}`);
         }
-        
+
         return await responseAuth.json();
       } catch (guestError: any) {
         console.error('Erreur avec compte invité par défaut:', guestError.message);
         throw new Error('Les commentaires invités ne sont pas autorisés sur ce site. Veuillez vous connecter.');
       }
     }
-    
+
     throw new Error(errorData.message || 'Impossible de publier le commentaire');
   } catch (error: any) {
     console.error('Erreur publication commentaire invité:', error.message);
@@ -197,7 +198,7 @@ export interface LikeResponse {
 export const likePost = async (postId: number): Promise<LikeResponse> => {
   try {
     const authHeaders = await getAuthHeaders();
-    
+
     const response = await fetch(`${LIKES_API_URL}/like`, {
       method: 'POST',
       headers: {
@@ -208,7 +209,7 @@ export const likePost = async (postId: number): Promise<LikeResponse> => {
     });
 
     if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     return await response.json();
@@ -224,7 +225,7 @@ export const likePost = async (postId: number): Promise<LikeResponse> => {
 export const unlikePost = async (postId: number): Promise<LikeResponse> => {
   try {
     const authHeaders = await getAuthHeaders();
-    
+
     const response = await fetch(`${LIKES_API_URL}/unlike`, {
       method: 'POST',
       headers: {
@@ -235,7 +236,7 @@ export const unlikePost = async (postId: number): Promise<LikeResponse> => {
     });
 
     if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     return await response.json();
@@ -251,13 +252,13 @@ export const unlikePost = async (postId: number): Promise<LikeResponse> => {
 export const getLikeStatus = async (postId: number): Promise<{ likes: number; liked: boolean }> => {
   try {
     const authHeaders = await getAuthHeaders();
-    
+
     const response = await fetch(`${LIKES_API_URL}/likes/${postId}`, {
       headers: authHeaders as any,
     });
 
     if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     return await response.json();
@@ -286,7 +287,7 @@ export const submitDraftPost = async (post: NewPost): Promise<any> => {
   try {
     const authHeaders = await getAuthHeaders();
     const token = await getToken();
-    
+
     if (!token) {
       throw new Error('Vous devez être connecté pour soumettre un article');
     }
@@ -309,8 +310,8 @@ export const submitDraftPost = async (post: NewPost): Promise<any> => {
     });
 
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
     }
 
     return await response.json();
@@ -331,7 +332,7 @@ export const uploadMedia = async (uri: string, filename: string): Promise<number
   try {
     const authHeaders = await getAuthHeaders();
     const token = await getToken();
-    
+
     if (!token) {
       throw new Error('Vous devez être connecté pour uploader des images');
     }
@@ -353,8 +354,8 @@ export const uploadMedia = async (uri: string, filename: string): Promise<number
     });
 
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
     }
 
     const data = await response.json();

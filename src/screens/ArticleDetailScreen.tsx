@@ -1,41 +1,48 @@
-// src/screens/ArticleDetailScreen
+// src/screens/ArticleDetailScreen.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity, ActivityIndicator, Dimensions, Linking, Share } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  Image,
+  TouchableOpacity,
+  ActivityIndicator,
+  Dimensions,
+  Share,
+  StyleSheet,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
+import RenderHtml from 'react-native-render-html';
+
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { savedArticlesService } from '../services/supabaseService';
-import { decodeHtmlEntities, formatArticleTitle, getShareMessage } from '../utils/textUtils';
-import RenderHtml from 'react-native-render-html';
 import { CommentsSection } from '../components/CommentsSection';
 import { getAds, api } from '../services/api';
 import { analyticsService } from '../services/analytics.simple';
 import { useTaxonomyMapping } from '../hooks/useTaxonomyMapping';
-// import { useRelatedPosts } from '../hooks/useRelatedPosts';
 import { InlineAdBanner } from '../components/InlineAdBanner';
-import { StyleSheet } from 'react-native';
 
 const { width } = Dimensions.get('window');
 const screenWidth = Dimensions.get('window').width;
-const height = Dimensions.get('window').height;
 
-const allowComments = false
+const allowComments = false;
 
 // Zone ID pour les pubs dans l'écran de lecture
 const IN_READ_AD_ZONE_ID = 18751;
 
 type ArticleDetailScreenProps = {
-  route: { params: { article: Post } };
+  route?: { params?: { article?: Post } };
   navigation: any;
 };
 
-
-
 const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) => {
-  const { article } = route.params;
+  // Sécurisation globale contre les params non transmis
+  const article = route?.params?.article;
+
   const [isSaved, setIsSaved] = useState(false);
   const [authorPostCount, setAuthorPostCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -44,72 +51,76 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
   const navigationHook = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   // Hook pour mapper les IDs de catégories et tags vers les noms
-  const { getCategoryName, getTagName, getCategoryDetails, getTagDetails, loading: taxonomyLoading } = useTaxonomyMapping();
-
-  // Hook pour les articles similaires
-  // const { relatedPosts, loading: relatedPostsLoading, error: relatedPostsError } = useRelatedPosts(article);
+  const {
+    getCategoryName,
+    getTagName,
+    getCategoryDetails,
+    getTagDetails,
+    loading: taxonomyLoading,
+  } = useTaxonomyMapping();
 
   // Fonction pour récupérer le nombre d'articles de l'auteur
   const fetchAuthorPostCount = async (authorId: number) => {
+    if (!article) return;
     try {
-      // Optimisation: Utiliser les données déjà disponibles dans _embedded si possible
       if (article._embedded?.author?.[0]?.dmks_post_count) {
         setAuthorPostCount(article._embedded.author[0].dmks_post_count);
         return;
       }
 
-      // Fallback: API call avec retry amélioré
       let retries = 0;
       const maxRetries = 2;
-      const baseDelay = 1000; // 1 seconde
-      const maxDelay = 3000; // 3 secondes maximum
+      const baseDelay = 1000;
+      const maxDelay = 3000;
 
       while (retries < maxRetries) {
         try {
-          // Timeout plus court pour éviter les blocages
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
 
           const response = await api.get(`posts`, {
             params: {
               author: authorId,
               per_page: 1,
-              _fields: 'id'
+              _fields: 'id',
             },
-            timeout: 3000, // Timeout de 3s
-            signal: controller.signal
+            timeout: 3000,
+            signal: controller.signal,
           });
 
           clearTimeout(timeoutId);
 
           const totalPosts = response.headers['x-wp-total'];
           setAuthorPostCount(parseInt(totalPosts) || 0);
-          console.log('✅ Nombre d\'articles auteur récupéré:', totalPosts);
-          return; // Succès, on sort de la boucle
-
+          console.log("✅ Nombre d'articles auteur récupéré:", totalPosts);
+          return;
         } catch (error: any) {
           retries++;
           console.error(`Tentative ${retries} échouée:`, error);
 
-          // Gérer spécifiquement les AbortError
           if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
             console.warn('⏱️ Timeout ou requête abortée, nouvelle tentative...');
           }
 
           if (retries >= maxRetries) {
-            console.error('Erreur récupération nombre d\'articles auteur après', maxRetries, 'tentatives, utilisation du fallback');
-            setAuthorPostCount(null); // null = "Non disponible"
+            console.error(
+              "Erreur récupération nombre d'articles auteur après",
+              maxRetries,
+              'tentatives, utilisation du fallback'
+            );
+            setAuthorPostCount(null);
           } else {
-            // Backoff exponentiel avec jitter pour éviter les thundering herd
-            const delay = Math.min(baseDelay * Math.pow(2, retries - 1) + Math.random() * 500, maxDelay);
-            console.log(`🔄 Attente ${Math.round(delay)}ms avant nouvelle tentative...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
+            const delay = Math.min(
+              baseDelay * Math.pow(2, retries - 1) + Math.random() * 500,
+              maxDelay
+            );
+            await new Promise((resolve) => setTimeout(resolve, delay));
           }
         }
       }
     } catch (error) {
-      console.error('Erreur générale récupération nombre d\'articles auteur:', error);
-      setAuthorPostCount(null); // null = "Non disponible"
+      console.error("Erreur générale récupération nombre d'articles auteur:", error);
+      setAuthorPostCount(null);
     }
   };
 
@@ -117,12 +128,9 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
   const loadAds = async () => {
     try {
       const adsData = await getAds();
-
-      // Filtrer les pubs qui ont la zone 18751 dans leur app_ad_zone
-      const filteredAds = adsData.filter((ad: any) =>
-        ad.app_ad_zone && ad.app_ad_zone.includes(18751)
+      const filteredAds = adsData.filter(
+        (ad: any) => ad.app_ad_zone && ad.app_ad_zone.includes(IN_READ_AD_ZONE_ID)
       );
-
       setInReadAds(filteredAds);
     } catch (error) {
       console.error('Erreur chargement des pubs:', error);
@@ -131,46 +139,15 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
 
   // Fonction pour vérifier si l'article est sauvegardé
   const checkIfArticleIsSaved = async () => {
+    if (!article?.id) return;
     const saved = await savedArticlesService.isArticleSaved(article.id.toString());
     setIsSaved(saved);
   };
 
-  useEffect(() => {
-    // 📊 Track article view
-    analyticsService.trackArticleView(
-      article.id.toString(),
-      article.title.rendered,
-      'article_detail'
-    );
-
-    // Récupérer le nombre d'articles de l'auteur
-    if (article._embedded?.author?.[0]?.id) {
-      fetchAuthorPostCount(article._embedded.author[0].id);
-    }
-
-    // Debug: Afficher les catégories et tags de l'article
-    console.log('Article categories:', article.categories);
-    console.log('Article tags:', article.tags);
-
-    // Charger les pubs
-    loadAds();
-
-    // Vérifier si l'article est sauvegardé
-    checkIfArticleIsSaved();
-
-    // Incrémenter les articles lus
-    incrementArticlesRead();
-
-  }, [article, navigation]);
-
-  // Les commentaires sont maintenant gérés par CommentsSection
-
   // Fonction pour incrémenter les articles lus
   const incrementArticlesRead = async () => {
     try {
-      // Importer profileService dynamiquement pour éviter les imports circulaires
       const { profileService } = await import('../services/profileService');
-
       const currentProfile = await profileService.getCurrentProfile();
       if (currentProfile && currentProfile.profile_data) {
         const profileStats = currentProfile.profile_data.stats || {};
@@ -179,8 +156,8 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
         await profileService.updatePreferences({
           stats: {
             ...profileStats,
-            articles_read: newArticlesRead
-          }
+            articles_read: newArticlesRead,
+          },
         });
 
         console.log(`📈 Articles lus: ${newArticlesRead}`);
@@ -190,12 +167,26 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
     }
   };
 
-  const checkIfSaved = async () => {
-    const saved = await savedArticlesService.isArticleSaved(article.id.toString());
-    setIsSaved(saved);
-  };
+  useEffect(() => {
+    if (!article) return;
+
+    analyticsService.trackArticleView(
+      article.id.toString(),
+      article.title?.rendered || '',
+      // 'article_detail'
+    );
+
+    if (article._embedded?.author?.[0]?.id) {
+      fetchAuthorPostCount(article._embedded.author[0].id);
+    }
+
+    loadAds();
+    checkIfArticleIsSaved();
+    incrementArticlesRead();
+  }, [article, navigation]);
 
   const toggleSave = async () => {
+    if (!article) return;
     setIsLoading(true);
     if (isSaved) {
       await savedArticlesService.unsaveArticle(article.id.toString());
@@ -208,8 +199,9 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
   };
 
   const handleShare = async () => {
+    if (!article) return;
     try {
-      const shareMessage = `${decodeHtmlEntities(article.title.rendered)}
+      const shareMessage = `${decodeHtmlEntities(article.title?.rendered || '')}
 
 Lire sur Femme d'Afrique : ${article.link}
 
@@ -219,14 +211,12 @@ AppStore : Bientôt disponible`;
 
       await Share.share({
         message: shareMessage,
-        // url: article.link,
       });
     } catch (error) {
       console.error('Error sharing:', error);
     }
   };
 
-  // Fonction de décodage des entités HTML
   const decodeHtmlEntities = (text: string): string => {
     if (!text) return '';
     return text
@@ -252,7 +242,8 @@ AppStore : Bientôt disponible`;
       .replace(/&hellip;/g, '…');
   };
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '';
     const date = new Date(dateString);
     return date.toLocaleDateString('fr-FR', {
       year: 'numeric',
@@ -261,45 +252,35 @@ AppStore : Bientôt disponible`;
     });
   };
 
-  const stripHtml = (html: string) => {
-    return html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
-  };
-
-  // Extraire la catégorie de l'article avec navigation
   const handleCategoryPress = (categoryId: number) => {
     const categoryDetails = getCategoryDetails(categoryId);
     if (categoryDetails) {
       navigationHook.navigate('CategoryArticles', {
         categoryId,
-        categoryName: categoryDetails.name
+        categoryName: categoryDetails.name,
       });
     }
   };
 
-  // Extraire les mots-clés de l'article avec navigation
-  const handleTagPress = (tagId: number) => {
-    const tagDetails = getTagDetails(tagId);
-    if (tagDetails) {
-      // Naviguer vers CategoryArticles avec isTag=true ET fromArticle=true
-      // Le back reviendra automatiquement à l'article
-      navigationHook.navigate('CategoryArticles', {
-        categoryId: tagId,
-        categoryName: tagDetails.name,
-        isTag: true,
-        fromArticle: true // Indiquer qu'on vient d'un article
-      });
-    }
-  };
-
-  // Fonction pour revenir à l'article précédent
   const goBack = () => {
     navigation.goBack();
   };
 
-  // Fonction pour scroller jusqu'aux commentaires
   const scrollToComments = () => {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   };
+
+  // Écran de repli si aucun article n'est transmis
+  if (!article) {
+    return (
+      <View style={[styles.container, styles.emptyStateContainer]}>
+        <Text style={styles.emptyText}>Aucun article sélectionné.</Text>
+        <TouchableOpacity style={styles.headerButton} onPress={goBack}>
+          <Ionicons name="arrow-back" size={24} color={Colors.text} />
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -308,14 +289,11 @@ AppStore : Bientôt disponible`;
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
         <View style={styles.headerActions}>
-
-          {
-            allowComments && (
-              <TouchableOpacity style={styles.headerButton} onPress={scrollToComments}>
-                <Ionicons name="chatbubble-outline" size={24} color={Colors.text} />
-              </TouchableOpacity>
-            )
-          }
+          {allowComments && (
+            <TouchableOpacity style={styles.headerButton} onPress={scrollToComments}>
+              <Ionicons name="chatbubble-outline" size={24} color={Colors.text} />
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity style={styles.headerButton} onPress={handleShare}>
             <Ionicons name="share-social-outline" size={24} color={Colors.text} />
@@ -335,24 +313,17 @@ AppStore : Bientôt disponible`;
         </View>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        ref={scrollViewRef}
-      >
-        {/* Featured Image - Utiliser dmks_featured_image en priorité */}
+      <ScrollView showsVerticalScrollIndicator={false} ref={scrollViewRef}>
+        {/* Featured Image */}
         {article.dmks_featured_image?.src ? (
           <Image
-            source={{
-              uri: article.dmks_featured_image.src
-            }}
+            source={{ uri: article.dmks_featured_image.src }}
             style={styles.featuredImage}
             resizeMode="cover"
           />
         ) : article._embedded?.['wp:featuredmedia']?.[0]?.source_url ? (
           <Image
-            source={{
-              uri: article._embedded['wp:featuredmedia'][0].source_url
-            }}
+            source={{ uri: article._embedded['wp:featuredmedia'][0].source_url }}
             style={styles.featuredImage}
             resizeMode="cover"
           />
@@ -367,18 +338,23 @@ AppStore : Bientôt disponible`;
         )}
 
         <View style={styles.content}>
-          {/* Catégorie avant le titre - cliquable */}
+          {/* Catégorie */}
           {article.categories && article.categories.length > 0 && (
             <TouchableOpacity
               onPress={() => handleCategoryPress(article.categories![0])}
               style={styles.categoryContainer}
             >
               <Text style={styles.category}>
-                {taxonomyLoading ? 'Chargement...' : getCategoryName(article.categories[0])}
+                {taxonomyLoading
+                  ? 'Chargement...'
+                  : getCategoryName(article.categories[0])}
               </Text>
             </TouchableOpacity>
           )}
-          <Text style={styles.title} selectable>{decodeHtmlEntities(article.title.rendered)}</Text>
+
+          <Text style={styles.title} selectable>
+            {decodeHtmlEntities(article.title?.rendered || '')}
+          </Text>
 
           <View style={styles.meta}>
             <View style={styles.metaItem}>
@@ -392,19 +368,18 @@ AppStore : Bientôt disponible`;
           {/* Pub avant le contenu */}
           {inReadAds.length > 0 && (
             <View style={styles.inContentAd}>
-              {/* <InlineAdBanner ad={inReadAds[0]} /> */}
-              <InlineAdBanner ad={inReadAds.length > 1 ? inReadAds[1] : inReadAds[0]} />
-
+              <InlineAdBanner
+                ad={inReadAds.length > 1 ? inReadAds[1] : inReadAds[0]}
+              />
             </View>
           )}
 
-          {/* <Text style={styles.body}>{stripHtml(article.content.rendered)}</Text> */}
-          {/* <View style={styles.body}> */}
+          {/* Contenu HTML */}
           <RenderHtml
             contentWidth={screenWidth - 40}
-            source={{ html: article.content.rendered }}
+            source={{ html: article.content?.rendered || '' }}
             defaultTextProps={{
-              selectable: true, // Activer la sélection de texte
+              selectable: true,
             }}
             baseStyle={{
               fontSize: 17,
@@ -412,8 +387,18 @@ AppStore : Bientôt disponible`;
               color: Colors.text,
             }}
             tagsStyles={{
-              img: { maxWidth: screenWidth - 52, borderRadius: 8, marginVertical: 5, overflow: 'hidden' },
-              figure: { marginVertical: 10, marginHorizontal: 5, width: screenWidth - 52, height: 'auto' },
+              img: {
+                maxWidth: screenWidth - 52,
+                borderRadius: 8,
+                marginVertical: 5,
+                overflow: 'hidden',
+              },
+              figure: {
+                marginVertical: 10,
+                marginHorizontal: 5,
+                width: screenWidth - 52,
+                height: 'auto',
+              },
               p: { marginBottom: 15, marginTop: 5, fontSize: 17, lineHeight: 28 },
               strong: { fontWeight: '700' },
               h1: { fontSize: 24, fontWeight: '700', marginBottom: 10, marginTop: 20 },
@@ -440,7 +425,6 @@ AppStore : Bientôt disponible`;
               figcaption: {
                 fontSize: 14,
                 color: Colors.textSecondary,
-                // fontStyle: 'italic',
                 textAlign: 'center',
                 marginTop: 8,
                 marginBottom: 16,
@@ -448,106 +432,95 @@ AppStore : Bientôt disponible`;
             }}
             classesStyles={{
               'wp-block-image': { backgroundColor: '#f5f5f5', borderRadius: 8 },
-              'MsoNormal': { fontSize: 17, color: Colors.text, lineHeight: 28 },
+              MsoNormal: { fontSize: 17, color: Colors.text, lineHeight: 28 },
               'wp-element-caption': {
                 textAlign: 'center',
-                // fontStyle: 'italic',
-                fontSize: 13, // 10% inférieur à 17 (taille de police de lecture)
+                fontSize: 13,
                 color: Colors.textSecondary,
                 marginTop: 8,
                 marginBottom: 16,
               },
             }}
           />
-          {/* <WebView
-            originWhitelist={['*']}
-            style={{ height: height - 30, width: width - 40 }}
-          {/* </View> */}
-          {/* 
-          Bloc Post article
-          */}
-
         </View>
 
+        {/* Bloc Informations Auteur */}
         <View>
-          {/* Bloc Post Article - Informations supplémentaires */}
-          {article._embedded && (
+          {article._embedded?.author?.[0] && (
             <>
               <View style={styles.postArticleInfo}>
                 <View style={styles.authorBox}>
-                  <Image
-                    source={{ uri: article?._embedded['author'][0].mpp_avatar[300] }}
-                    style={styles.authorAvatar}
-                    resizeMode="cover"
-                  />
+                  {article._embedded.author[0].mpp_avatar?.[300] ? (
+                    <Image
+                      source={{ uri: article._embedded.author[0].mpp_avatar[300] }}
+                      style={styles.authorAvatar}
+                      resizeMode="cover"
+                    />
+                  ) : null}
                   <View style={styles.authorInfo}>
                     <Text>Par </Text>
-                    <Text style={styles.authorName}>{article?._embedded['author'][0].name}</Text>
-                    {article?._embedded['author'][0].description && (
-                      <Text style={styles.authorDescription}>{article?._embedded['author'][0].description}</Text>
-                    )}
+                    <Text style={styles.authorName}>
+                      {article._embedded.author[0].name}
+                    </Text>
+                    {article._embedded.author[0].description ? (
+                      <Text style={styles.authorDescription}>
+                        {article._embedded.author[0].description}
+                      </Text>
+                    ) : null}
                     <Text style={styles.milestone}>
-                      {authorPostCount !== null ? `${authorPostCount} article${authorPostCount > 1 ? 's' : ''}` : 'Non disponible'}
+                      {authorPostCount !== null
+                        ? `${authorPostCount} article${authorPostCount > 1 ? 's' : ''}`
+                        : 'Non disponible'}
                     </Text>
                   </View>
                 </View>
               </View>
               <View style={styles.disclaimer}>
-                {/* <Text style={styles.authorName}>{article._embedded['author'][0].name}</Text> */}
-                <Text>Vous avez des reclamations ? Veuillez les signaler ici .
-                </Text>
+                <Text>Vous avez des réclamations ? Veuillez les signaler ici.</Text>
               </View>
             </>
           )}
         </View>
 
-        {/* Pub après le contenu (utilise la 2ème pub si disponible, sinon la 1ère) */}
-        {
-          inReadAds.length > 0 && (
-            <View style={styles.afterContentAd}>
-              <InlineAdBanner ad={inReadAds.length > 1 ? inReadAds[1] : inReadAds[0]} />
-            </View>
-          )
-        }
+        {/* Pub après le contenu */}
+        {inReadAds.length > 0 && (
+          <View style={styles.afterContentAd}>
+            <InlineAdBanner
+              ad={inReadAds.length > 1 ? inReadAds[1] : inReadAds[0]}
+            />
+          </View>
+        )}
 
-        {/* Mots-clés - temporairement non cliquables */}
-        {
-          article.tags && article.tags.length > 0 && (
-            <View style={styles.keywordsSection}>
-              <Text style={styles.keywordsTitle}>Mots-clés</Text>
-              <View style={styles.keywordsContainer}>
-                {article.tags.map((tagId: number, index: number) => (
-                  (tagId != 184 && (
-                    <View
-                      key={index}
-                      style={styles.keywordTag}
-                    >
+        {/* Mots-clés */}
+        {article.tags && article.tags.length > 0 && (
+          <View style={styles.keywordsSection}>
+            <Text style={styles.keywordsTitle}>Mots-clés</Text>
+            <View style={styles.keywordsContainer}>
+              {article.tags.map(
+                (tagId: number, index: number) =>
+                  tagId !== 184 && (
+                    <View key={index} style={styles.keywordTag}>
                       <Text style={styles.keywordText}>
                         {taxonomyLoading ? 'Chargement...' : getTagName(tagId)}
                       </Text>
                     </View>
-                  ))
-                ))}
-              </View>
+                  )
+              )}
             </View>
-          )
-        }
-
+          </View>
+        )}
 
         {/* Section Commentaires */}
-        {
-          allowComments && (
-            <View style={styles.commentsSection}>
-              <Text style={styles.commentsTitle}>Commentaires</Text>
-              <CommentsSection postId={article.id} />
-            </View>
-          )
-        }
-
+        {allowComments && (
+          <View style={styles.commentsSection}>
+            <Text style={styles.commentsTitle}>Commentaires</Text>
+            <CommentsSection postId={article.id} />
+          </View>
+        )}
 
         <View style={{ height: 40 }} />
-      </ScrollView >
-    </View >
+      </ScrollView>
+    </View>
   );
 };
 
@@ -556,6 +529,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  emptyStateContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: Colors.text,
+    marginBottom: 16,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -563,8 +545,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 16,
-    // backgroundColor: Colors.background,
-    backgroundColor: 'transparent'
+    backgroundColor: 'transparent',
   },
   glassmorphismHeader: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
@@ -581,7 +562,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    // backgroundColor: Colors.borderLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -603,28 +583,23 @@ const styles = StyleSheet.create({
   postArticleInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    // marginTop: 20,
     marginHorizontal: 20,
     borderColor: Colors.border,
     borderWidth: 1,
     borderRadius: 20,
-    // padding: 12,
-    // backgroundColor: 'rgba(169, 63, 85, 0.4)',
-
   },
   authorBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     flex: 1,
-    // marginHorizontal: 5,
     borderRadius: 20,
     padding: 12,
   },
   authorAvatar: {
     width: width * 0.23,
     height: width * 0.23,
-    borderRadius: width * 0.23,
+    borderRadius: (width * 0.23) / 2,
     borderColor: Colors.textSecondary,
     borderWidth: 1,
     shadowColor: '#000',
@@ -646,7 +621,6 @@ const styles = StyleSheet.create({
   authorDescription: {
     fontSize: 14,
     color: Colors.textSecondary,
-    // marginTop: 8,
   },
   milestone: {
     fontSize: 14,
@@ -699,13 +673,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border,
     marginBottom: 12,
   },
-  body: {
-    fontSize: 18,
-    color: Colors.text,
-    lineHeight: 28,
-    // paddingHorizontal: 2,
-
-  },
   commentsSection: {
     marginTop: 32,
     marginBottom: 32,
@@ -720,14 +687,8 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginBottom: 16,
   },
-  loadingText: {
-    fontSize: 14,
-    color: Colors.textLight,
-    textAlign: 'center',
-    padding: 20,
-  },
   inContentAd: {
-    marginHorizontal: -20, // Compenser le padding du content pour avoir 100% width
+    marginHorizontal: -20,
     marginBottom: 16,
   },
   afterContentAd: {
@@ -779,4 +740,3 @@ const styles = StyleSheet.create({
 });
 
 export default ArticleDetailScreen;
-

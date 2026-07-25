@@ -48,8 +48,8 @@
 
 **API Tests:**
 - ✅ Mobile Money (E-Money): Working - Payment initiated successfully
-- ❌ Card Payment (FlexPay): External service error - "FLEXPAY_ERROR"
-  - Note: This is a server-side issue with the FlexPay gateway, not our code
+- ❌ Card Payment (FlexPaie): External service error - "FlexPaie_ERROR"
+  - Note: This is a server-side issue with the FlexPaie gateway, not our code
   - Added user-friendly error message to guide users to use mobile money
 
 ---

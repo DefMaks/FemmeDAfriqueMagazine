@@ -1,6 +1,7 @@
+import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const WP_API_URL = (process.env.EXPO_PUBLIC_WORDPRESS_API_URL || 'https://femmedafrique.net/wp-json/wp/v2').replace(/\/$/, '');
+const WP_API_URL = (Constants.expoConfig?.extra?.EXPO_PUBLIC_WORDPRESS_API_URL || 'https://femmedafrique.net/wp-json/wp/v2').replace(/\/$/, '');
 const JWT_AUTH_URL = WP_API_URL.replace('/wp/v2', '/jwt-auth/v1');
 
 const STORAGE_KEYS = {
@@ -45,7 +46,7 @@ export const loginWordPress = async (username: string, password: string): Promis
     }
 
     const data = await response.json();
-    
+
     // Sauvegarder le token
     await AsyncStorage.setItem(STORAGE_KEYS.JWT_TOKEN, data.token);
     await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify({
@@ -53,9 +54,9 @@ export const loginWordPress = async (username: string, password: string): Promis
       user_nicename: data.user_nicename,
       user_display_name: data.user_display_name,
     }));
-    
+
     cachedToken = data.token;
-    
+
     return data;
   } catch (error: any) {
     console.error('Erreur login WordPress:', error.message);
@@ -95,7 +96,7 @@ export const validateToken = async (): Promise<boolean> => {
  */
 export const getToken = async (): Promise<string | null> => {
   if (cachedToken) return cachedToken;
-  
+
   try {
     const token = await AsyncStorage.getItem(STORAGE_KEYS.JWT_TOKEN);
     cachedToken = token;
@@ -110,7 +111,7 @@ export const getToken = async (): Promise<string | null> => {
  */
 export const getUser = async (): Promise<WPUser | null> => {
   if (cachedUser) return cachedUser;
-  
+
   try {
     const userData = await AsyncStorage.getItem(STORAGE_KEYS.USER_DATA);
     if (userData) {

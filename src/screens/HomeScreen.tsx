@@ -29,6 +29,7 @@ import { ErrorMessage } from '../components/ErrorMessage';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { savedArticlesService } from '../services/supabaseService';
 import { analyticsService } from '../services/analytics.simple';
+import { AdBanner } from '../components/AdBanner';
 
 const { width: screenWidth } = Dimensions.get('window');
 const AD_BANNER_HEIGHT = ((screenWidth - 32) * 406) / 1300; // Ratio 1300x406
@@ -342,6 +343,8 @@ const HomeScreen = () => {
                     </ScrollView>
                 </View>
             )}
+
+            <AdBanner provider='supabase' zone="home" />
 
             {/* Gastronomie */}
             {gastronomiePosts.length > 0 && (

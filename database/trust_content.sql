@@ -80,12 +80,12 @@ INSERT INTO trust_content (
             "description": "Solution de paiement principale développée par DefMaks"
         },
         {
-            "name": "AvadPay",
+            "name": "AvadaPay",
             "type": "mobile_money",
             "description": "Traitement des paiements Mobile Money"
         },
         {
-            "name": "Flexpay",
+            "name": "FlexPaie",
             "type": "ecard",
             "description": "Traitement des paiements E-Card"
         }
@@ -128,12 +128,12 @@ INSERT INTO trust_content (
             "description": "Solution de paiement principale développée par DefMaks"
         },
         {
-            "name": "AvadPay",
+            "name": "AvadaPay",
             "type": "mobile_money",
             "description": "Traitement des paiements Mobile Money"
         },
         {
-            "name": "Flexpay",
+            "name": "FlexPaie",
             "type": "ecard",
             "description": "Traitement des paiements E-Card"
         }

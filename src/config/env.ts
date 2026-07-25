@@ -4,34 +4,35 @@
  * Ce fichier centralise toutes les configurations de l'application
  * pour faciliter la gestion et le débogage.
  */
+import Constants from 'expo-constants';
 
 // Supabase Configuration
 export const SUPABASE_CONFIG = {
-  url: process.env.EXPO_PUBLIC_SUPABASE_URL || '',
-  anonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
+  url: Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL || '',
+  anonKey: Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
 };
 
 // WordPress API Configuration
 export const WORDPRESS_CONFIG = {
-  apiUrl: process.env.EXPO_PUBLIC_WORDPRESS_API_URL || 'https://femmedafrique.net/wp-json/wp/v2/',
+  apiUrl: Constants.expoConfig?.extra?.EXPO_PUBLIC_WORDPRESS_API_URL || 'https://femmedafrique.net/wp-json/wp/v2/',
 };
 
 // TwigaPaie Payment Gateway Configuration
 export const TWIGAPAIE_CONFIG = {
-  apiUrl: process.env.EXPO_PUBLIC_TWIGAPAIE_API_URL || '',
-  apiKey: process.env.EXPO_PUBLIC_TWIGAPAIE_API_KEY || '',
+  apiUrl: Constants.expoConfig?.extra?.EXPO_PUBLIC_TWIGAPAIE_API_URL || '',
+  apiKey: Constants.expoConfig?.extra?.EXPO_PUBLIC_TWIGAPAIE_API_KEY || '',
 };
 
 // OneSignal Push Notifications Configuration
 export const ONESIGNAL_CONFIG = {
-  appId: process.env.EXPO_PUBLIC_ONESIGNAL_APP_ID || '',
+  appId: Constants.expoConfig?.extra?.EXPO_PUBLIC_ONESIGNAL_APP_ID || '',
 };
 
 // Firebase Analytics Configuration
 export const FIREBASE_CONFIG = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || '',
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || '',
-  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID || '',
+  apiKey: Constants.expoConfig?.extra?.EXPO_PUBLIC_FIREBASE_API_KEY || '',
+  projectId: Constants.expoConfig?.extra?.EXPO_PUBLIC_FIREBASE_PROJECT_ID || '',
+  measurementId: Constants.expoConfig?.extra?.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID || '',
 };
 
 // Validation function to check if all required configurations are present

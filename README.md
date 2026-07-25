@@ -44,7 +44,7 @@ eas build --platform ios --profile preview
 - **Navigation** : React Navigation v7 (Stack + BottomTabs)
 - **API contenu** : WordPress REST API v2
 - **Base de données** : Supabase (PostgreSQL)
-- **Paiements** : TwigaPaie / FlexPay (Mobile Money, carte)
+- **Paiements** : TwigaPaie / FlexPaie (Mobile Money, carte)
 - **Notifications** : OneSignal (implémentation manuelle, sans plugin)
 - **Analytics** : Firebase GA4
 - **HTTP Client** : `fetch` natif (pas d'axios)
