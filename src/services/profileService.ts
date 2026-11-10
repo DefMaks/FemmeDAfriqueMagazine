@@ -489,6 +489,13 @@ export class ProfileService {
         } catch (e) {
           console.warn('⚠️ Subscriptions deletion notice:', e);
         }
+
+        try {
+          await supabase.from('saved_articles').delete().eq('user_id', current.id);
+          await supabase.from('user_preferences').delete().eq('user_id', current.id);
+        } catch (e) {
+          console.warn('⚠️ User data deletion notice:', e);
+        }
       }
 
       try {
