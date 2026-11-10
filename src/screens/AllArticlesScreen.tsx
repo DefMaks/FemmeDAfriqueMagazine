@@ -168,7 +168,7 @@ const AllArticlesScreen = () => {
                         </View>
                     ) : !hasMore && posts.length > 0 ? (
                         <Text style={styles.endText}>Fin des articles</Text>
-                    ) : null
+                    ) : undefined
                 }
             />
         </View>

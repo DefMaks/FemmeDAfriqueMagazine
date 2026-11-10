@@ -7,6 +7,7 @@ export const Colors = {
   ternary_rgb: "232, 77, 21",
   background: "#F8F9FA",
   backgroundLight: "#FFFFFF",
+  card: "#FFFFFF",
   text: "#1A1A1A",
   textSecondary: "#6B7280",
   textLight: "#9CA3AF",

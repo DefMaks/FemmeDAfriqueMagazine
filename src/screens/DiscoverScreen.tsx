@@ -361,7 +361,7 @@ const DiscoverScreen = () => {
                                 </View>
                             ) : !searchHasMore && searchResults.length > 0 ? (
                                 <Text style={styles.endOfList}>Fin des résultats</Text>
-                            ) : null
+                            ) : undefined
                         }
                         onEndReached={loadMoreSearchResults}
                         onEndReachedThreshold={0.3}
@@ -418,7 +418,7 @@ const DiscoverScreen = () => {
                                 </View>
                             ) : !categoryHasMore && categoryPosts.length > 0 ? (
                                 <Text style={styles.endOfList}>Fin des articles</Text>
-                            ) : null
+                            ) : undefined
                         }
                         onEndReached={loadMoreCategoryPosts}
                         onEndReachedThreshold={0.3}

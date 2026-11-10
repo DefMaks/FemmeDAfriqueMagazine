@@ -160,7 +160,7 @@ export const TagArticlesScreen: React.FC<TagArticlesScreenProps> = ({ route, nav
             <View style={styles.footerLoader}>
               <ActivityIndicator size="small" color={Colors.primary} />
             </View>
-          ) : null
+          ) : undefined
         }
       />
     </View>

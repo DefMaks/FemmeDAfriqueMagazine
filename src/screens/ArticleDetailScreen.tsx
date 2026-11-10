@@ -47,7 +47,7 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
   const [authorPostCount, setAuthorPostCount] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [inReadAds, setInReadAds] = useState<any[]>([]);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<any>(null);
   const navigationHook = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   // Hook pour mapper les IDs de catégories et tags vers les noms

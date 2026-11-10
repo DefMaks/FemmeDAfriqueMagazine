@@ -23,7 +23,7 @@ export const PostSlider: React.FC<PostSliderProps> = ({
   fullWidth = false,
   autoplayInterval = 3000
 }) => {
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<any>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
   const sliderWidth = fullWidth ? width : DEFAULT_SLIDER_WIDTH;
 

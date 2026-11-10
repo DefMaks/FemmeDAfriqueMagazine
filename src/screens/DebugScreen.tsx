@@ -61,7 +61,7 @@ const DebugScreen = () => {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={[styles.title, { marginTop: 16 }]}>Chargement des diagnostics...</Text>
+        <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Chargement des diagnostics...</Text>
       </View>
     );
   }
