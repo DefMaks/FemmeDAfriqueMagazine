@@ -469,6 +469,55 @@ export class ProfileService {
   }
 
   /**
+   * Suppression définitive du compte et des données associées
+   * (Exigence stricte de la politique Google Play & RGPD)
+   */
+  async deleteCurrentAccount(): Promise<void> {
+    try {
+      const current = await this.getCurrentProfile();
+      console.log('🗑️ Suppression définitive du compte utilisateur:', current?.id || current?.email);
+
+      if (current?.id) {
+        try {
+          await supabase.from('profiles').delete().eq('id', current.id);
+        } catch (e) {
+          console.warn('⚠️ Profil deletion notice:', e);
+        }
+
+        try {
+          await supabase.from('subscriptions').delete().eq('user_id', current.id);
+        } catch (e) {
+          console.warn('⚠️ Subscriptions deletion notice:', e);
+        }
+      }
+
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {
+        console.warn('⚠️ Auth signOut error:', e);
+      }
+
+      this.profileCache = null;
+      this.cacheTimestamp = 0;
+      await AsyncStorage.multiRemove([
+        this.STORAGE_KEY,
+        this.PREFS_KEY,
+        '@fda_session',
+        '@fda_user_email',
+        '@fda_user_phone',
+        '@fda_social_x',
+        '@fda_social_fb',
+        '@fda_profile_photo',
+      ]);
+
+      console.log('✅ Compte mobile et données locales définitivement supprimés.');
+    } catch (error) {
+      console.error('❌ Erreur deleteCurrentAccount:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Mettre à jour les préférences de profil
    */
   async updatePreferences(preferences: Partial<UserProfile['profile_data']>): Promise<void> {

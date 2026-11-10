@@ -186,6 +186,37 @@ const ContactScreen = () => {
         </Text>
       </View>
 
+      {/* Section 4 : Protection des Données & Suppression de compte */}
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <Ionicons name="shield-checkmark-outline" size={20} color={Colors.primary} />
+          <Text style={styles.cardTitle}>Protection des Données & RGPD</Text>
+        </View>
+        <Text style={styles.legalText}>
+          Vous disposez d'un droit d'accès, de rectification et d'effacement de l'intégralité de vos données personnelles et de votre compte.
+        </Text>
+        <TouchableOpacity
+          style={[styles.contactItem, { marginTop: 12, borderBottomWidth: 0 }]}
+          onPress={async () => {
+            try {
+              await WebBrowser.openBrowserAsync('https://femmedafrique.net/suppression-compte');
+            } catch (e) {
+              Linking.openURL('https://femmedafrique.net/suppression-compte');
+            }
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={styles.contactIconBg}>
+            <Ionicons name="trash-outline" size={20} color="#DC2626" />
+          </View>
+          <View style={styles.contactTextContainer}>
+            <Text style={styles.contactLabel}>Politique & Demande de suppression</Text>
+            <Text style={[styles.contactValue, { color: '#DC2626' }]}>femmedafrique.net/suppression-compte</Text>
+          </View>
+          <Ionicons name="open-outline" size={18} color={Colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+
       {/* Footer information */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>Femme d'Afrique Magazine • Tous droits réservés</Text>

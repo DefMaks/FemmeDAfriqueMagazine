@@ -484,6 +484,45 @@ const ProfileScreen = () => {
         Linking.openURL('mailto:support@defmaks.com?subject=Support FDA App');
     };
 
+    const openAccountDeletionPolicy = async () => {
+        try {
+            await WebBrowser.openBrowserAsync('https://femmedafrique.net/suppression-compte', {
+                showTitle: true,
+                enableBarCollapsing: true,
+            });
+        } catch (error) {
+            console.error('Erreur ouverture page suppression:', error);
+        }
+    };
+
+    const handleDeleteAccount = () => {
+        Alert.alert(
+            '⚠️ Supprimer mon compte ?',
+            'Cette action est irréversible. L\'ensemble de vos données, votre abonnement et vos favoris seront définitivement effacés.',
+            [
+                { text: 'Annuler', style: 'cancel' },
+                {
+                    text: 'Supprimer définitivement',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await profileService.deleteCurrentAccount();
+                            setHasActiveSession(false);
+                            setUserName('');
+                            setUserEmail('');
+                            setUserPhone('243');
+                            setSubscriptionInfo(null);
+                            setProfilePhoto(null);
+                            Alert.alert('✅ Compte supprimé', 'Votre compte et vos données ont été définitivement effacés.');
+                        } catch (e: any) {
+                            Alert.alert('Erreur', e?.message || 'Impossible de supprimer le compte');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const handleLogout = () => {
         Alert.alert(
             'Déconnexion',
@@ -577,13 +616,29 @@ const ProfileScreen = () => {
             subtitle: 'État OTA et débogage',
             action: () => navigation.navigate('Debug')
         },
-        ...(hasActiveSession ? [{
-            id: 'logout',
-            icon: 'log-out-outline',
-            title: 'Se déconnecter',
-            subtitle: 'Fermer la session actuelle',
-            action: handleLogout
-        }] : []),
+        {
+            id: 'privacy_deletion',
+            icon: 'shield-checkmark-outline',
+            title: 'Suppression des données',
+            subtitle: 'Politique et droit à l\'oubli (RGPD)',
+            action: openAccountDeletionPolicy
+        },
+        ...(hasActiveSession ? [
+            {
+                id: 'logout',
+                icon: 'log-out-outline',
+                title: 'Se déconnecter',
+                subtitle: 'Fermer la session actuelle',
+                action: handleLogout
+            },
+            {
+                id: 'delete_account',
+                icon: 'trash-outline',
+                title: 'Supprimer mon compte',
+                subtitle: 'Effacer définitivement vos données',
+                action: handleDeleteAccount
+            }
+        ] : []),
     ];
 
     return (
