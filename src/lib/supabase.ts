@@ -3,9 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
-// Load directly from environment variables
-const SUPABASE_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+import { SUPABASE_CONFIG } from '../config/env';
+
+// Load directly from environment variables (compatible OTA & EAS)
+const SUPABASE_URL = SUPABASE_CONFIG.url || Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = SUPABASE_CONFIG.anonKey || Constants.expoConfig?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 // Validation: Ensure environment variables are set
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {

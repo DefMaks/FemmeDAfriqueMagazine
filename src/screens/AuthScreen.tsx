@@ -84,8 +84,11 @@ const AuthScreen = ({ navigation }: any) => {
             // Analytics tracking
             await analyticsService.trackAuth('signup', username);
 
-            Alert.alert('✅ Compte créé', 'Votre compte a été créé avec succès !');
-            navigation.goBack();
+            Alert.alert(
+                '✅ Compte créé',
+                'Votre compte Femme d\'Afrique a été créé avec succès ! Si un e-mail de confirmation vous a été envoyé, pensez à valider votre boîte de réception.',
+                [{ text: 'Continuer', onPress: () => navigation.goBack() }]
+            );
 
         } catch (error: any) {
             await analyticsService.trackAuth('login_failed', username);

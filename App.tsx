@@ -10,6 +10,7 @@ import RootNavigator from './src/navigation/RootNavigator';
 // Import des services
 import { oneSignalService } from './src/services/oneSignal.simple';
 import { analyticsService } from './src/services/analytics.simple';
+import { updateService } from './src/services/updateService';
 import ErrorBoundary from './src/components/ErrorBoundary';
 import { logger } from './src/utils/logger';
 
@@ -39,6 +40,9 @@ export default function App() {
         timestamp: new Date().toISOString(),
         device_id: deviceInfo.userId,
       });
+
+      // Vérifier les mises à jour OTA
+      await updateService.checkOnAppLaunch();
 
       await logger.info('✅ Services initialisés avec succès');
 

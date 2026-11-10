@@ -163,26 +163,12 @@ class ProfilePhotoService {
         throw new Error('Aucun profil trouvé');
       }
 
-      // Ajouter la photo au profile_data
-      const updatedProfileData = {
-        ...currentProfile.profile_data,
+      // Mettre à jour les préférences de profil (local + Supabase)
+      await profileService.updatePreferences({
         profile_photo: photoData,
-      };
+      });
 
-      // Mettre à jour le profil
-      const { error } = await supabase
-        .from('user_profile_media')
-        .update({
-          profile_data: updatedProfileData,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', currentProfile.id);
-
-      if (error) {
-        throw new Error(`Erreur mise à jour profil: ${error.message}`);
-      }
-
-      console.log('✅ Photo mise à jour dans Supabase');
+      console.log('✅ Photo mise à jour dans le profil');
 
     } catch (error) {
       console.error('❌ Erreur mise à jour Supabase:', error);
@@ -247,22 +233,10 @@ class ProfilePhotoService {
       // On pourrait utiliser l'API REST pour supprimer si nécessaire
       console.log('🗑️ Photo marquée pour suppression:', currentPhoto.uuid);
 
-      // 2. Mettre à jour dans Supabase
-      const currentProfile = await profileService.getCurrentProfile();
-      if (currentProfile) {
-        const updatedProfileData = {
-          ...currentProfile.profile_data,
-          profile_photo: null,
-        };
-
-        await supabase
-          .from('user_profile_media')
-          .update({
-            profile_data: updatedProfileData,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', currentProfile.id);
-      }
+      // 2. Mettre à jour le profil (retirer la photo)
+      await profileService.updatePreferences({
+        profile_photo: undefined,
+      });
 
       // 3. Supprimer localement
       await AsyncStorage.removeItem(this.STORAGE_KEY);

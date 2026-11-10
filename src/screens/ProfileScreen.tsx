@@ -40,11 +40,13 @@ const ProfileScreen = () => {
     const [showEditModal, setShowEditModal] = useState(false);
     const [hasActiveSession, setHasActiveSession] = useState(false);
 
-    // États du formulaire
+    // États du profil et du compte
+    const [userName, setUserName] = useState('');
     const [userEmail, setUserEmail] = useState('');
     const [userPhone, setUserPhone] = useState('243');
     const [socialX, setSocialX] = useState('');
     const [socialFB, setSocialFB] = useState('');
+    const [subscriptionInfo, setSubscriptionInfo] = useState<string | null>(null);
 
     // États pour la photo de profil
     const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
@@ -57,12 +59,20 @@ const ProfileScreen = () => {
         activeDays: 0
     });
 
-    // Charger les préférences au démarrage
+    const refreshAll = async () => {
+        await loadUserPreferences();
+        await checkActiveSession();
+        await loadStats();
+    };
+
+    // Recharger lors de l'accès à l'écran
     useEffect(() => {
-        loadUserPreferences();
-        checkActiveSession();
-        loadStats();
-    }, []);
+        refreshAll();
+        const unsubscribe = navigation.addListener('focus', () => {
+            refreshAll();
+        });
+        return unsubscribe;
+    }, [navigation]);
 
     const loadStats = async () => {
         try {
@@ -207,33 +217,33 @@ const ProfileScreen = () => {
 
     const loadUserPreferences = async () => {
         try {
-            // Charger depuis le profil Supabase si session active
             const currentProfile = await profileService.getCurrentProfile();
 
-            if (currentProfile && currentProfile.profile_data) {
-                console.log('📂 Chargement préférences depuis Supabase:', currentProfile.profile_data);
+            if (currentProfile) {
+                console.log('📂 Chargement données utilisateur:', currentProfile.username);
+                if (currentProfile.username) setUserName(currentProfile.username);
+                if (currentProfile.email) setUserEmail(currentProfile.email);
+                if (currentProfile.profile_data?.phone) setUserPhone(currentProfile.profile_data.phone);
+                if (currentProfile.profile_data?.social_x) setSocialX(currentProfile.profile_data.social_x);
+                if (currentProfile.profile_data?.social_fb) setSocialFB(currentProfile.profile_data.social_fb);
 
-                // Appliquer les préférences du profil
-                if (currentProfile.profile_data.email) setUserEmail(currentProfile.profile_data.email);
-                if (currentProfile.profile_data.phone) setUserPhone(currentProfile.profile_data.phone);
-                if (currentProfile.profile_data.social_x) setSocialX(currentProfile.profile_data.social_x);
-                if (currentProfile.profile_data.social_fb) setSocialFB(currentProfile.profile_data.social_fb);
+                if (currentProfile.subscription?.status === 'active') {
+                    const planLabel = currentProfile.subscription.plan === 'yearly' ? 'Annuel' : 'Mensuel';
+                    setSubscriptionInfo(`Abonné FDA (${planLabel})`);
+                } else {
+                    setSubscriptionInfo(null);
+                }
 
-                // Charger l'état des notifications
-                if (currentProfile.profile_data.notifications !== undefined) {
+                if (currentProfile.profile_data?.notifications !== undefined) {
                     setNotificationsEnabled(currentProfile.profile_data.notifications);
                     await notificationService.saveNotificationState(currentProfile.profile_data.notifications);
                 }
 
-                // Charger la photo de profil
-                if (currentProfile.profile_data.profile_photo) {
-                    console.log('📸 Photo de profil chargée:', currentProfile.profile_data.profile_photo.url);
+                if (currentProfile.profile_data?.profile_photo?.url) {
                     setProfilePhoto(currentProfile.profile_data.profile_photo.url);
                 }
             } else {
-                console.log('ℹ️ Aucun profil Supabase trouvé, utilisation du fallback local');
-
-                // Fallback sur AsyncStorage si pas de profil Supabase
+                console.log('ℹ️ Aucun compte connecté, utilisation du fallback local');
                 const [notifications, email, phone, x, fb] = await Promise.all([
                     AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS),
                     AsyncStorage.getItem(STORAGE_KEYS.USER_EMAIL),
@@ -242,7 +252,6 @@ const ProfileScreen = () => {
                     AsyncStorage.getItem(STORAGE_KEYS.SOCIAL_FB),
                 ]);
 
-                // Utiliser le service OneSignal pour charger l'état
                 const notificationState = await notificationService.getNotificationState();
                 setNotificationsEnabled(notificationState);
 
@@ -250,6 +259,7 @@ const ProfileScreen = () => {
                 if (phone) setUserPhone(phone);
                 if (x) setSocialX(x);
                 if (fb) setSocialFB(fb);
+                setSubscriptionInfo(null);
             }
         } catch (error) {
             console.error('❌ Erreur chargement préférences:', error);
@@ -258,18 +268,25 @@ const ProfileScreen = () => {
 
     const checkActiveSession = async () => {
         try {
-            // Vérifier si un profil existe dans Supabase
             const currentProfile = await profileService.getCurrentProfile();
-            const hasProfile = currentProfile !== null;
+            const hasProfile = currentProfile !== null && !!(currentProfile.id || currentProfile.email);
             setHasActiveSession(hasProfile);
-            console.log('🔍 Session active:', hasProfile);
 
-            if (hasProfile) {
-                console.log('✅ Profil trouvé:', currentProfile.username);
+            if (hasProfile && currentProfile) {
+                setUserName(currentProfile.username || currentProfile.email?.split('@')[0] || '');
+                if (currentProfile.subscription?.status === 'active') {
+                    const planLabel = currentProfile.subscription.plan === 'yearly' ? 'Annuel' : 'Mensuel';
+                    setSubscriptionInfo(`Abonné FDA (${planLabel})`);
+                } else {
+                    setSubscriptionInfo(null);
+                }
+            } else {
+                setSubscriptionInfo(null);
             }
         } catch (error) {
             console.error('❌ Erreur vérification session:', error);
             setHasActiveSession(false);
+            setSubscriptionInfo(null);
         }
     };
 
@@ -467,6 +484,34 @@ const ProfileScreen = () => {
         Linking.openURL('mailto:support@defmaks.com?subject=Support FDA App');
     };
 
+    const handleLogout = () => {
+        Alert.alert(
+            'Déconnexion',
+            'Voulez-vous vous déconnecter de votre compte Femme d\'Afrique ?',
+            [
+                { text: 'Annuler', style: 'cancel' },
+                {
+                    text: 'Se déconnecter',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await profileService.logout();
+                            setHasActiveSession(false);
+                            setUserName('');
+                            setUserEmail('');
+                            setUserPhone('243');
+                            setSubscriptionInfo(null);
+                            setProfilePhoto(null);
+                            Alert.alert('✅ Déconnexion', 'Vous avez été déconnecté avec succès.');
+                        } catch (e: any) {
+                            Alert.alert('Erreur', e?.message || 'Erreur lors de la déconnexion');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     const menuItems = [
         {
             id: '1',
@@ -494,8 +539,15 @@ const ProfileScreen = () => {
                 analyticsService.trackEvent('screen_viewed', 'navigation', 'Favoris', 1);
 
                 // Naviguer vers l'écran des favoris
-                navigation.navigate('Favorites');
+                navigation.navigate('Favoris');
             }
+        },
+        {
+            id: 'contact_news',
+            icon: 'call-outline',
+            title: 'Coordonnées & Rédaction',
+            subtitle: 'Téléphone, courriel et adresse de l\'éditeur',
+            action: () => navigation.navigate('Contact')
         },
         {
             id: '4',
@@ -518,6 +570,20 @@ const ProfileScreen = () => {
             subtitle: 'Contactez-nous par email',
             action: openSupportEmail
         },
+        {
+            id: '7',
+            icon: 'construct-outline',
+            title: 'Diagnostic & Logs',
+            subtitle: 'État OTA et débogage',
+            action: () => navigation.navigate('Debug')
+        },
+        ...(hasActiveSession ? [{
+            id: 'logout',
+            icon: 'log-out-outline',
+            title: 'Se déconnecter',
+            subtitle: 'Fermer la session actuelle',
+            action: handleLogout
+        }] : []),
     ];
 
     return (
@@ -551,10 +617,16 @@ const ProfileScreen = () => {
                         )}
                     </View>
                     <Text style={styles.userName}>
-                        {userEmail || 'Utilisateur'}
+                        {userName || userEmail || 'Lecteur FDA'}
                     </Text>
+                    {subscriptionInfo && (
+                        <View style={styles.subscriptionPill}>
+                            <Ionicons name="star" size={12} color="#D97706" style={{ marginRight: 4 }} />
+                            <Text style={styles.subscriptionPillText}>{subscriptionInfo}</Text>
+                        </View>
+                    )}
                     <Text style={styles.userEmail}>
-                        {userPhone !== '243' ? userPhone : 'Configurer votre profil'}
+                        {userEmail ? userEmail : 'Compte non connecté (mode invité)'}
                     </Text>
                 </View>
 
@@ -573,7 +645,7 @@ const ProfileScreen = () => {
                     <View id='statCards' style={styles.statsCard}>
                         <TouchableOpacity
                             style={styles.statItem}
-                            onPress={() => navigation.navigate('Favorites')}
+                            onPress={() => navigation.navigate('Favoris')}
                             activeOpacity={0.8}
                         >
                             <Text style={styles.statValue}>{stats.articlesRead}</Text>
@@ -583,7 +655,7 @@ const ProfileScreen = () => {
                         <View style={styles.statDivider} />
                         <TouchableOpacity
                             style={styles.statItem}
-                            onPress={() => navigation.navigate('Shop')}
+                            onPress={() => navigation.navigate('Boutique')}
                             activeOpacity={0.8}
                         >
                             <Text style={styles.statValue}>{stats.purchases}</Text>
@@ -779,6 +851,20 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: Colors.text,
         marginBottom: 4,
+    },
+    subscriptionPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FEF3C7',
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        borderRadius: 12,
+        marginBottom: 6,
+    },
+    subscriptionPillText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#92400E',
     },
     userEmail: {
         fontSize: 14,

@@ -2,6 +2,7 @@
 import Constants from 'expo-constants';
 import { Alert, Platform, Linking } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import { TWIGAPAIE_CONFIG } from '../config/env';
 
 // --- Types et Interfaces ---
 
@@ -63,8 +64,8 @@ export class PaymentError extends Error {
 
 // --- Configuration API ---
 
-const API_URL = Constants.expoConfig?.extra?.EXPO_PUBLIC_TWIGAPAIE_API_URL || '';
-const API_KEY = Constants.expoConfig?.extra?.EXPO_PUBLIC_TWIGAPAIE_API_KEY || '';
+const API_URL = TWIGAPAIE_CONFIG.apiUrl || Constants.expoConfig?.extra?.EXPO_PUBLIC_TWIGAPAIE_API_URL || '';
+const API_KEY = TWIGAPAIE_CONFIG.apiKey || Constants.expoConfig?.extra?.EXPO_PUBLIC_TWIGAPAIE_API_KEY || '';
 
 const headers = {
   'Authorization': `Bearer ${API_KEY}`,

@@ -16,15 +16,15 @@ import { getDeviceId } from '../lib/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 import Constants from 'expo-constants';
+import { APP_CONFIG, TWIGAPAIE_CONFIG } from '../config/env';
 
 // Configuration
-const isTest = true;
+const isTest = !APP_CONFIG.isProd;
 const TEST_PRICE_CDF = 100;
 const STORAGE_KEY_PHONE = '@fda_user_phone';
 
-
-const agent_email = Constants?.expoConfig?.extra?.EXPO_PUBLIC_AGENT;
-const agent_password = Constants?.expoConfig?.extra?.EXPO_PUBLIC_AGENT_PASS;
+const agent_email = APP_CONFIG.agent;
+const agent_password = APP_CONFIG.agentPass;
 
 export interface PaymentRequest {
   magazineId: string;
@@ -58,7 +58,7 @@ class CentralPaymentService {
   private walletId: string;
 
   constructor() {
-    const envWalletId = Constants.expoConfig?.extra?.EXPO_PUBLIC_WALLET_ID || '';
+    const envWalletId = TWIGAPAIE_CONFIG.walletId || Constants.expoConfig?.extra?.EXPO_PUBLIC_WALLET_ID || '';
     console.log('Wallet ID from env:', envWalletId);
 
     // Validation du format UUID

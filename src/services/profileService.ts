@@ -1,32 +1,22 @@
 // src/services/profileService.ts
-import Constants from 'expo-constants';
-import { supabase } from '../lib/supabase';
+// Service d'authentification et de gestion de profil unifié (Femme d'Afrique Mobile & Web)
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import bcrypt from 'react-native-bcrypt';
-import { getDeviceId } from '../lib/supabase';
+import { supabase, getDeviceId } from '../lib/supabase';
 
-// Configurer le fallback crypto pour React Native
-if (bcrypt && typeof bcrypt.setRandomFallback === 'function') {
-  bcrypt.setRandomFallback((len: number): number[] => {
-    const randomBytes = new Array(len);
-    for (let i = 0; i < len; i++) {
-      randomBytes[i] = Math.floor(Math.random() * 256);
-    }
-    return randomBytes;
-  });
+export interface UserSubscription {
+  id?: string;
+  plan: 'monthly' | 'yearly' | string;
+  status: 'active' | 'pending' | 'expired' | 'cancelled' | string;
+  ends_at: string | null;
+  started_at?: string | null;
+  auto_renew?: boolean;
 }
 
-// Identifiants de l'agent pour contourner RLS
-const AGENT_EMAIL = Constants.expoConfig?.extra?.EXPO_PUBLIC_AGENT || 'agent@defmaks.com';
-const AGENT_PASSWORD = Constants.expoConfig?.extra?.EXPO_PUBLIC_AGENT_PASS || 'DefMaks!';
-
-// Interfaces
 export interface UserProfile {
-  id?: string;
+  id?: string; // Supabase auth.users UUID
   device_id: string;
   username: string;
   email?: string;
-  password_hash?: string;
   profile_data: {
     theme?: 'light' | 'dark';
     language?: 'fr' | 'en';
@@ -37,19 +27,21 @@ export interface UserProfile {
     social_fb?: string;
     profile_photo?: {
       url: string;
-      uuid: string;
-      filename: string;
+      uuid?: string;
+      filename?: string;
     };
     stats?: {
       articles_read?: number;
       articles_saved?: number;
       active_days?: number;
+      purchases?: number;
     };
     reading_preferences?: {
       font_size?: 'small' | 'medium' | 'large';
       auto_download?: boolean;
     };
   };
+  subscription?: UserSubscription | null;
   created_at?: string;
   updated_at?: string;
   last_sync?: string;
@@ -63,530 +55,375 @@ export interface LoginCredentials {
 
 export class ProfileService {
   private readonly STORAGE_KEY = '@fda_user_profile';
-  private readonly SYNC_INTERVAL = 30 * 60 * 1000; // 30 minutes
-  private syncTimer: NodeJS.Timeout | null = null;
+  private readonly PREFS_KEY = '@fda_user_preferences';
+  private readonly CACHE_TTL = 2 * 60 * 1000; // 2 minutes
   private profileCache: UserProfile | null = null;
   private cacheTimestamp: number = 0;
-  private readonly CACHE_TTL = 2 * 60 * 1000; // 2 minutes de cache
+  private syncTimer: NodeJS.Timeout | null = null;
 
   constructor() {
     this.startAutoSync();
   }
 
   /**
-   * Créer un profil utilisateur via la session agent (contourne RLS)
+   * Traduire et normaliser les erreurs Supabase Auth
    */
-  async createProfileViaAgent(username: string, email: string, password: string): Promise<UserProfile> {
+  private formatAuthError(error: any): string {
+    const msg = error?.message || '';
+    if (msg.includes('Invalid login credentials')) {
+      return 'Adresse e-mail ou mot de passe incorrect.';
+    }
+    if (msg.includes('Email not confirmed')) {
+      return 'Veuillez confirmer votre adresse e-mail via le lien reçu avant de vous connecter.';
+    }
+    if (msg.includes('User already registered')) {
+      return 'Un compte existe déjà avec cette adresse e-mail. Veuillez vous connecter.';
+    }
+    if (msg.includes('Password should be at least')) {
+      return 'Le mot de passe doit comporter au moins 6 caractères.';
+    }
+    if (msg.includes('rate limit')) {
+      return 'Trop de tentatives consécutives. Veuillez patienter un instant.';
+    }
+    return msg || 'Une erreur est survenue lors de l\'authentification.';
+  }
+
+  /**
+   * Récupérer les préférences locales
+   */
+  private async getLocalPreferences(): Promise<UserProfile['profile_data']> {
     try {
-      console.log('🔐 Connexion en tant qu\'agent pour contourner RLS...');
+      const stored = await AsyncStorage.getItem(this.PREFS_KEY);
+      if (stored) return JSON.parse(stored);
+    } catch (e) {
+      console.warn('⚠️ Erreur lecture préférences locales:', e);
+    }
+    return {
+      theme: 'light',
+      language: 'fr',
+      notifications: true,
+      reading_preferences: {
+        font_size: 'medium',
+        auto_download: false,
+      },
+      stats: {
+        articles_read: 0,
+        articles_saved: 0,
+        active_days: 1,
+        purchases: 0,
+      },
+    };
+  }
 
-      // 1. Se connecter en tant qu'agent
-      const { data: agentData, error: agentError } = await supabase.auth.signInWithPassword({
-        email: AGENT_EMAIL,
-        password: AGENT_PASSWORD,
-      });
-
-      if (agentError) {
-        console.error('❌ Erreur connexion agent:', agentError);
-        console.warn('⚠️ Agent non disponible, création profil temporaire local...');
-
-        // Fallback: créer un profil temporaire local
-        return await this.createTemporaryProfile(username, email, password);
-      }
-
-      console.log('✅ Agent connecté avec succès');
-
-      try {
-        // 2. Créer le profil utilisateur sous la session agent
-        const deviceId = await getDeviceId();
-
-        // Hasher le mot de passe
-        console.log('🔍 Type du password:', typeof password);
-        console.log('🔍 Valeur du password:', password);
-        console.log('🔍 Longueur du password:', password?.length);
-
-        if (!password || typeof password !== 'string') {
-          throw new Error('Le mot de passe doit être une chaîne de caractères non vide');
-        }
-
-        const trimmedPassword = String(password).trim();
-        if (trimmedPassword === '') {
-          throw new Error('Le mot de passe ne peut pas être vide');
-        }
-
-        // Validation supplémentaire pour bcrypt
-        if (trimmedPassword.length > 72) {
-          throw new Error('Le mot de passe est trop long (max 72 caractères)');
-        }
-
-        // S'assurer que le password est une string pure
-        const cleanPassword = trimmedPassword.replace(/[^\x00-\x7F]/g, '');
-        if (cleanPassword.length !== trimmedPassword.length) {
-          console.warn('⚠️ Caractères non-ASCII détectés, nettoyage appliqué');
-        }
-
-        console.log('🔍 Password final à hasher:', cleanPassword);
-        console.log('🔍 Type final:', typeof cleanPassword);
-        console.log('🔍 Longueur finale:', cleanPassword.length);
-
-        let passwordHash: string;
-        try {
-          // Utiliser genSalt puis hash pour plus de contrôle
-          const salt = await bcrypt.genSalt(10);
-          console.log('✅ Salt généré:', typeof salt, salt.length);
-
-          passwordHash = await bcrypt.hashSync(cleanPassword, salt);
-          console.log('✅ Password hashé avec succès, longueur:', passwordHash.length);
-          console.log('✅ Type du hash:', typeof passwordHash);
-
-          // Validation du hash
-          if (!passwordHash || typeof passwordHash !== 'string' || passwordHash.length < 50) {
-            throw new Error('Hash invalide généré');
-          }
-
-        } catch (bcryptError: any) {
-          console.error('❌ Erreur bcrypt.hash:', bcryptError);
-          console.error('❌ Détails erreur:', {
-            name: bcryptError.name,
-            message: bcryptError.message,
-            stack: bcryptError.stack
-          });
-          throw new Error(`Erreur de hashage: ${bcryptError.message}`);
-        }
-
-        const profileData = {
-          device_id: deviceId,
-          username,
-          email,
-          password_hash: passwordHash,
-          profile_data: {
-            theme: 'light',
-            language: 'fr',
-            notifications: true,
-            reading_preferences: {
-              font_size: 'medium',
-              auto_download: false
-            }
-          },
-          app_name: 'FAM'
-        };
-
-        console.log('👤 Création profil utilisateur via agent:', { deviceId, username });
-
-        // 3. Insérer le profil utilisateur sous la session agent
-        const { data, error } = await supabase
-          .from('user_profile_media')
-          .insert(profileData)
-          .select()
-          .single();
-
-        if (error) {
-          console.error('❌ Erreur création profil via agent:', error);
-          throw new Error(`Erreur création profil: ${error.message}`);
-        }
-
-        console.log('✅ Profil utilisateur créé avec succès via agent');
-
-        // 4. Se déconnecter de l'agent
-        await supabase.auth.signOut();
-        console.log('🔐 Déconnexion de l\'agent');
-
-        // 5. Sauvegarder localement
-        const localProfile = { ...data, password_hash: passwordHash };
-        await this.saveProfileLocally(localProfile);
-
-        // 6. Invalider le cache
-        this.profileCache = data;
-        this.cacheTimestamp = Date.now();
-
-        console.log('✅ Profil créé avec succès:', data.id);
-        return data;
-
-      } catch (profileError) {
-        // S'assurer de se déconnecter de l'agent même en cas d'erreur
-        try {
-          await supabase.auth.signOut();
-          console.log('🔐 Déconnexion de l\'agent (erreur)');
-        } catch (logoutError) {
-          console.error('❌ Erreur déconnexion agent:', logoutError);
-        }
-        throw profileError;
-      }
-
-    } catch (error) {
-      console.error('❌ Erreur création profil via agent:', error);
-      throw error;
+  /**
+   * Sauvegarder les préférences locales
+   */
+  private async saveLocalPreferences(prefs: UserProfile['profile_data']): Promise<void> {
+    try {
+      await AsyncStorage.setItem(this.PREFS_KEY, JSON.stringify(prefs));
+    } catch (e) {
+      console.warn('⚠️ Erreur sauvegarde préférences locales:', e);
     }
   }
 
   /**
-   * Authentifier un utilisateur
+   * Vérifier et récupérer l'abonnement actif d'un utilisateur
+   */
+  private async fetchActiveSubscription(userId: string): Promise<UserSubscription | null> {
+    try {
+      const { data: subs, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (error || !subs || subs.length === 0) return null;
+
+      const now = Date.now();
+      const active = subs.find(
+        (s: any) => s.status === 'active' && s.ends_at && new Date(s.ends_at).getTime() > now
+      );
+
+      if (active) {
+        return {
+          id: active.id,
+          plan: active.plan,
+          status: active.status,
+          ends_at: active.ends_at,
+          started_at: active.started_at,
+          auto_renew: active.auto_renew,
+        };
+      }
+      return null;
+    } catch (e) {
+      console.warn('⚠️ Erreur récupération abonnement:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Récupérer ou initialiser la ligne profil dans public.profiles
+   */
+  private async ensureDbProfile(userId: string, email: string, fullName?: string): Promise<any> {
+    try {
+      const { data: existing } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (existing) {
+        // Mettre à jour full_name si fourni et absent
+        if (fullName && !existing.full_name) {
+          await supabase.from('profiles').update({ full_name: fullName }).eq('id', userId);
+          existing.full_name = fullName;
+        }
+        return existing;
+      }
+
+      const newRow = {
+        id: userId,
+        email,
+        full_name: fullName || email.split('@')[0],
+      };
+      const { data: created } = await supabase
+        .from('profiles')
+        .insert(newRow)
+        .select('*')
+        .maybeSingle();
+
+      return created || newRow;
+    } catch (e) {
+      console.warn('⚠️ Erreur synchronisation public.profiles:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Authentifier un utilisateur (Unifié avec femmedafrique-revive Web)
    */
   async login(credentials: LoginCredentials): Promise<UserProfile> {
     try {
-      const deviceId = await getDeviceId();
+      const cleanEmail = credentials.email.trim().toLowerCase();
+      const cleanPassword = credentials.password;
 
-      console.log('🔐 Tentative de connexion:', credentials.email);
+      if (!cleanEmail || !cleanPassword) {
+        throw new Error('Veuillez renseigner un email et un mot de passe.');
+      }
 
-      // 1. Récupérer le profil depuis Supabase par email
-      const { data: profile, error } = await supabase
-        .from('user_profile_media')
-        .select('*')
-        .eq('email', credentials.email)
-        .maybeSingle();
+      console.log('🔐 Connexion utilisateur Supabase Auth:', cleanEmail);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: cleanPassword,
+      });
 
       if (error) {
-        console.error('❌ Erreur recherche profil:', error);
-        throw new Error('Erreur lors de la recherche du profil');
+        console.error('❌ Erreur Supabase auth.signInWithPassword:', error.message);
+        throw new Error(this.formatAuthError(error));
       }
 
-      if (!profile) {
-        throw new Error('Aucun compte trouvé avec cet email');
+      const user = data.user;
+      if (!user) {
+        throw new Error('Session invalide reçue de Supabase.');
       }
-
-      // 2. Vérifier le mot de passe
-      console.log('🔍 Type du password dans login:', typeof credentials.password);
-      console.log('🔍 Valeur du password dans login:', credentials.password);
-      console.log('🔍 Type du password_hash dans DB:', typeof profile.password_hash);
-
-      if (!credentials.password || typeof credentials.password !== 'string') {
-        throw new Error('Le mot de passe doit être une chaîne de caractères non vide');
-      }
-
-      const trimmedPassword = String(credentials.password).trim();
-      if (trimmedPassword === '') {
-        throw new Error('Le mot de passe ne peut pas être vide');
-      }
-
-      // Validation supplémentaire pour bcrypt
-      if (trimmedPassword.length > 72) {
-        throw new Error('Le mot de passe est trop long (max 72 caractères)');
-      }
-
-      // S'assurer que le password est une string pure
-      const cleanPassword = trimmedPassword.replace(/[^\x00-\x7F]/g, '');
-      if (cleanPassword.length !== trimmedPassword.length) {
-        console.warn('⚠️ Caractères non-ASCII détectés, nettoyage appliqué');
-      }
-
-      console.log('🔍 Password final à comparer:', cleanPassword);
-      console.log('🔍 Hash de la DB:', profile.password_hash?.substring(0, 20) + '...');
-
-      // Validation du hash dans la DB
-      if (!profile.password_hash || typeof profile.password_hash !== 'string' || profile.password_hash.length < 50) {
-        throw new Error('Hash de mot de passe invalide dans la base de données');
-      }
-
-      let passwordMatch: boolean;
-      try {
-        passwordMatch = bcrypt.compareSync(cleanPassword, profile.password_hash);
-        console.log('🔍 Résultat comparaison passwords:', passwordMatch);
-      } catch (bcryptError: any) {
-        console.error('❌ Erreur bcrypt.compare:', bcryptError);
-        console.error('❌ Détails erreur:', {
-          name: bcryptError.name,
-          message: bcryptError.message,
-          stack: bcryptError.stack
-        });
-        throw new Error(`Erreur de comparaison: ${bcryptError.message}`);
-      }
-
-      if (!passwordMatch) {
-        throw new Error('Mot de passe incorrect');
-      }
-
-      // 3. Vérifier et gérer le changement de device_id
-      if (profile.device_id !== deviceId) {
-        console.warn('🔄 Changement de device_id détecté:', {
-          old: profile.device_id,
-          new: deviceId
-        });
-
-        // Mettre à jour le device_id
-        const { error: updateError } = await supabase
-          .from('user_profile_media')
-          .update({
-            device_id: deviceId,
-            updated_at: new Date().toISOString(),
-            last_seen: new Date().toISOString()
-          })
-          .eq('id', profile.id);
-
-        if (updateError) {
-          console.error('❌ Erreur mise à jour device_id:', updateError);
-        } else {
-          console.log('✅ Device_id mis à jour');
-          profile.device_id = deviceId;
-        }
-      }
-
-      // 4. Mettre à jour last_seen
-      await supabase
-        .from('user_profile_media')
-        .update({ last_seen: new Date().toISOString() })
-        .eq('id', profile.id);
-
-      // 5. Sauvegarder localement
-      const localProfile = { ...profile, last_seen: new Date().toISOString() };
-      await this.saveProfileLocally(localProfile);
-
-      // 6. Invalider le cache
-      this.profileCache = localProfile;
-      this.cacheTimestamp = Date.now();
-
-      console.log('✅ Connexion réussie pour:', profile.email);
-      return localProfile;
-
-    } catch (error) {
-      console.error('❌ Erreur connexion:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Créer un profil temporaire local (quand RLS et agent échouent)
-   */
-  async createTemporaryProfile(username: string, email: string, password: string): Promise<UserProfile> {
-    try {
-      console.log('📦 Création profil temporaire local...');
 
       const deviceId = await getDeviceId();
+      const localPrefs = await this.getLocalPreferences();
 
-      // Hasher le mot de passe
-      const trimmedPassword = String(password).trim();
-      if (trimmedPassword === '') {
-        throw new Error('Le mot de passe ne peut pas être vide');
-      }
+      // Synchroniser avec public.profiles
+      const fullName = (user.user_metadata as any)?.full_name || cleanEmail.split('@')[0];
+      const dbProfile = await this.ensureDbProfile(user.id, cleanEmail, fullName);
 
-      const cleanPassword = trimmedPassword.replace(/[^\x00-\x7F]/g, '');
-      const salt = await bcrypt.genSalt(10);
-      const passwordHash = bcrypt.hashSync(cleanPassword, salt);
+      // Récupérer l'abonnement actif (harmonisé Web)
+      const subscription = await this.fetchActiveSubscription(user.id);
 
-      // Créer un profil local avec ID temporaire
-      const tempProfile: UserProfile = {
-        id: `temp_${Date.now()}`,
+      const username = dbProfile?.full_name || fullName;
+      const phone = dbProfile?.phone || localPrefs.phone || '';
+
+      const userProfile: UserProfile = {
+        id: user.id,
         device_id: deviceId,
         username,
-        email,
-        password_hash: passwordHash,
+        email: user.email || cleanEmail,
         profile_data: {
-          theme: 'light',
-          language: 'fr',
-          notifications: true,
-          reading_preferences: {
-            font_size: 'medium',
-            auto_download: false
-          }
+          ...localPrefs,
+          email: user.email || cleanEmail,
+          phone,
         },
-        created_at: new Date().toISOString(),
+        subscription,
+        created_at: user.created_at,
         updated_at: new Date().toISOString(),
         last_sync: new Date().toISOString(),
-        app_name: 'FAM'
+        app_name: 'FAM',
       };
 
-      // Sauvegarder localement
-      await this.saveProfileLocally(tempProfile);
-
-      // Mettre en cache
-      this.profileCache = tempProfile;
+      await this.saveProfileLocally(userProfile);
+      this.profileCache = userProfile;
       this.cacheTimestamp = Date.now();
 
-      console.log('✅ Profil temporaire créé localement:', tempProfile.id);
-      console.log('ℹ️ Le profil sera synchronisé quand RLS/Agent sera configuré');
+      console.log('✅ Utilisateur connecté avec succès:', user.id, 'Abonnement:', subscription?.status || 'aucun');
+      return userProfile;
 
-      return tempProfile;
-
-    } catch (error) {
-      console.error('❌ Erreur création profil temporaire:', error);
+    } catch (error: any) {
+      console.error('❌ Erreur login:', error);
       throw error;
     }
   }
 
   /**
-   * Créer un nouveau profil utilisateur
+   * Créer un profil utilisateur (Unifié avec femmedafrique-revive Web)
    */
   async createProfile(username: string, email: string, password: string): Promise<UserProfile> {
     try {
-      // Essai normal d'abord
-      try {
-        return await this.createProfileNormal(username, email, password);
-      } catch (error: any) {
-        // Si erreur RLS, utiliser la méthode via agent
-        if (error.message?.includes('row-level security policy') || error.code === '42501') {
-          console.warn('⚠️ RLS bloquant, utilisation de la session agent...');
-          return await this.createProfileViaAgent(username, email, password);
-        } else {
-          throw error;
-        }
-      }
-    } catch (error) {
-      console.error('❌ Erreur création profil:', error);
-      throw error;
-    }
-  }
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanUsername = username.trim();
 
-  /**
-   * Créer un profil utilisateur (méthode normale)
-   */
-  async createProfileNormal(username: string, email: string, password: string): Promise<UserProfile> {
-    try {
-      const deviceId = await getDeviceId();
-
-      // Hasher le mot de passe
-      console.log('🔍 Type du password:', typeof password);
-      console.log('🔍 Valeur du password:', password);
-      console.log('🔍 Longueur du password:', password?.length);
-
-      if (!password || typeof password !== 'string') {
-        throw new Error('Le mot de passe doit être une chaîne de caractères non vide');
+      if (!cleanEmail || !cleanUsername || !password) {
+        throw new Error('Veuillez remplir tous les champs.');
       }
 
-      const trimmedPassword = String(password).trim();
-      if (trimmedPassword === '') {
-        throw new Error('Le mot de passe ne peut pas être vide');
-      }
-
-      // Validation supplémentaire pour bcrypt
-      if (trimmedPassword.length > 72) {
-        throw new Error('Le mot de passe est trop long (max 72 caractères)');
-      }
-
-      // S'assurer que le password est une string pure
-      const cleanPassword = trimmedPassword.replace(/[^\x00-\x7F]/g, '');
-      if (cleanPassword.length !== trimmedPassword.length) {
-        console.warn('⚠️ Caractères non-ASCII détectés, nettoyage appliqué');
-      }
-
-      console.log('🔍 Password final à hasher:', cleanPassword);
-      console.log('🔍 Type final:', typeof cleanPassword);
-      console.log('🔍 Longueur finale:', cleanPassword.length);
-
-      let passwordHash: string;
-      try {
-        // Utiliser genSalt puis hash pour plus de contrôle
-        const salt = await bcrypt.genSalt(10);
-        console.log('✅ Salt généré:', typeof salt, salt.length);
-
-        passwordHash = bcrypt.hashSync(cleanPassword, salt);
-        console.log('✅ Password hashé avec succès, longueur:', passwordHash.length);
-        console.log('✅ Type du hash:', typeof passwordHash);
-
-        // Validation du hash
-        if (!passwordHash || typeof passwordHash !== 'string' || passwordHash.length < 50) {
-          throw new Error('Hash invalide généré');
-        }
-
-      } catch (bcryptError: any) {
-        console.error('❌ Erreur bcrypt.hash:', bcryptError);
-        console.error('❌ Détails erreur:', {
-          name: bcryptError.name,
-          message: bcryptError.message,
-          stack: bcryptError.stack
-        });
-        throw new Error(`Erreur de hashage: ${bcryptError.message}`);
-      }
-
-      const profileData = {
-        device_id: deviceId,
-        username,
-        email,
-        password_hash: passwordHash,
-        profile_data: {
-          theme: 'light',
-          language: 'fr',
-          notifications: true,
-          reading_preferences: {
-            font_size: 'medium',
-            auto_download: false
-          }
+      console.log('👤 Inscription utilisateur Supabase Auth:', cleanEmail);
+      const { data, error } = await supabase.auth.signUp({
+        email: cleanEmail,
+        password,
+        options: {
+          data: {
+            full_name: cleanUsername,
+          },
         },
-        app_name: 'FAM'
+      });
+
+      if (error) {
+        console.error('❌ Erreur Supabase auth.signUp:', error.message);
+        throw new Error(this.formatAuthError(error));
+      }
+
+      const user = data.user;
+      if (!user) {
+        throw new Error('Inscription réussie mais aucun compte renvoyé.');
+      }
+
+      const deviceId = await getDeviceId();
+      const localPrefs = await this.getLocalPreferences();
+
+      // Si la session est ouverte immédiatement, créer la ligne profiles
+      if (data.session) {
+        await this.ensureDbProfile(user.id, cleanEmail, cleanUsername);
+      }
+
+      const userProfile: UserProfile = {
+        id: user.id,
+        device_id: deviceId,
+        username: cleanUsername,
+        email: cleanEmail,
+        profile_data: {
+          ...localPrefs,
+          email: cleanEmail,
+        },
+        subscription: null,
+        created_at: user.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        last_sync: new Date().toISOString(),
+        app_name: 'FAM',
       };
 
-      console.log('👤 Création profil utilisateur:', { deviceId, username });
-
-      let data;
-      try {
-        // Essai normal d'abord
-        const { data: result, error } = await supabase
-          .from('user_profile_media')
-          .insert(profileData)
-          .select()
-          .single();
-
-        if (error) {
-          console.error('❌ Erreur insertion normale:', error);
-          throw error;
-        } else {
-          data = result;
-          console.log('✅ Profil créé normalement dans Supabase');
-        }
-      } catch (insertError: any) {
-        console.error('❌ Erreur création profil Supabase:', insertError);
-        throw insertError;
-      }
-
-      // 2. Sauvegarder localement
-      const localProfile = { ...data, password_hash: passwordHash };
-      await this.saveProfileLocally(localProfile);
-
-      // 3. Invalider le cache
-      this.profileCache = data;
+      await this.saveProfileLocally(userProfile);
+      this.profileCache = userProfile;
       this.cacheTimestamp = Date.now();
 
-      console.log('✅ Profil créé avec succès:', data.id);
-      return data;
+      console.log('✅ Compte utilisateur créé avec succès:', user.id);
+      return userProfile;
 
-    } catch (error) {
-      console.error('❌ Erreur création profil:', error);
+    } catch (error: any) {
+      console.error('❌ Erreur createProfile:', error);
       throw error;
     }
   }
 
   /**
-   * Récupérer le profil actuel
+   * Alias de rétrocompatibilité pour createProfile
+   */
+  async createProfileNormal(username: string, email: string, password: string): Promise<UserProfile> {
+    return this.createProfile(username, email, password);
+  }
+
+  /**
+   * Alias de rétrocompatibilité pour createProfileViaAgent
+   */
+  async createProfileViaAgent(username: string, email: string, password: string): Promise<UserProfile> {
+    return this.createProfile(username, email, password);
+  }
+
+  /**
+   * Récupérer le profil courant (Session Supabase + cache local)
    */
   async getCurrentProfile(): Promise<UserProfile | null> {
     try {
-      // Vérifier le cache d'abord
       const now = Date.now();
       if (this.profileCache && (now - this.cacheTimestamp) < this.CACHE_TTL) {
-        console.log('📦 Utilisation du cache profil');
         return this.profileCache;
       }
 
-      const deviceId = await getDeviceId();
+      // Vérifier le profil sauvegardé localement d'abord (pour un rendu instantané)
+      const local = await this.getProfileLocally();
 
-      // Utiliser maybeSingle() au lieu de single() pour éviter PGRST116
-      const { data, error } = await supabase
-        .from('user_profile_media')
-        .select('*')
-        .eq('device_id', deviceId)
-        .maybeSingle();
+      // Vérifier la session Supabase
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData?.session?.user;
 
-      if (error) {
-        console.error('❌ Erreur récupération profil:', error);
-        return null;
-      }
-
-      if (!data) {
-        console.log('ℹ️ Aucun profil trouvé pour ce device_id:', deviceId);
-        // Mettre en cache le résultat null pour éviter les appels répétifs
+      if (!user) {
+        // Aucune session Supabase active
+        if (local && local.email) {
+          // L'utilisateur s'était connecté auparavant mais la session a expiré
+          this.profileCache = local;
+          this.cacheTimestamp = now;
+          return local;
+        }
         this.profileCache = null;
-        this.cacheTimestamp = now;
         return null;
       }
 
-      // Mettre en cache le profil
-      this.profileCache = data;
-      this.cacheTimestamp = now;
-      console.log('✅ Profil récupéré et mis en cache');
+      // Session active trouvée : rafraîchir les données
+      const deviceId = await getDeviceId();
+      const localPrefs = await this.getLocalPreferences();
+      const dbProfile = await this.ensureDbProfile(
+        user.id,
+        user.email || '',
+        (user.user_metadata as any)?.full_name || local?.username
+      );
+      const subscription = await this.fetchActiveSubscription(user.id);
 
-      return data;
+      const username = dbProfile?.full_name || (user.user_metadata as any)?.full_name || user.email?.split('@')[0] || 'Lecteur FDA';
+      const phone = dbProfile?.phone || local?.profile_data?.phone || localPrefs.phone || '';
+
+      const updatedProfile: UserProfile = {
+        id: user.id,
+        device_id: deviceId,
+        username,
+        email: user.email,
+        profile_data: {
+          ...localPrefs,
+          ...(local?.profile_data || {}),
+          email: user.email,
+          phone,
+        },
+        subscription: subscription || local?.subscription || null,
+        created_at: user.created_at,
+        updated_at: new Date().toISOString(),
+        last_sync: new Date().toISOString(),
+        app_name: 'FAM',
+      };
+
+      await this.saveProfileLocally(updatedProfile);
+      this.profileCache = updatedProfile;
+      this.cacheTimestamp = now;
+
+      return updatedProfile;
 
     } catch (error) {
-      console.error('❌ Erreur getCurrentProfile:', error);
-      return null;
+      console.warn('⚠️ Erreur getCurrentProfile (fallback local utilisé):', error);
+      return await this.getProfileLocally();
     }
   }
 
@@ -615,134 +452,55 @@ export class ProfileService {
   }
 
   /**
-   * Démarrer la synchronisation automatique
+   * Déconnexion complète (Supabase + Local)
    */
-  private startAutoSync(): void {
-    if (this.syncTimer) {
-      clearInterval(this.syncTimer);
-    }
-
-    this.syncTimer = setInterval(async () => {
-      try {
-        await this.syncProfile();
-      } catch (error) {
-        console.error('❌ Erreur synchronisation automatique:', error);
-      }
-    }, this.SYNC_INTERVAL);
-
-    console.log('⏰ Synchronisation automatique démarrée (30 minutes)');
-  }
-
-  /**
-   * Arrêter la synchronisation automatique
-   */
-  stopAutoSync(): void {
-    if (this.syncTimer) {
-      clearInterval(this.syncTimer);
-      this.syncTimer = null;
-      console.log('⏹ Synchronisation automatique arrêtée');
-    }
-  }
-
-  /**
-   * Synchroniser le profil
-   */
-  async syncProfile(): Promise<{ success: boolean; message: string }> {
+  async logout(): Promise<void> {
     try {
-      const localProfile = await this.getProfileLocally();
-      if (!localProfile) {
-        return { success: false, message: 'Aucun profil local à synchroniser' };
-      }
-
-      const deviceId = await getDeviceId();
-      const { data: remoteProfile, error } = await supabase
-        .from('user_profile_media')
-        .select('*')
-        .eq('device_id', deviceId)
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      if (!remoteProfile) {
-        // Pas de profil distant, créer le profil distant
-        const { data: createdProfile, error: createError } = await supabase
-          .from('user_profile_media')
-          .insert(localProfile)
-          .select()
-          .single();
-
-        if (createError) {
-          throw createError;
-        }
-
-        await this.saveProfileLocally(createdProfile);
-        return {
-          success: true,
-          message: 'Profil synchronisé (créé sur Supabase)'
-        };
-      }
-
-      // Comparer les dates pour déterminer quel profil est plus récent
-      const localTime = new Date(localProfile.last_sync || localProfile.created_at || '');
-      const remoteTime = new Date(remoteProfile.last_sync || remoteProfile.created_at || '');
-
-      if (remoteTime > localTime) {
-        // Le distant est plus récent
-        await this.saveProfileLocally(remoteProfile);
-        return {
-          success: true,
-          message: 'Profil synchronisé (distant plus récent)'
-        };
-      } else if (localTime.getTime() > remoteTime.getTime() + 300000) { // 5 minutes de tolérance
-        // Le local est plus récent (avec tolérance)
-        await this.updateRemoteProfile(localProfile);
-        return {
-          success: true,
-          message: 'Profil synchronisé (local plus récent)'
-        };
-      }
-
-      return { success: true, message: 'Profil déjà synchronisé' };
-
-    } catch (error) {
-      console.error('❌ Erreur synchronisation profil:', error);
-      return { success: false, message: 'Erreur de synchronisation' };
+      console.log('🚪 Déconnexion utilisateur...');
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('⚠️ Erreur supabase.auth.signOut:', e);
+    } finally {
+      this.profileCache = null;
+      this.cacheTimestamp = 0;
+      await AsyncStorage.removeItem(this.STORAGE_KEY);
+      console.log('✅ Déconnexion terminée');
     }
   }
 
   /**
-   * Mettre à jour les préférences du profil
+   * Mettre à jour les préférences de profil
    */
   async updatePreferences(preferences: Partial<UserProfile['profile_data']>): Promise<void> {
     try {
-      const deviceId = await getDeviceId();
+      const current = await this.getCurrentProfile();
+      const localPrefs = await this.getLocalPreferences();
 
-      // Récupérer le profil existant
-      const existingProfile = await this.getCurrentProfile();
-
-      if (!existingProfile) {
-        throw new Error('Aucun profil trouvé');
-      }
-
-      // Fusionner les préférences
-      const updatedProfileData = {
-        ...existingProfile.profile_data,
-        ...preferences
+      const updatedPrefs: UserProfile['profile_data'] = {
+        ...localPrefs,
+        ...(current?.profile_data || {}),
+        ...preferences,
       };
 
-      // Mettre à jour le profil
-      const { error } = await supabase
-        .from('user_profile_media')
-        .update({
-          profile_data: updatedProfileData,
-          updated_at: new Date().toISOString()
-        })
-        .eq('device_id', deviceId);
+      await this.saveLocalPreferences(updatedPrefs);
 
-      if (error) {
-        throw error;
+      if (current) {
+        current.profile_data = updatedPrefs;
+        current.updated_at = new Date().toISOString();
+        await this.saveProfileLocally(current);
+        this.profileCache = current;
+
+        // Si l'utilisateur est authentifié et que le téléphone ou nom change, synchroniser avec DB
+        if (current.id) {
+          const updates: Record<string, any> = { updated_at: new Date().toISOString() };
+          if (preferences.phone !== undefined) updates.phone = preferences.phone;
+          if (current.username) updates.full_name = current.username;
+
+          await supabase
+            .from('profiles')
+            .update(updates)
+            .eq('id', current.id);
+        }
       }
 
       console.log('✅ Préférences mises à jour avec succès');
@@ -753,25 +511,51 @@ export class ProfileService {
   }
 
   /**
-   * Mettre à jour le profil distant
+   * Synchroniser le profil
    */
-  private async updateRemoteProfile(profile: UserProfile): Promise<void> {
+  async syncProfile(): Promise<{ success: boolean; message: string }> {
     try {
-      const { error } = await supabase
-        .from('user_profile_media')
-        .update({
-          profile_data: profile.profile_data,
-          updated_at: new Date().toISOString(),
-          last_sync: new Date().toISOString()
-        })
-        .eq('device_id', profile.device_id);
-
-      if (error) {
-        throw error;
+      const profile = await this.getCurrentProfile();
+      if (!profile || !profile.id) {
+        return { success: false, message: 'Aucun profil actif à synchroniser' };
       }
+
+      // Rafraîchir l'abonnement
+      const sub = await this.fetchActiveSubscription(profile.id);
+      if (sub) {
+        profile.subscription = sub;
+        await this.saveProfileLocally(profile);
+      }
+
+      return { success: true, message: 'Profil synchronisé avec succès' };
     } catch (error) {
-      console.error('❌ Erreur mise à jour profil distant:', error);
-      throw error;
+      console.warn('⚠️ Erreur synchronisation profil:', error);
+      return { success: false, message: 'Erreur de synchronisation' };
+    }
+  }
+
+  /**
+   * Démarrer la synchronisation automatique en arrière-plan
+   */
+  private startAutoSync(): void {
+    if (this.syncTimer) clearInterval(this.syncTimer);
+
+    this.syncTimer = setInterval(async () => {
+      try {
+        await this.syncProfile();
+      } catch (error) {
+        // Silencieux en tâche de fond
+      }
+    }, 30 * 60 * 1000); // 30 minutes
+  }
+
+  /**
+   * Arrêter la synchronisation automatique
+   */
+  stopAutoSync(): void {
+    if (this.syncTimer) {
+      clearInterval(this.syncTimer);
+      this.syncTimer = null;
     }
   }
 }

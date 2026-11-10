@@ -1,17 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase, getDeviceId } from '../lib/supabase';
 
-interface AnalyticsEvent {
+export interface AnalyticsEvent {
   name: string;
-  params?: { [key: string]: any };
+  category?: string;
+  label?: string;
+  value?: number;
+  params?: Record<string, any>;
   timestamp: number;
 }
 
 class AnalyticsService {
   private events: AnalyticsEvent[] = [];
   private isEnabled = true;
+  private pendingRemoteQueue: any[] = [];
+  private flushTimer: any = null;
 
   constructor() {
     this.loadStoredEvents();
+    this.startPeriodicFlush();
   }
 
   private async loadStoredEvents(): Promise<void> {
@@ -21,23 +28,72 @@ class AnalyticsService {
         this.events = JSON.parse(stored);
       }
     } catch (error) {
-      console.error('❌ Erreur chargement analytics:', error);
+      console.warn('⚠️ Erreur chargement analytics local:', error);
     }
   }
 
   private async saveEvents(): Promise<void> {
     try {
+      // Conserver les 200 derniers événements en local pour ne pas saturer le stockage
+      if (this.events.length > 200) {
+        this.events = this.events.slice(-200);
+      }
       await AsyncStorage.setItem('analytics_events', JSON.stringify(this.events));
     } catch (error) {
-      console.error('❌ Erreur sauvegarde analytics:', error);
+      console.warn('⚠️ Erreur sauvegarde analytics local:', error);
     }
   }
 
-  async trackEvent(name: string, params?: { [key: string]: any }): Promise<void> {
+  private startPeriodicFlush(): void {
+    if (this.flushTimer) clearInterval(this.flushTimer);
+    this.flushTimer = setInterval(() => {
+      this.flushToSupabase();
+    }, 30000); // Tenter d'envoyer vers Supabase toutes les 30 secondes
+  }
+
+  private async flushToSupabase(): Promise<void> {
+    if (this.pendingRemoteQueue.length === 0) return;
+    const batch = [...this.pendingRemoteQueue];
+    this.pendingRemoteQueue = [];
+
+    try {
+      const { error } = await supabase.from('analytics_events').insert(batch);
+      if (error) {
+        // En cas d'erreur réseau / RLS, réinsérer au début de la queue sans bloquer
+        this.pendingRemoteQueue.unshift(...batch.slice(-50));
+      }
+    } catch (err) {
+      // Ignoré silencieusement pour ne jamais planter l'app
+    }
+  }
+
+  /**
+   * Enregistre un événement avec support pour les deux signatures (objet ou arguments positionnels)
+   */
+  async trackEvent(
+    name: string,
+    categoryOrParams?: string | Record<string, any>,
+    label?: string,
+    value?: number,
+    extraMetadata?: Record<string, any>
+  ): Promise<void> {
     if (!this.isEnabled) return;
+
+    let category: string | undefined;
+    let params: Record<string, any> = {};
+
+    if (typeof categoryOrParams === 'object' && categoryOrParams !== null) {
+      params = categoryOrParams;
+    } else if (typeof categoryOrParams === 'string') {
+      category = categoryOrParams;
+      params = { label, value, ...extraMetadata };
+    }
 
     const event: AnalyticsEvent = {
       name,
+      category,
+      label,
+      value,
       params,
       timestamp: Date.now(),
     };
@@ -45,30 +101,57 @@ class AnalyticsService {
     this.events.push(event);
     await this.saveEvents();
 
-    console.log(`📊 Analytics Event: ${name}`, params);
+    // Enqueue pour Supabase
+    try {
+      getDeviceId().then((deviceId) => {
+        this.pendingRemoteQueue.push({
+          event_name: name,
+          event_category: category || 'general',
+          event_label: label,
+          event_value: value,
+          user_id: deviceId,
+          timestamp: new Date().toISOString(),
+          metadata: params,
+        });
+      }).catch(() => {});
+    } catch {
+      // Ignorer
+    }
+
+    if (__DEV__) {
+      console.log(`📊 Analytics Event: ${name}`, params);
+    }
   }
 
   async trackScreenView(screenName: string): Promise<void> {
     await this.trackEvent('screen_view', { screen_name: screenName });
   }
 
-  async trackArticleView(articleId: string, articleTitle: string): Promise<void> {
+  async trackArticleView(articleId: string | number, articleTitle: string): Promise<void> {
     await this.trackEvent('article_view', {
-      article_id: articleId,
+      article_id: String(articleId),
       article_title: articleTitle,
     });
   }
 
-  async trackCategoryView(categoryId: string, categoryName: string): Promise<void> {
+  async trackArticleViewed(articleTitle: string, categoryName?: string, articleId?: string | number): Promise<void> {
+    await this.trackEvent('article_viewed', {
+      article_title: articleTitle,
+      category_name: categoryName || 'Non catégorisé',
+      article_id: articleId ? String(articleId) : undefined,
+    });
+  }
+
+  async trackCategoryView(categoryId: string | number, categoryName: string): Promise<void> {
     await this.trackEvent('category_view', {
-      category_id: categoryId,
+      category_id: String(categoryId),
       category_name: categoryName,
     });
   }
 
-  async trackTagView(tagId: string, tagName: string): Promise<void> {
+  async trackTagView(tagId: string | number, tagName: string): Promise<void> {
     await this.trackEvent('tag_view', {
-      tag_id: tagId,
+      tag_id: String(tagId),
       tag_name: tagName,
     });
   }
@@ -80,67 +163,60 @@ class AnalyticsService {
     });
   }
 
-  async trackShare(contentType: string, contentId: string): Promise<void> {
+  async trackShare(contentType: string, contentId: string | number): Promise<void> {
     await this.trackEvent('share', {
       content_type: contentType,
-      content_id: contentId,
+      content_id: String(contentId),
     });
   }
 
-  async trackFavorite(articleId: string, articleTitle: string): Promise<void> {
+  async trackFavorite(articleId: string | number, articleTitle: string): Promise<void> {
     await this.trackEvent('favorite', {
-      article_id: articleId,
+      article_id: String(articleId),
       article_title: articleTitle,
     });
   }
 
-  async trackPurchase(itemId: string, itemName: string, price: number): Promise<void> {
+  async trackPurchase(itemId: string, itemName: string, price: number, currency: string = 'CDF'): Promise<void> {
     await this.trackEvent('purchase', {
       item_id: itemId,
       item_name: itemName,
       price,
-      currency: 'XOF',
+      currency,
     });
   }
 
-  async setUserProperties(properties: { [key: string]: any }): Promise<void> {
-    try {
-      await AsyncStorage.setItem('analytics_user_properties', JSON.stringify(properties));
-      console.log('👤 Analytics User Properties:', properties);
-    } catch (error) {
-      console.error('❌ Erreur setUserProperties analytics:', error);
-    }
+  async trackAuth(action: 'login_success' | 'login_failed' | 'logout' | 'signup', username?: string): Promise<void> {
+    await this.trackEvent(`auth_${action}`, {
+      action,
+      username,
+    });
   }
 
-  async getUserProperties(): Promise<{ [key: string]: any }> {
-    try {
-      const stored = await AsyncStorage.getItem('analytics_user_properties');
-      return stored ? JSON.parse(stored) : {};
-    } catch (error) {
-      console.error('❌ Erreur getUserProperties analytics:', error);
-      return {};
-    }
+  async trackError(errorType: string, errorMessage: string, context?: string): Promise<void> {
+    await this.trackEvent('error_occurred', {
+      error_type: errorType,
+      error_message: errorMessage,
+      context,
+    });
+  }
+
+  async trackDownload(status: 'started' | 'completed' | 'failed', fileType: 'pdf' | 'image', fileName?: string): Promise<void> {
+    await this.trackEvent('download', {
+      status,
+      file_type: fileType,
+      file_name: fileName,
+    });
   }
 
   async enable(): Promise<void> {
     this.isEnabled = true;
     await AsyncStorage.setItem('analytics_enabled', 'true');
-    console.log('✅ Analytics activé');
   }
 
   async disable(): Promise<void> {
     this.isEnabled = false;
     await AsyncStorage.setItem('analytics_enabled', 'false');
-    console.log('❌ Analytics désactivé');
-  }
-
-  async getAnalyticsEnabled(): Promise<boolean> {
-    try {
-      const stored = await AsyncStorage.getItem('analytics_enabled');
-      return stored !== 'false';
-    } catch (error) {
-      return this.isEnabled;
-    }
   }
 
   async getEvents(): Promise<AnalyticsEvent[]> {
@@ -149,14 +225,14 @@ class AnalyticsService {
 
   async clearEvents(): Promise<void> {
     this.events = [];
+    this.pendingRemoteQueue = [];
     await this.saveEvents();
-    console.log('🗑️ Analytics events cleared');
   }
 
   async getStats(): Promise<{ totalEvents: number; screenViews: number; articleViews: number }> {
     const totalEvents = this.events.length;
-    const screenViews = this.events.filter(e => e.name === 'screen_view').length;
-    const articleViews = this.events.filter(e => e.name === 'article_view').length;
+    const screenViews = this.events.filter((e) => e.name === 'screen_view').length;
+    const articleViews = this.events.filter((e) => e.name === 'article_view' || e.name === 'article_viewed').length;
 
     return {
       totalEvents,
@@ -166,5 +242,5 @@ class AnalyticsService {
   }
 }
 
-// Export singleton
 export const analyticsService = new AnalyticsService();
+export default analyticsService;

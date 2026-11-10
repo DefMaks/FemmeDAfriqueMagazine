@@ -15,6 +15,7 @@ import ArticleDetailScreen from '../screens/ArticleDetailScreen';
 import AllArticlesScreen from '../screens/AllArticlesScreen';
 import DebugScreen from '../screens/DebugScreen';
 import AuthScreen from '../screens/AuthScreen';
+import ContactScreen from '../screens/ContactScreen';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { Magazine } from '../models/Magazine';
@@ -29,6 +30,7 @@ export type RootStackParamList = {
     AllArticles: undefined;
     CategoryArticles: { categoryId: number; categoryName: string; isTag?: boolean; fromArticle?: boolean };
     Debug: undefined;
+    Contact: undefined;
 };
 
 const Tab = createBottomTabNavigator();
@@ -174,6 +176,7 @@ const linking: LinkingOptions<RootStackParamList> = {
             AuthScreen: 'connexion',
             Checkout: 'checkout',
             Debug: 'debug',
+            Contact: 'contact',
         },
     },
 };
@@ -243,6 +246,16 @@ export default function RootNavigator() {
                     options={{
                         headerShown: true,
                         title: 'Debug Logs',
+                        headerStyle: { backgroundColor: Colors.primary },
+                        headerTintColor: '#FFFFFF',
+                    }}
+                />
+                <Stack.Screen
+                    name="Contact"
+                    component={ContactScreen}
+                    options={{
+                        headerShown: true,
+                        title: "Coordonnées de l'éditeur",
                         headerStyle: { backgroundColor: Colors.primary },
                         headerTintColor: '#FFFFFF',
                     }}

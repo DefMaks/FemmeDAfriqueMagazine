@@ -66,10 +66,15 @@ class SessionService {
       // Sauvegarder localement
       await AsyncStorage.setItem(this.SESSION_KEY, JSON.stringify(sessionData));
 
-      // Sauvegarder dans Supabase
-      await supabase
-        .from('user_sessions_media')
-        .insert(sessionData);
+      // Sauvegarder dans Supabase (optionnel / non-bloquant)
+      try {
+        await supabase
+          .from('user_sessions_media')
+          .insert(sessionData);
+      } catch (remoteError) {
+        // Table optionnelle, la session locale suffit
+        console.warn('⚠️ user_sessions_media non disponible:', remoteError);
+      }
 
       console.log('✅ Session créée:', sessionId);
       return sessionData;
