@@ -176,21 +176,36 @@ GRANT ALL ON public.purchased_magazines TO anon, authenticated, service_role;
 DROP POLICY IF EXISTS "Public purchased_magazines" ON public.purchased_magazines;
 CREATE POLICY "Public purchased_magazines" ON public.purchased_magazines FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
 
--- 8. TRUST CONTENT
+-- 8. TRUST CONTENT (Rassurance paiement synchronisé avec femmedafrique-revive)
 CREATE TABLE IF NOT EXISTS public.trust_content (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  article_id text NOT NULL,
-  content text,
-  metadata jsonb DEFAULT '{}'::jsonb,
-  is_verified boolean DEFAULT true,
-  created_at timestamptz DEFAULT now()
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  key VARCHAR(100) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  short_message TEXT NOT NULL,
+  modal_title VARCHAR(255) NOT NULL,
+  modal_content TEXT NOT NULL,
+  security_features JSONB DEFAULT '[]'::jsonb,
+  partners JSONB DEFAULT '[]'::jsonb,
+  cta_text VARCHAR(255) NOT NULL DEFAULT 'Je paie en toute confiance',
+  cancel_text VARCHAR(255) NOT NULL DEFAULT 'Annuler',
+  is_active BOOLEAN DEFAULT true,
+  language VARCHAR(10) DEFAULT 'fr',
+  app_name VARCHAR(100) DEFAULT 'fam',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT trust_content_key_lang_app UNIQUE (key, language, app_name)
 );
+
+CREATE INDEX IF NOT EXISTS idx_trust_content_lookup ON public.trust_content(key, language, app_name, is_active);
 
 ALTER TABLE public.trust_content ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.trust_content TO anon, authenticated, service_role;
 
-DROP POLICY IF EXISTS "Public trust_content" ON public.trust_content;
-CREATE POLICY "Public trust_content" ON public.trust_content FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Public trust_content access" ON public.trust_content;
+CREATE POLICY "Public trust_content access" ON public.trust_content
+  FOR ALL TO anon, authenticated
+  USING (true)
+  WITH CHECK (true);
 
 -- 9. ANALYTICS EVENTS & ARTICLE VIEWS
 CREATE TABLE IF NOT EXISTS public.analytics_events (
@@ -225,3 +240,26 @@ CREATE POLICY "Public analytics_events" ON public.analytics_events FOR ALL TO an
 
 DROP POLICY IF EXISTS "Public article_views" ON public.article_views;
 CREATE POLICY "Public article_views" ON public.article_views FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+-- 10. RPC GET_CUTS (Frais DefMaks / TwigaPaie pour le Shop)
+CREATE OR REPLACE FUNCTION public.get_cuts(p_wallet_id text DEFAULT NULL)
+RETURNS TABLE (
+  defmaks_fees_usd numeric,
+  defmaks_fees_cdf numeric,
+  fees_type text
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    1.00::numeric as defmaks_fees_usd, 
+    5.00::numeric as defmaks_fees_cdf, 
+    'fixed'::text as fees_type;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_cuts(text) TO anon, authenticated, service_role;
+
