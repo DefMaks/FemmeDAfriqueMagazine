@@ -133,7 +133,7 @@ const AuthScreen = ({ navigation }: any) => {
                     <Text style={styles.subtitle}>
                         {mode === 'login'
                             ? 'Accédez à votre profil personnalisé'
-                            : 'Rejoignez la communauté FDA'
+                            : 'Rejoignez la communauté FAM'
                         }
                     </Text>
                 </View>

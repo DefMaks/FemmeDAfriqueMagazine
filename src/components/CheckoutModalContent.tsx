@@ -65,7 +65,7 @@ const CheckoutModalContent = ({ magazine, onClose }: CheckoutModalContentProps) 
         try {
             const media = await getMedia(magazine.acf.pdf);
             const pdfUrl = media.source_url;
-            const filename = `FDA_N${magazine.acf.numero}.pdf`;
+            const filename = `FAM_N${magazine.acf.numero}.pdf`;
             const localUri = `${FileSystem.Directory}${filename}`;
             await FileSystem.downloadAsync(pdfUrl, localUri);
             if (await Sharing.isAvailableAsync()) {

@@ -121,7 +121,7 @@ const CheckoutScreen = ({ route }: CheckoutScreenProps) => {
             const pdfUrl = media.source_url;
 
             // 2. Télécharger le fichier
-            const filename = `FDA_N${magazine.acf.numero}.pdf`;
+            const filename = `FAM_N${magazine.acf.numero}.pdf`;
             const localUri = `${FileSystem.Directory}${filename}`;
             await FileSystem.downloadAsync(pdfUrl, localUri);
 

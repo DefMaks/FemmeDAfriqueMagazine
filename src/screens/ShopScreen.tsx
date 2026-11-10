@@ -32,6 +32,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { centralPaymentService, PaymentRequest } from '../services/centralPaymentService';
 import Constants from 'expo-constants';
 import { supabase } from '../lib/supabase';
+import { purchaseHistoryService } from '../services/purchaseHistoryService';
 
 const STORAGE_KEY_PHONE = '@fda_user_phone';
 
@@ -77,7 +78,7 @@ const ShopScreen = () => {
                 pdfUrl = pdfUrl.replace('http://', 'https://');
             }
 
-            const filename = `FDA_N${magazine.acf.numero}.pdf`;
+            const filename = `FAM_N${magazine.acf.numero}.pdf`;
             const documentDir = FileSystem.documentDirectory || FileSystem.cacheDirectory || '';
             const localUri = `${documentDir}${filename}`;
 
@@ -92,7 +93,7 @@ const ShopScreen = () => {
             if (downloadResult && downloadResult.status === 200) {
                 Alert.alert(
                     '✅ PDF Téléchargé',
-                    `Le magazine FDA N°${magazine.acf.numero} a été téléchargé avec succès !`,
+                    `Le magazine FAM N°${magazine.acf.numero} a été téléchargé avec succès !`,
                     [
                         {
                             text: 'Ouvrir le PDF',
@@ -100,7 +101,7 @@ const ShopScreen = () => {
                                 try {
                                     await Sharing.shareAsync(localUri, {
                                         mimeType: 'application/pdf',
-                                        dialogTitle: `FDA N°${magazine.acf.numero}`,
+                                        dialogTitle: `FAM N°${magazine.acf.numero}`,
                                         UTI: 'com.adobe.pdf',
                                     });
                                 } catch (shareError) {
@@ -266,6 +267,20 @@ const ShopScreen = () => {
         }
     };
 
+    const handleSuccessfulPurchase = async (mag: Magazine | null) => {
+        if (!mag) return;
+        try {
+            await purchaseHistoryService.recordMagazinePurchase({
+                magazineId: mag.id.toString(),
+                magazineTitle: mag.title?.rendered ? mag.title.rendered.replace(/<[^>]+>/g, '').trim() : `Magazine FAM N°${mag.acf?.numero || ''}`,
+                amount: totalPrice,
+                currency: currency,
+            });
+        } catch (e) {
+            console.warn('Erreur enregistrement achat:', e);
+        }
+    };
+
     const handleEmoneyPayment = async () => {
         if (!selectedMagazine) return;
 
@@ -284,6 +299,7 @@ const ShopScreen = () => {
                 setPaymentStatusMessage('');
                 setPaymentSuccess(true);
                 setShowDownloadPopup(true);
+                handleSuccessfulPurchase(selectedMagazine);
             } else {
                 setPaymentStatusMessage('');
                 if (result.error === 'PAYMENT_PENDING') {
@@ -317,6 +333,7 @@ const ShopScreen = () => {
                 setPaymentStatusMessage('');
                 setPaymentSuccess(true);
                 setShowDownloadPopup(true);
+                handleSuccessfulPurchase(selectedMagazine);
             } else {
                 setPaymentStatusMessage('');
                 if (result.error === 'CARD_PAYMENT_PENDING') {
@@ -354,6 +371,7 @@ const ShopScreen = () => {
                 setPaymentStatusMessage('');
                 setPaymentSuccess(true);
                 setShowDownloadPopup(true);
+                handleSuccessfulPurchase(selectedMagazine);
             } else if (isPaymentFailed(result.status)) {
                 setPaymentStatusMessage('');
                 Alert.alert(

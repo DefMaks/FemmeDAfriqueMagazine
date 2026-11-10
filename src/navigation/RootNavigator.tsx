@@ -16,6 +16,8 @@ import AllArticlesScreen from '../screens/AllArticlesScreen';
 import DebugScreen from '../screens/DebugScreen';
 import AuthScreen from '../screens/AuthScreen';
 import ContactScreen from '../screens/ContactScreen';
+import ArticlesLusScreen from '../screens/ArticlesLusScreen';
+import AchatsScreen from '../screens/AchatsScreen';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { Magazine } from '../models/Magazine';
@@ -31,6 +33,8 @@ export type RootStackParamList = {
     CategoryArticles: { categoryId: number; categoryName: string; isTag?: boolean; fromArticle?: boolean };
     Debug: undefined;
     Contact: undefined;
+    ArticlesLus: undefined;
+    Achats: undefined;
 };
 
 const Tab = createBottomTabNavigator();
@@ -177,6 +181,8 @@ const linking: LinkingOptions<RootStackParamList> = {
             Checkout: 'checkout',
             Debug: 'debug',
             Contact: 'contact',
+            ArticlesLus: 'articles-lus',
+            Achats: 'achats',
         },
     },
 };
@@ -260,6 +266,8 @@ export default function RootNavigator() {
                         headerTintColor: '#FFFFFF',
                     }}
                 />
+                <Stack.Screen name="ArticlesLus" component={ArticlesLusScreen} />
+                <Stack.Screen name="Achats" component={AchatsScreen} />
             </Stack.Navigator>
         </NavigationContainer>
     );

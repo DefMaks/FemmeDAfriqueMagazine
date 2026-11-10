@@ -235,6 +235,18 @@ export class ProfileService {
       const fullName = (user.user_metadata as any)?.full_name || cleanEmail.split('@')[0];
       const dbProfile = await this.ensureDbProfile(user.id, cleanEmail, fullName);
 
+      // Migration automatique des données device (favoris, lectures, achats) vers le compte connecté
+      try {
+        if (deviceId && deviceId !== user.id) {
+          console.log('🔄 Migration automatique des données device vers compte:', deviceId, '->', user.id);
+          await supabase.from('saved_articles').update({ user_id: user.id }).eq('user_id', deviceId);
+          await supabase.from('reading_history').update({ user_id: user.id }).eq('user_id', deviceId);
+          await supabase.from('purchased_magazines').update({ user_id: user.id }).eq('user_id', deviceId);
+        }
+      } catch (migErr) {
+        console.warn('⚠️ Erreur migration automatique données device:', migErr);
+      }
+
       // Récupérer l'abonnement actif (harmonisé Web)
       const subscription = await this.fetchActiveSubscription(user.id);
 
@@ -394,7 +406,7 @@ export class ProfileService {
       );
       const subscription = await this.fetchActiveSubscription(user.id);
 
-      const username = dbProfile?.full_name || (user.user_metadata as any)?.full_name || user.email?.split('@')[0] || 'Lecteur FDA';
+      const username = dbProfile?.full_name || (user.user_metadata as any)?.full_name || user.email?.split('@')[0] || 'Lecteur FAM';
       const phone = dbProfile?.phone || local?.profile_data?.phone || localPrefs.phone || '';
 
       const updatedProfile: UserProfile = {
@@ -463,8 +475,18 @@ export class ProfileService {
     } finally {
       this.profileCache = null;
       this.cacheTimestamp = 0;
-      await AsyncStorage.removeItem(this.STORAGE_KEY);
-      console.log('✅ Déconnexion terminée');
+      await Promise.all([
+        AsyncStorage.removeItem(this.STORAGE_KEY),
+        AsyncStorage.removeItem('@fda_user_email'),
+        AsyncStorage.removeItem('@fda_user_phone'),
+        AsyncStorage.removeItem('@fda_social_x'),
+        AsyncStorage.removeItem('@fda_social_fb'),
+        AsyncStorage.removeItem('@fam_user_email'),
+        AsyncStorage.removeItem('@fam_user_phone'),
+        AsyncStorage.removeItem('@fam_social_x'),
+        AsyncStorage.removeItem('@fam_social_fb'),
+      ]);
+      console.log('✅ Déconnexion terminée et caches nettoyés');
     }
   }
 

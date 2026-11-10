@@ -112,7 +112,7 @@ class CentralPaymentService {
         amount: request.amount,
         currency: request.currency as 'CDF' | 'USD' | 'XOF',
         transaction_type: 'DEPOSIT',
-        description: `Achat Magazine FDA N°${request.magazineNumber}`,
+        description: `Achat Magazine FAM N°${request.magazineNumber}`,
         external_reference: paymentResult.orderId,
         transaction_platform: request.paymentMethod === 'emoney' ? 'EMONEY' : 'ECARD',
       };
@@ -208,7 +208,7 @@ class CentralPaymentService {
       const result = await initiateCardPayment(
         request.amount.toString(),
         request.currency,
-        `Magazine FDA N°${request.magazineNumber}`,
+        `Magazine FAM N°${request.magazineNumber}`,
         orderId
       );
 

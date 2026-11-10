@@ -19,6 +19,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { notificationService } from '../services/notificationService';
 import { profileService } from '../services/profileService';
 import { profilePhotoService } from '../services/profilePhotoService';
+import { readingHistoryService } from '../services/readingHistoryService';
+import { purchaseHistoryService } from '../services/purchaseHistoryService';
 import { analyticsService } from '../services/analytics.simple';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
@@ -99,89 +101,25 @@ const ProfileScreen = () => {
         }
     };
 
-    // Fonction pour récupérer les vraies statistiques dynamiquement depuis user_profile_media
+    // Fonction pour récupérer les vraies statistiques dynamiquement
     const getDynamicStats = async () => {
         try {
+            const [readCount, purchasesCount, currentProfile] = await Promise.all([
+                readingHistoryService.getArticlesReadCount(),
+                purchaseHistoryService.getPurchasesCount(),
+                profileService.getCurrentProfile(),
+            ]);
+
+            const activeDays = currentProfile?.profile_data?.stats?.active_days || 1;
+
             const statsData = {
-                articlesRead: 0,
-                purchases: 0,
-                activeDays: 0
+                articlesRead: readCount,
+                purchases: purchasesCount,
+                activeDays: Math.max(activeDays, readCount > 0 ? 1 : 0),
             };
 
-            // Récupérer depuis la vue user_profile_stats (version simplifiée sans post_views)
-            try {
-                const { supabase } = await import('../lib/supabase');
-                const { data: profileStats, error } = await supabase
-                    .from('user_profile_stats')
-                    .select(`
-                        saved_articles_count, 
-                        articles_read_count,
-                        total_active_days,
-                        activity_status, 
-                        last_seen,
-                        last_activity
-                    `)
-                    .eq('username', userEmail?.split('@')[0] || 'user')
-                    .single();
-
-                if (profileStats && !error) {
-                    // Articles lus = articles sauvegardés (proxy)
-                    statsData.articlesRead = profileStats.articles_read_count || 0;
-
-                    // Achats magazines = articles sauvegardés (même logique)
-                    statsData.purchases = profileStats.saved_articles_count || 0;
-
-                    // Jours actifs = jours avec activité de sauvegarde
-                    statsData.activeDays = profileStats.total_active_days || 0;
-
-                    console.log('📊 Statistiques depuis user_profile_stats (simplifié):', {
-                        articlesRead: statsData.articlesRead,
-                        purchases: statsData.purchases,
-                        activeDays: statsData.activeDays,
-                        activityStatus: profileStats.activity_status,
-                        lastActivity: profileStats.last_activity
-                    });
-                } else {
-                    console.warn('⚠️ Erreur user_profile_stats:', error);
-                }
-            } catch (dbError) {
-                console.warn('⚠️ Erreur BD user_profile_stats:', dbError);
-            }
-
-            // Fallback: Récupérer depuis le profil Supabase (ancienne méthode)
-            if (statsData.articlesRead === 0 && statsData.purchases === 0) {
-                try {
-                    const currentProfile = await profileService.getCurrentProfile();
-                    if (currentProfile?.profile_data?.stats) {
-                        statsData.articlesRead = currentProfile.profile_data.stats.articles_read || 0;
-                        statsData.purchases = (currentProfile.profile_data.stats as any).purchases || 0;
-                        statsData.activeDays = currentProfile.profile_data.stats.active_days || 0;
-
-                        console.log('📂 Statistiques depuis profile_data (fallback):', currentProfile.profile_data.stats);
-                    }
-                } catch (fallbackError) {
-                    console.warn('⚠️ Erreur fallback profile_service:', fallbackError);
-                }
-            }
-
-            // Compléter avec savedArticlesService si disponible
-            try {
-                const { savedArticlesService } = await import('../services/supabaseService');
-                const savedArticles = await savedArticlesService.getSavedArticles();
-
-                // Mettre à jour avec les données les plus récentes
-                if (savedArticles.length > statsData.purchases) {
-                    statsData.purchases = savedArticles.length;
-                }
-
-                console.log('� Articles sauvegardés:', savedArticles.length);
-            } catch (serviceError) {
-                console.warn('⚠️ Erreur savedArticlesService:', serviceError);
-            }
-
-            console.log('📊 Statistiques finales synchronisées:', statsData);
+            console.log('📊 Statistiques réelles synchronisées:', statsData);
             return statsData;
-
         } catch (error) {
             console.error('❌ Erreur getDynamicStats:', error);
             return {
@@ -229,7 +167,7 @@ const ProfileScreen = () => {
 
                 if (currentProfile.subscription?.status === 'active') {
                     const planLabel = currentProfile.subscription.plan === 'yearly' ? 'Annuel' : 'Mensuel';
-                    setSubscriptionInfo(`Abonné FDA (${planLabel})`);
+                    setSubscriptionInfo(`Abonné FAM (${planLabel})`);
                 } else {
                     setSubscriptionInfo(null);
                 }
@@ -276,7 +214,7 @@ const ProfileScreen = () => {
                 setUserName(currentProfile.username || currentProfile.email?.split('@')[0] || '');
                 if (currentProfile.subscription?.status === 'active') {
                     const planLabel = currentProfile.subscription.plan === 'yearly' ? 'Annuel' : 'Mensuel';
-                    setSubscriptionInfo(`Abonné FDA (${planLabel})`);
+                    setSubscriptionInfo(`Abonné FAM (${planLabel})`);
                 } else {
                     setSubscriptionInfo(null);
                 }
@@ -481,7 +419,7 @@ const ProfileScreen = () => {
     };
 
     const openSupportEmail = () => {
-        Linking.openURL('mailto:support@defmaks.com?subject=Support FDA App');
+        Linking.openURL('mailto:support@defmaks.com?subject=Support FAM App');
     };
 
     const openAccountDeletionPolicy = async () => {
@@ -582,6 +520,26 @@ const ProfileScreen = () => {
             }
         },
         {
+            id: 'articles_lus',
+            icon: 'time-outline',
+            title: 'Articles lus',
+            subtitle: 'Historique des articles consultés',
+            action: () => {
+                analyticsService.trackEvent('screen_viewed', 'navigation', 'ArticlesLus', 1);
+                navigation.navigate('ArticlesLus');
+            }
+        },
+        {
+            id: 'mes_achats',
+            icon: 'cart-outline',
+            title: 'Mes achats',
+            subtitle: 'Magazines achetés et abonnements',
+            action: () => {
+                analyticsService.trackEvent('screen_viewed', 'navigation', 'Achats', 1);
+                navigation.navigate('Achats');
+            }
+        },
+        {
             id: 'contact_news',
             icon: 'call-outline',
             title: 'Coordonnées & Rédaction',
@@ -592,7 +550,7 @@ const ProfileScreen = () => {
             id: '4',
             icon: 'information-circle-outline',
             title: 'À Propos',
-            subtitle: 'En savoir plus sur FDA',
+            subtitle: 'En savoir plus sur FAM',
             action: openAboutPage
         },
         {
@@ -608,13 +566,6 @@ const ProfileScreen = () => {
             title: 'Aide & Support',
             subtitle: 'Contactez-nous par email',
             action: openSupportEmail
-        },
-        {
-            id: '7',
-            icon: 'construct-outline',
-            title: 'Diagnostic & Logs',
-            subtitle: 'État OTA et débogage',
-            action: () => navigation.navigate('Debug')
         },
         {
             id: 'privacy_deletion',
@@ -672,7 +623,7 @@ const ProfileScreen = () => {
                         )}
                     </View>
                     <Text style={styles.userName}>
-                        {userName || userEmail || 'Lecteur FDA'}
+                        {userName || userEmail || 'Lecteur FAM'}
                     </Text>
                     {subscriptionInfo && (
                         <View style={styles.subscriptionPill}>
@@ -700,7 +651,7 @@ const ProfileScreen = () => {
                     <View id='statCards' style={styles.statsCard}>
                         <TouchableOpacity
                             style={styles.statItem}
-                            onPress={() => navigation.navigate('Favoris')}
+                            onPress={() => navigation.navigate('ArticlesLus')}
                             activeOpacity={0.8}
                         >
                             <Text style={styles.statValue}>{stats.articlesRead}</Text>
@@ -710,12 +661,12 @@ const ProfileScreen = () => {
                         <View style={styles.statDivider} />
                         <TouchableOpacity
                             style={styles.statItem}
-                            onPress={() => navigation.navigate('Boutique')}
+                            onPress={() => navigation.navigate('Achats')}
                             activeOpacity={0.8}
                         >
                             <Text style={styles.statValue}>{stats.purchases}</Text>
                             <Text style={styles.statLabel}>Achats</Text>
-                            <Ionicons name="storefront-outline" size={12} color={Colors.textSecondary} style={styles.statIcon} />
+                            <Ionicons name="cart-outline" size={12} color={Colors.textSecondary} style={styles.statIcon} />
                         </TouchableOpacity>
                         <View style={styles.statDivider} />
                         <View style={styles.statItem}>

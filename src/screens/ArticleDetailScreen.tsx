@@ -20,6 +20,7 @@ import { RootStackParamList } from '../navigation/RootNavigator';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { savedArticlesService } from '../services/supabaseService';
+import { readingHistoryService } from '../services/readingHistoryService';
 import { CommentsSection } from '../components/CommentsSection';
 import { getAds, api } from '../services/api';
 import { analyticsService } from '../services/analytics.simple';
@@ -183,6 +184,7 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
     loadAds();
     checkIfArticleIsSaved();
     incrementArticlesRead();
+    readingHistoryService.recordReading(article);
   }, [article, navigation]);
 
   const toggleSave = async () => {
