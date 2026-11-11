@@ -51,7 +51,7 @@ export const getSavedArticles = async (): Promise<Post[]> => {
  * Ne lève jamais d’exception → retourne `false` en cas d’erreur.
  */
 export const isArticleSaved = async (id: number): Promise<boolean> => {
-  if (typeof id !== "number" || id <= 0) return false; // 🔹 Protection supplémentaire
+  if (typeof id !== "number" || id <= 0) return false;
 
   try {
     const saved = await getSavedArticles();

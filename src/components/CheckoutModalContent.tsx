@@ -130,7 +130,7 @@ const CheckoutModalContent = ({ magazine, onClose }: CheckoutModalContentProps) 
             {showInfoModal && (
                 <View style={styles.overlay}>
                     <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>✅ Paiement sécurisé</Text>
+                        <Text style={styles.modalTitle}>Paiement sécurisé</Text>
                         <Text style={styles.modalText}>
                             Votre paiement est traité via TwigaPaie en toute sécurité.
                         </Text>
@@ -165,9 +165,9 @@ const CheckoutModalContent = ({ magazine, onClose }: CheckoutModalContentProps) 
                 </View>
             ) : (
                 <View style={styles.successContainer}>
-                    <Text style={styles.successTitle}>🎉 Paiement réussi !</Text>
+                    <Text style={styles.successTitle}>Paiement réussi !</Text>
                     <TouchableOpacity style={styles.downloadButton} onPress={downloadPdf}>
-                        <Text style={styles.downloadButtonText}>📥 Télécharger le PDF</Text>
+                        <Text style={styles.downloadButtonText}>Télécharger le PDF</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.backButton} onPress={onClose}>
                         <Text style={styles.backButtonText}>← Retour à la boutique</Text>

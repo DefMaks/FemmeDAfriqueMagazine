@@ -100,20 +100,20 @@ class Logger {
   async formatErrorLogs(): Promise<string> {
     const errorLogs = await this.getErrorLogs();
     if (errorLogs.length === 0) {
-      return '✅ Aucune erreur détectée';
+      return 'Aucune erreur detectee';
     }
 
-    let formatted = `❌ ${errorLogs.length} erreur(s) détectée(s):\n\n`;
+    let formatted = `${errorLogs.length} erreur(s) detectee(s):\n\n`;
     
     errorLogs.forEach((log, index) => {
       formatted += `--- Erreur ${index + 1} ---\n`;
-      formatted += `📅 ${log.timestamp}\n`;
-      formatted += `📝 ${log.message}\n`;
+      formatted += `Date: ${log.timestamp}\n`;
+      formatted += `Message: ${log.message}\n`;
       
       if (log.error) {
-        formatted += `🔍 ${log.error.name}: ${log.error.message}\n`;
+        formatted += `Erreur: ${log.error.name}: ${log.error.message}\n`;
         if (log.error.stack) {
-          formatted += `📚 Stack:\n${log.error.stack}\n`;
+          formatted += `Stack:\n${log.error.stack}\n`;
         }
       }
       formatted += '\n';

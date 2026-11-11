@@ -7,13 +7,14 @@ import {
   FlatList,
   TouchableOpacity,
   Image,
-  ActivityIndicator,
   RefreshControl,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { readingHistoryService, ReadArticleItem } from '../services/readingHistoryService';
+import { ArticleListSkeleton } from '../components/PageSkeletons';
+import { decodeHtmlEntities } from '../utils/textUtils';
 
 const ArticlesLusScreen = ({ navigation }: any) => {
   const [items, setItems] = useState<ReadArticleItem[]>([]);
@@ -49,8 +50,8 @@ const ArticlesLusScreen = ({ navigation }: any) => {
     if (items.length === 0) return;
 
     Alert.alert(
-      'Vider l\'historique',
-      'Voulez-vous supprimer l\'historique des articles lus ?',
+      "Vider l'historique",
+      "Voulez-vous supprimer l'historique des articles lus ?",
       [
         { text: 'Annuler', style: 'cancel' },
         {
@@ -74,7 +75,7 @@ const ArticlesLusScreen = ({ navigation }: any) => {
       const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-      if (diffMin < 5) return 'À l\'instant';
+      if (diffMin < 5) return "À l'instant";
       if (diffMin < 60) return `Il y a ${diffMin} min`;
       if (diffHours < 24) return `Il y a ${diffHours} h`;
       if (diffDays === 1) return 'Hier';
@@ -85,12 +86,15 @@ const ArticlesLusScreen = ({ navigation }: any) => {
         month: 'short',
         year: 'numeric',
       });
-    } catch (e) {
+    } catch {
       return '';
     }
   };
 
   const renderItem = ({ item }: { item: ReadArticleItem }) => {
+    const cleanTitle = decodeHtmlEntities(item.post_title || 'Article');
+    const cleanCategory = item.category_name ? decodeHtmlEntities(item.category_name) : null;
+
     return (
       <TouchableOpacity
         style={styles.card}
@@ -100,11 +104,11 @@ const ArticlesLusScreen = ({ navigation }: any) => {
             article: {
               id: item.post_id,
               slug: item.post_slug,
-              title: { rendered: item.post_title },
+              title: { rendered: cleanTitle },
               dmks_featured_image: item.post_image ? { src: item.post_image } : undefined,
               _embedded: {
                 'wp:featuredmedia': item.post_image ? [{ source_url: item.post_image }] : [],
-                'wp:term': item.category_name ? [[{ name: item.category_name, slug: item.category_slug || '' }]] : [],
+                'wp:term': cleanCategory ? [[{ name: cleanCategory, slug: item.category_slug || '' }]] : [],
               },
             },
           });
@@ -119,14 +123,14 @@ const ArticlesLusScreen = ({ navigation }: any) => {
         )}
 
         <View style={styles.cardContent}>
-          {item.category_name && (
+          {cleanCategory && (
             <View style={styles.categoryBadge}>
-              <Text style={styles.categoryText}>{item.category_name}</Text>
+              <Text style={styles.categoryText}>{cleanCategory}</Text>
             </View>
           )}
 
           <Text style={styles.cardTitle} numberOfLines={2}>
-            {item.post_title}
+            {cleanTitle}
           </Text>
 
           <View style={styles.cardFooter}>
@@ -161,10 +165,7 @@ const ArticlesLusScreen = ({ navigation }: any) => {
 
       {/* Content */}
       {loading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Chargement de l'historique...</Text>
-        </View>
+        <ArticleListSkeleton count={6} />
       ) : items.length === 0 ? (
         <View style={styles.centerContainer}>
           <View style={styles.emptyIconContainer}>
@@ -176,7 +177,7 @@ const ArticlesLusScreen = ({ navigation }: any) => {
           </Text>
           <TouchableOpacity
             style={styles.emptyButton}
-            onPress={() => navigation.navigate('Home')}
+            onPress={() => navigation.navigate('Main', { screen: 'Accueil' })}
             activeOpacity={0.8}
           >
             <Text style={styles.emptyButtonText}>Découvrir les actualités</Text>
@@ -235,11 +236,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: Colors.textSecondary,
   },
   emptyIconContainer: {
     width: 90,

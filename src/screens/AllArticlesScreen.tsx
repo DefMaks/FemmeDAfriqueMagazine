@@ -1,31 +1,31 @@
 // src/screens/AllArticlesScreen.tsx
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     FlatList,
     TouchableOpacity,
-    ActivityIndicator,
     Platform,
+    RefreshControl,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { getPosts, getAdsByZoneId } from '../services/api';
+import { getPosts, getAdsByZoneId, clearCache } from '../services/api';
 import { Post } from '../models/Post';
 import { ArticleCard } from '../components/ArticleCard';
 import { InlineAdBanner, AppAd } from '../components/InlineAdBanner';
+import { ArticleListSkeleton, ArticleFooterSkeleton } from '../components/PageSkeletons';
 import { Colors } from '../theme/colors';
 import { RootStackParamList } from '../navigation/RootNavigator';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-// Zone ID pour les pubs dans la liste d'articles
 const IN_LIST_AD_ZONE_ID = 14742;
-const AD_INTERVAL = 5; // Afficher une pub tous les 5 articles
+const AD_INTERVAL = 5;
+const PAGE_SIZE = 12;
 
-// Type mixte pour la liste (article ou pub)
 type ListItem = { type: 'article'; data: Post } | { type: 'ad'; data: AppAd; index: number };
 
 const AllArticlesScreen = () => {
@@ -33,12 +33,16 @@ const AllArticlesScreen = () => {
     const [posts, setPosts] = useState<Post[]>([]);
     const [inListAds, setInListAds] = useState<AppAd[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [loadingMore, setLoadingMore] = useState(false);
-    const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(true);
 
+    const pageRef = useRef(1);
+    const loadingMoreRef = useRef(false);
+    const hasMoreRef = useRef(true);
+
     useEffect(() => {
-        loadPosts();
+        loadPosts(false);
         loadInListAds();
     }, []);
 
@@ -51,55 +55,73 @@ const AllArticlesScreen = () => {
         }
     };
 
-    const loadPosts = async () => {
+    const loadPosts = async (isRefresh = false) => {
         try {
-            setLoading(true);
-            const data = await getPosts(1, 15);
+            if (isRefresh) {
+                setRefreshing(true);
+                clearCache('posts');
+            } else {
+                setLoading(true);
+            }
+
+            pageRef.current = 1;
+            const data = await getPosts(1, PAGE_SIZE);
             setPosts(data);
-            setHasMore(data.length >= 15);
-            setPage(1);
+            const more = data.length >= PAGE_SIZE;
+            hasMoreRef.current = more;
+            setHasMore(more);
         } catch (error) {
             console.error('Erreur chargement articles:', error);
         } finally {
             setLoading(false);
+            setRefreshing(false);
         }
     };
 
-    const loadMorePosts = async () => {
-        if (loadingMore || !hasMore) return;
-        
+    const loadMorePosts = useCallback(async () => {
+        if (loadingMoreRef.current || !hasMoreRef.current || loading) return;
+
+        loadingMoreRef.current = true;
         setLoadingMore(true);
+
         try {
-            const nextPage = page + 1;
-            const morePosts = await getPosts(nextPage, 15);
-            if (morePosts.length === 0) {
+            const nextPage = pageRef.current + 1;
+            const morePosts = await getPosts(nextPage, PAGE_SIZE);
+
+            if (!morePosts || morePosts.length === 0) {
+                hasMoreRef.current = false;
                 setHasMore(false);
             } else {
-                setPosts(prev => [...prev, ...morePosts]);
-                setPage(nextPage);
-                setHasMore(morePosts.length >= 15);
+                pageRef.current = nextPage;
+                const more = morePosts.length >= PAGE_SIZE;
+                hasMoreRef.current = more;
+                setHasMore(more);
+
+                setPosts(prev => {
+                    const existingIds = new Set(prev.map(p => p.id));
+                    const uniqueNew = morePosts.filter((p: Post) => p && !existingIds.has(p.id));
+                    return [...prev, ...uniqueNew];
+                });
             }
         } catch (error) {
             console.error('Erreur chargement plus d\'articles:', error);
-            setHasMore(false);
         } finally {
+            loadingMoreRef.current = false;
             setLoadingMore(false);
         }
-    };
+    }, [loading]);
 
     const handleArticlePress = useCallback((article: Post) => {
         navigation.navigate('ArticleDetail', { article });
     }, [navigation]);
 
-    // Créer une liste mixte avec articles et pubs intercalées
-    const getMixedList = (): ListItem[] => {
+    const mixedData = useMemo((): ListItem[] => {
         const mixedList: ListItem[] = [];
         let adIndex = 0;
 
         posts.forEach((post, index) => {
             mixedList.push({ type: 'article', data: post });
 
-            // Après chaque 5 articles, insérer une pub
             if ((index + 1) % AD_INTERVAL === 0 && inListAds.length > 0) {
                 const ad = inListAds[adIndex % inListAds.length];
                 mixedList.push({ type: 'ad', data: ad, index: adIndex });
@@ -108,9 +130,9 @@ const AllArticlesScreen = () => {
         });
 
         return mixedList;
-    };
+    }, [posts, inListAds]);
 
-    const renderItem = ({ item }: { item: ListItem }) => {
+    const renderItem = useCallback(({ item }: { item: ListItem }) => {
         if (item.type === 'ad') {
             return <InlineAdBanner ad={item.data} />;
         }
@@ -121,30 +143,20 @@ const AllArticlesScreen = () => {
                 variant="horizontal"
             />
         );
-    };
+    }, [handleArticlePress]);
 
-    const getItemKey = (item: ListItem, index: number): string => {
+    const getItemKey = useCallback((item: ListItem): string => {
         if (item.type === 'ad') {
             return `ad_${item.data.id}_${item.index}`;
         }
-        return `article_${item.data.id}_${index}`;
-    };
-
-    if (loading) {
-        return (
-            <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.primary} />
-            </View>
-        );
-    }
-
-    const mixedData = getMixedList();
+        return `article_${item.data.id}`;
+    }, []);
 
     return (
         <View style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity 
-                    style={styles.backButton} 
+                <TouchableOpacity
+                    style={styles.backButton}
                     onPress={() => navigation.goBack()}
                 >
                     <Ionicons name="arrow-back" size={24} color={Colors.text} />
@@ -153,24 +165,38 @@ const AllArticlesScreen = () => {
                 <View style={styles.placeholder} />
             </View>
 
-            <FlatList
-                data={mixedData}
-                renderItem={renderItem}
-                keyExtractor={getItemKey}
-                contentContainerStyle={styles.list}
-                showsVerticalScrollIndicator={false}
-                onEndReached={loadMorePosts}
-                onEndReachedThreshold={0.3}
-                ListFooterComponent={
-                    loadingMore ? (
-                        <View style={styles.footerLoader}>
-                            <ActivityIndicator size="small" color={Colors.primary} />
-                        </View>
-                    ) : !hasMore && posts.length > 0 ? (
-                        <Text style={styles.endText}>Fin des articles</Text>
-                    ) : undefined
-                }
-            />
+            {loading ? (
+                <ArticleListSkeleton count={7} />
+            ) : (
+                <FlatList
+                    data={mixedData}
+                    renderItem={renderItem}
+                    keyExtractor={getItemKey}
+                    contentContainerStyle={styles.list}
+                    showsVerticalScrollIndicator={false}
+                    onEndReached={loadMorePosts}
+                    onEndReachedThreshold={0.5}
+                    initialNumToRender={8}
+                    maxToRenderPerBatch={8}
+                    windowSize={7}
+                    removeClippedSubviews={Platform.OS === 'android'}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={() => loadPosts(true)}
+                            tintColor={Colors.primary}
+                            colors={[Colors.primary]}
+                        />
+                    }
+                    ListFooterComponent={
+                        loadingMore ? (
+                            <ArticleFooterSkeleton />
+                        ) : !hasMore && posts.length > 0 ? (
+                            <Text style={styles.endText}>Fin des articles</Text>
+                        ) : undefined
+                    }
+                />
+            )}
         </View>
     );
 };
@@ -205,18 +231,8 @@ const styles = StyleSheet.create({
     placeholder: {
         width: 40,
     },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: Colors.background,
-    },
     list: {
         paddingVertical: 16,
-    },
-    footerLoader: {
-        paddingVertical: 20,
-        alignItems: 'center',
     },
     endText: {
         textAlign: 'center',

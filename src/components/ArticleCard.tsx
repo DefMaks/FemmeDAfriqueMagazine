@@ -1,19 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Platform, Share } from 'react-native';
+import React, { useState, useEffect, memo } from 'react';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Platform, Share, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { savedArticlesService } from '../services/supabaseService';
 import { decodeHtmlEntities, getShareMessage } from '../utils/textUtils';
 
+const { width: screenWidth } = Dimensions.get('window');
+const GRID_CARD_WIDTH = (screenWidth - 44) / 2;
+
 interface ArticleCardProps {
   article: Post;
   onPress: () => void;
-  variant?: 'horizontal' | 'vertical' | 'compact';
+  variant?: 'horizontal' | 'vertical' | 'compact' | 'grid';
   showActions?: boolean;
 }
 
-export const ArticleCard: React.FC<ArticleCardProps> = ({
+const ArticleCardComponent: React.FC<ArticleCardProps> = ({
   article,
   onPress,
   variant = 'horizontal',
@@ -23,17 +26,14 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    checkIfSaved();
+    let mounted = true;
+    savedArticlesService.isArticleSaved(article.id.toString()).then((saved) => {
+      if (mounted) setIsSaved(saved);
+    }).catch(() => {});
+    return () => {
+      mounted = false;
+    };
   }, [article.id]);
-
-  const checkIfSaved = async () => {
-    try {
-      const saved = await savedArticlesService.isArticleSaved(article.id.toString());
-      setIsSaved(saved);
-    } catch (error) {
-      // Silencieux
-    }
-  };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -41,14 +41,14 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
     const diffMs = now.getTime() - date.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
 
-    if (diffHours < 1) return 'À l\'instant';
+    if (diffHours < 1) return "À l'instant";
     if (diffHours < 24) return `Il y a ${diffHours}h`;
     const diffDays = Math.floor(diffHours / 24);
     if (diffDays < 7) return `Il y a ${diffDays}j`;
     return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
   };
 
-  const formatTitle = (title: string) => decodeHtmlEntities(title);
+  const formatTitle = (title: string) => decodeHtmlEntities(title || '');
 
   const getImageUrl = (): string | null => {
     if (article.dmks_featured_image?.sizes?.medium_large?.url) {
@@ -90,7 +90,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
 
   const handleShare = async () => {
     try {
-      const message = getShareMessage(article.title.rendered, article.link);
+      const message = getShareMessage(article.title?.rendered || '', article.link);
       await Share.share({
         message,
         ...(Platform.OS === 'ios' && { url: article.link }),
@@ -100,20 +100,60 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
     }
   };
 
-  // Variant compact (sans actions)
+  // Variant grid (pour le bloc 2 colonnes x 3 lignes comme Mines)
+  if (variant === 'grid') {
+    return (
+      <TouchableOpacity style={styles.gridCard} activeOpacity={0.85} onPress={onPress}>
+        <View style={styles.imageWrapper}>
+          {imageUrl ? (
+            <Image source={{ uri: imageUrl }} style={styles.gridImage} resizeMode="cover" />
+          ) : (
+            <View style={[styles.gridImage, styles.placeholderBox]}>
+              <Ionicons name="newspaper-outline" size={24} color={Colors.textLight} />
+            </View>
+          )}
+        </View>
+        <View style={styles.gridContent}>
+          <Text style={styles.gridTitle} numberOfLines={2}>
+            {formatTitle(article.title?.rendered || '')}
+          </Text>
+          <View style={styles.metaItem}>
+            <Ionicons name="time-outline" size={11} color={Colors.textLight} />
+            <Text style={styles.gridMetaText}>{formatDate(article.date)}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  // Variant compact (comme Derniers articles mais un chouya plus compact)
   if (variant === 'compact') {
     return (
-      <TouchableOpacity style={styles.horizontalCard} activeOpacity={0.8} onPress={onPress}>
-        <View style={styles.horizontalContent}>
+      <TouchableOpacity style={[styles.horizontalCard, styles.compactCard]} activeOpacity={0.8} onPress={onPress}>
+        <View style={styles.compactContent}>
           <View style={styles.textContainer}>
-            <Text style={styles.horizontalTitle} numberOfLines={2}>
-              {formatTitle(article.title.rendered)}
+            <Text style={styles.compactTitle} numberOfLines={2}>
+              {formatTitle(article.title?.rendered || '')}
             </Text>
             <View style={styles.metaRow}>
               <View style={styles.metaItem}>
-                <Ionicons name="time-outline" size={12} color={Colors.textLight} />
-                <Text style={styles.metaText}>{formatDate(article.date)}</Text>
+                <Ionicons name="time-outline" size={11} color={Colors.textLight} />
+                <Text style={styles.compactMetaText}>{formatDate(article.date)}</Text>
               </View>
+              {showActions && (
+                <View style={styles.compactActions}>
+                  <TouchableOpacity style={styles.tinyActionBtn} onPress={handleShare}>
+                    <Ionicons name="share-social-outline" size={12} color="#666" />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.tinyActionBtn} onPress={toggleSave} disabled={isLoading}>
+                    <Ionicons
+                      name={isSaved ? 'heart' : 'heart-outline'}
+                      size={12}
+                      color={isSaved ? Colors.primary : '#666'}
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
           {imageUrl && (
@@ -149,7 +189,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
         </View>
         <View style={styles.verticalContent}>
           <Text style={styles.verticalTitle} numberOfLines={2}>
-            {formatTitle(article.title.rendered)}
+            {formatTitle(article.title?.rendered || '')}
           </Text>
           <View style={styles.metaItem}>
             <Ionicons name="time-outline" size={12} color={Colors.textLight} />
@@ -166,7 +206,7 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
       <View style={styles.horizontalContent}>
         <View style={styles.textContainer}>
           <Text style={styles.horizontalTitle} numberOfLines={3}>
-            {formatTitle(article.title.rendered)}
+            {formatTitle(article.title?.rendered || '')}
           </Text>
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
@@ -198,6 +238,8 @@ export const ArticleCard: React.FC<ArticleCardProps> = ({
     </TouchableOpacity>
   );
 };
+
+export const ArticleCard = memo(ArticleCardComponent);
 
 const styles = StyleSheet.create({
   // Horizontal card
@@ -256,6 +298,92 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.borderLight,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // Compact card (for Enfer des femmes, slightly smaller than Derniers articles)
+  compactCard: {
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  compactContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 9,
+    paddingHorizontal: 11,
+  },
+  compactTitle: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    color: Colors.text,
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  compactMetaText: {
+    fontSize: 11,
+    color: Colors.textLight,
+    marginLeft: 4,
+  },
+  compactImage: {
+    width: 76,
+    height: 58,
+    borderRadius: 8,
+    backgroundColor: Colors.borderLight,
+  },
+  compactActions: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  tinyActionBtn: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: Colors.borderLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Grid card (2 columns x 3 rows for Mines)
+  gridCard: {
+    width: GRID_CARD_WIDTH,
+    backgroundColor: Colors.backgroundLight,
+    borderRadius: 14,
+    marginBottom: 12,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: Colors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.07,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  gridImage: {
+    width: '100%',
+    height: 105,
+    backgroundColor: Colors.borderLight,
+  },
+  placeholderBox: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  gridContent: {
+    padding: 10,
+    justifyContent: 'space-between',
+    minHeight: 68,
+  },
+  gridTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.text,
+    lineHeight: 17,
+    marginBottom: 6,
+  },
+  gridMetaText: {
+    fontSize: 11,
+    color: Colors.textLight,
+    marginLeft: 4,
   },
   // Vertical card
   verticalCard: {
@@ -321,11 +449,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textLight,
     marginLeft: 4,
-  },
-  compactImage: {
-    width: 80,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: Colors.borderLight,
   },
 });

@@ -7,11 +7,11 @@ import {
   Modal,
   ScrollView,
   Dimensions,
-  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { TrustContent, trustContentService, TrustContent as TrustContentType } from '../services/trustContentService';
+import { TrustBadgeSkeleton } from './PageSkeletons';
 
 interface TrustBadgeProps {
   contentKey?: string;
@@ -21,16 +21,21 @@ interface TrustBadgeProps {
   style?: any;
 }
 
+const cleanEmoji = (text?: string): string => {
+  if (!text) return '';
+  return text.replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}]/gu, '').trim();
+};
+
 const defaultContent: TrustContent = {
-  title: '🛡️ Paiement Sécurisé',
+  title: 'Paiement Sécurisé',
   shortMessage: 'Transactions protégées et garanties par TwigaPaie',
-  modalTitle: '🛡️ Paiement 100% Sécurisé & Transparent',
+  modalTitle: 'Paiement 100% Sécurisé & Transparent',
   modalContent: 'Vous finalisez votre achat pour Femmes d\'Afrique. Pour garantir la sécurité de votre transaction, celle-ci est traitée par TwigaPaie, la solution de paiement développée par DefMaks.',
   securityFeatures: [
-    '🔒 Transactions chiffrées de bout en bout',
-    '✅ Partenariat officiel avec les opérateurs mobiles',
-    '🛡️ Conformité aux standards de sécurité OHADA / PCI-DSS',
-    '📞 Support disponible 24/7 en cas de problème'
+    'Transactions chiffrées de bout en bout',
+    'Partenariat officiel avec les opérateurs mobiles',
+    'Conformité aux standards de sécurité OHADA / PCI-DSS',
+    'Support disponible 24/7 en cas de problème'
   ],
   partners: [
     {
@@ -129,10 +134,7 @@ const TrustBadge: React.FC<TrustBadgeProps> = ({
   return (
     <>
       {loading ? (
-        <View style={[styles.trustBadge, style, styles.loadingBadge]}>
-          <ActivityIndicator size="small" color={Colors.primary} />
-          <Text style={styles.loadingText}>Chargement...</Text>
-        </View>
+        <TrustBadgeSkeleton style={style} />
       ) : (
         <TouchableOpacity
           style={[styles.trustBadge, style]}
@@ -141,7 +143,7 @@ const TrustBadge: React.FC<TrustBadgeProps> = ({
         >
           <View style={styles.badgeContent}>
             <Ionicons name="shield-checkmark" size={20} color={Colors.success} />
-            <Text style={styles.badgeText}>{content?.shortMessage || defaultContent.shortMessage}</Text>
+            <Text style={styles.badgeText}>{cleanEmoji(content?.shortMessage || defaultContent.shortMessage)}</Text>
             <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
           </View>
         </TouchableOpacity>
@@ -158,7 +160,7 @@ const TrustBadge: React.FC<TrustBadgeProps> = ({
             <ScrollView showsVerticalScrollIndicator={false}>
               {/* Header */}
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{content?.modalTitle || defaultContent.modalTitle}</Text>
+                <Text style={styles.modalTitle}>{cleanEmoji(content?.modalTitle || defaultContent.modalTitle)}</Text>
                 <TouchableOpacity
                   style={styles.closeButton}
                   onPress={() => setShowModal(false)}
@@ -168,19 +170,19 @@ const TrustBadge: React.FC<TrustBadgeProps> = ({
               </View>
 
               {/* Main Content */}
-              <Text style={styles.modalText}>{content?.modalContent || defaultContent.modalContent}</Text>
+              <Text style={styles.modalText}>{cleanEmoji(content?.modalContent || defaultContent.modalContent)}</Text>
 
               {/* Security Features */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>🔒 Pourquoi ce paiement est fiable ?</Text>
+                <Text style={styles.sectionTitle}>Pourquoi ce paiement est fiable ?</Text>
                 {(content?.securityFeatures || defaultContent.securityFeatures).map((feature: string, index: number) => (
-                  <Text key={index} style={styles.featureItem}>• {feature}</Text>
+                  <Text key={index} style={styles.featureItem}>• {cleanEmoji(feature)}</Text>
                 ))}
               </View>
 
               {/* Partners Section */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>🤝 Nos partenaires de confiance</Text>
+                <Text style={styles.sectionTitle}>Nos partenaires de confiance</Text>
                 <View style={styles.partnersList}>
                   {(content?.partners || defaultContent.partners).map(renderPartner)}
                 </View>

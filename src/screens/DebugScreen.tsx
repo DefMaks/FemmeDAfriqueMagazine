@@ -19,7 +19,7 @@ const DebugScreen = () => {
       setUpdateInfo(updateService.getUpdateInfo());
     } catch (error) {
       console.error('Erreur chargement logs:', error);
-      setLogs('❌ Impossible de charger les logs');
+      setLogs('Impossible de charger les logs');
     } finally {
       setLoading(false);
     }
@@ -61,7 +61,6 @@ const DebugScreen = () => {
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Chargement des diagnostics...</Text>
       </View>
     );
   }
@@ -70,11 +69,11 @@ const DebugScreen = () => {
     <View style={styles.container}>
       {/* Section État OTA & Environnement */}
       <View style={styles.otaCard}>
-        <Text style={styles.sectionTitle}>🚀 État OTA & Système</Text>
+        <Text style={styles.sectionTitle}>État OTA & Système</Text>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>OTA Activé :</Text>
           <Text style={[styles.infoValue, { color: updateInfo.isEnabled ? '#2E7D32' : '#C62828' }]}>
-            {updateInfo.isEnabled ? '✅ Oui' : '❌ Non (Mode Dev/Test)'}
+            {updateInfo.isEnabled ? 'Oui' : 'Non (Mode Dev/Test)'}
           </Text>
         </View>
         <View style={styles.infoRow}>
@@ -93,7 +92,7 @@ const DebugScreen = () => {
         </View>
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Mode :</Text>
-          <Text style={styles.infoValue}>{APP_CONFIG.isProd ? '🔴 Production' : '🟡 Test / Développement'}</Text>
+          <Text style={styles.infoValue}>{APP_CONFIG.isProd ? 'Production' : 'Test / Développement'}</Text>
         </View>
 
         <TouchableOpacity
@@ -104,20 +103,20 @@ const DebugScreen = () => {
           {checkingUpdate ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
-            <Text style={styles.updateButtonText}>🔄 Vérifier les mises à jour (OTA)</Text>
+            <Text style={styles.updateButtonText}>Vérifier les mises à jour (OTA)</Text>
           )}
         </TouchableOpacity>
       </View>
 
       {/* Entête Logs */}
       <View style={styles.header}>
-        <Text style={styles.sectionTitle}>🔍 Logs d'Erreur & Événements</Text>
+        <Text style={styles.sectionTitle}>Logs d'Erreur & Événements</Text>
         <View style={styles.buttonContainer}>
           <TouchableOpacity style={[styles.button, styles.clearButton]} onPress={clearLogs}>
-            <Text style={styles.buttonText}>🗑️ Effacer</Text>
+            <Text style={styles.buttonText}>Effacer</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.button, styles.refreshButton]} onPress={loadLogs}>
-            <Text style={styles.buttonText}>🔄 Rafraîchir</Text>
+            <Text style={styles.buttonText}>Rafraîchir</Text>
           </TouchableOpacity>
         </View>
       </View>

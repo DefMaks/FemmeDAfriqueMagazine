@@ -347,9 +347,7 @@ AppStore : Bientôt disponible`;
               style={styles.categoryContainer}
             >
               <Text style={styles.category}>
-                {taxonomyLoading
-                  ? 'Chargement...'
-                  : getCategoryName(article.categories[0])}
+                {getCategoryName(article.categories[0]) || 'Actualité'}
               </Text>
             </TouchableOpacity>
           )}
@@ -503,7 +501,7 @@ AppStore : Bientôt disponible`;
                   tagId !== 184 && (
                     <View key={index} style={styles.keywordTag}>
                       <Text style={styles.keywordText}>
-                        {taxonomyLoading ? 'Chargement...' : getTagName(tagId)}
+                        {getTagName(tagId) || ''}
                       </Text>
                     </View>
                   )

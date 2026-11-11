@@ -7,15 +7,78 @@ export interface SavedArticle {
   user_id: string;
   article_id: string;
   article_data: Post;
-  media: string; // Ajout du champ media
+  media: string;
   saved_at: string;
   created_at: string;
 }
 
+let savedIdsCache: Set<string> | null = null;
+let savedIdsCacheUserId: string | null = null;
+let savedIdsCacheTime = 0;
+let savedIdsFetchPromise: Promise<Set<string>> | null = null;
+const SAVED_CACHE_TTL = 60 * 1000; // 60 secondes
+
+async function resolveCurrentUserId(): Promise<string> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    if (data?.session?.user?.id) {
+      return data.session.user.id;
+    }
+  } catch {
+    // Fallback sur deviceId
+  }
+  return await getDeviceId();
+}
+
+async function ensureSavedIdsSet(forceRefresh = false): Promise<Set<string>> {
+  const userId = await resolveCurrentUserId();
+  const now = Date.now();
+
+  if (
+    !forceRefresh &&
+    savedIdsCache &&
+    savedIdsCacheUserId === userId &&
+    now - savedIdsCacheTime < SAVED_CACHE_TTL
+  ) {
+    return savedIdsCache;
+  }
+
+  if (savedIdsFetchPromise && !forceRefresh) {
+    return savedIdsFetchPromise;
+  }
+
+  savedIdsFetchPromise = (async () => {
+    try {
+      const { data, error } = await supabase
+        .from('saved_articles')
+        .select('article_id')
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      const set = new Set<string>((data || []).map((row: any) => String(row.article_id)));
+      savedIdsCache = set;
+      savedIdsCacheUserId = userId;
+      savedIdsCacheTime = Date.now();
+      return set;
+    } catch {
+      return savedIdsCache || new Set<string>();
+    } finally {
+      savedIdsFetchPromise = null;
+    }
+  })();
+
+  return savedIdsFetchPromise;
+}
+
 export const savedArticlesService = {
+  invalidateCache() {
+    savedIdsCache = null;
+    savedIdsCacheTime = 0;
+  },
+
   async getSavedArticles(): Promise<SavedArticle[]> {
     try {
-      const userId = await getDeviceId();
+      const userId = await resolveCurrentUserId();
       const { data, error } = await supabase
         .from('saved_articles')
         .select('*')
@@ -23,7 +86,11 @@ export const savedArticlesService = {
         .order('saved_at', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      const list = data || [];
+      savedIdsCache = new Set<string>(list.map((item: any) => String(item.article_id)));
+      savedIdsCacheUserId = userId;
+      savedIdsCacheTime = Date.now();
+      return list;
     } catch (error) {
       console.error('Error fetching saved articles:', error);
       return [];
@@ -32,23 +99,28 @@ export const savedArticlesService = {
 
   async saveArticle(article: Post): Promise<boolean> {
     try {
-      const userId = await getDeviceId();
-      const media = Constants.expoConfig?.extra?.EXPO_PUBLIC_MEDIA || Constants.expoConfig?.extra?.media || 'FDA'; // Récupérer depuis .env
+      const userId = await resolveCurrentUserId();
+      const articleIdStr = article.id.toString();
+      const media =
+        Constants.expoConfig?.extra?.EXPO_PUBLIC_MEDIA ||
+        Constants.expoConfig?.extra?.media ||
+        'FDA';
+
       const { error } = await supabase
         .from('saved_articles')
         .insert({
           user_id: userId,
-          article_id: article.id.toString(),
+          article_id: articleIdStr,
           article_data: article,
-          media: media, // Ajout du champ media
+          media: media,
         });
 
-      if (error) {
-        if (error.code === '23505') {
-          console.log('Article already saved');
-          return true;
-        }
+      if (error && error.code !== '23505') {
         throw error;
+      }
+
+      if (savedIdsCache) {
+        savedIdsCache.add(articleIdStr);
       }
       return true;
     } catch (error) {
@@ -59,7 +131,7 @@ export const savedArticlesService = {
 
   async unsaveArticle(articleId: string): Promise<boolean> {
     try {
-      const userId = await getDeviceId();
+      const userId = await resolveCurrentUserId();
       const { error } = await supabase
         .from('saved_articles')
         .delete()
@@ -67,6 +139,9 @@ export const savedArticlesService = {
         .eq('article_id', articleId);
 
       if (error) throw error;
+      if (savedIdsCache) {
+        savedIdsCache.delete(String(articleId));
+      }
       return true;
     } catch (error) {
       console.error('Error unsaving article:', error);
@@ -76,18 +151,9 @@ export const savedArticlesService = {
 
   async isArticleSaved(articleId: string): Promise<boolean> {
     try {
-      const userId = await getDeviceId();
-      const { data, error } = await supabase
-        .from('saved_articles')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('article_id', articleId)
-        .maybeSingle();
-
-      if (error) throw error;
-      return !!data;
-    } catch (error) {
-      console.error('Error checking if article is saved:', error);
+      const set = await ensureSavedIdsSet();
+      return set.has(String(articleId));
+    } catch {
       return false;
     }
   },
@@ -103,7 +169,7 @@ export interface UserPreferences {
 export const userPreferencesService = {
   async getPreferences(): Promise<UserPreferences> {
     try {
-      const userId = await getDeviceId();
+      const userId = await resolveCurrentUserId();
       const { data, error } = await supabase
         .from('user_preferences')
         .select('preferences')
@@ -120,7 +186,7 @@ export const userPreferencesService = {
 
   async updatePreferences(preferences: UserPreferences): Promise<boolean> {
     try {
-      const userId = await getDeviceId();
+      const userId = await resolveCurrentUserId();
       const { error } = await supabase
         .from('user_preferences')
         .upsert({
@@ -149,7 +215,7 @@ export interface PopularPost {
 export const postViewsService = {
   async trackView(postId: string): Promise<boolean> {
     try {
-      const userId = await getDeviceId();
+      const userId = await resolveCurrentUserId();
       const { error } = await supabase
         .from('post_views')
         .insert({

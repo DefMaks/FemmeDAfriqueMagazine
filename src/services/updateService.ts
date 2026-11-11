@@ -45,28 +45,28 @@ class UpdateService {
    */
   async checkOnAppLaunch(): Promise<void> {
     if (__DEV__ || !Updates.isEnabled) {
-      console.log('ℹ️ OTA désactivé en mode développement ou non supporté');
+      console.log('[updateService] OTA desactive en mode developpement ou non supporte');
       return;
     }
 
     try {
-      await logger.info('🔄 OTA : Recherche de mise à jour au démarrage...');
+      await logger.info('OTA : Recherche de mise a jour au demarrage...');
       const check = await Updates.checkForUpdateAsync();
 
       if (check.isAvailable) {
-        await logger.info('📥 OTA : Nouvelle mise à jour trouvée, téléchargement...');
+        await logger.info('OTA : Nouvelle mise a jour trouvee, telechargement...');
         const fetchResult = await Updates.fetchUpdateAsync();
 
         if (fetchResult.isNew) {
-          await logger.info('✅ OTA : Mise à jour téléchargée avec succès. Application...');
+          await logger.info('OTA : Mise a jour telechargee avec succes. Application...');
           // On recharge l'application pour charger le nouveau bundle
           await Updates.reloadAsync();
         }
       } else {
-        await logger.info('✅ OTA : L\'application est à jour');
+        await logger.info("OTA : L'application est a jour");
       }
     } catch (error: any) {
-      console.warn('⚠️ Erreur recherche OTA au démarrage (ignorée pour ne pas bloquer l\'app):', error?.message);
+      console.warn('[updateService] Erreur recherche OTA au demarrage:', error?.message);
     }
   }
 

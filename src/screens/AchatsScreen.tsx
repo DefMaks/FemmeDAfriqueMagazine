@@ -6,13 +6,14 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { purchaseHistoryService, PurchaseItem } from '../services/purchaseHistoryService';
 import { profileService, UserSubscription } from '../services/profileService';
+import { AchatsSkeleton } from '../components/PageSkeletons';
+import { decodeHtmlEntities } from '../utils/textUtils';
 
 const AchatsScreen = ({ navigation }: any) => {
   const [purchases, setPurchases] = useState<PurchaseItem[]>([]);
@@ -48,6 +49,10 @@ const AchatsScreen = ({ navigation }: any) => {
   const onRefresh = () => {
     setRefreshing(true);
     loadData();
+  };
+
+  const navigateToShop = () => {
+    navigation.navigate('Main', { screen: 'Boutique' });
   };
 
   const formatDate = (isoString?: string) => {
@@ -101,7 +106,7 @@ const AchatsScreen = ({ navigation }: any) => {
             </View>
             <TouchableOpacity
               style={styles.promoButton}
-              onPress={() => navigation.navigate('Boutique')}
+              onPress={navigateToShop}
               activeOpacity={0.8}
             >
               <Text style={styles.promoButtonText}>S'abonner</Text>
@@ -127,7 +132,7 @@ const AchatsScreen = ({ navigation }: any) => {
         </View>
 
         <View style={styles.cardContent}>
-          <Text style={styles.itemTitle}>{item.title}</Text>
+          <Text style={styles.itemTitle}>{decodeHtmlEntities(item.title)}</Text>
           <Text style={styles.itemDate}>{formatDate(item.purchaseDate)}</Text>
         </View>
 
@@ -160,10 +165,7 @@ const AchatsScreen = ({ navigation }: any) => {
 
       {/* Content */}
       {loading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>Chargement de vos achats...</Text>
-        </View>
+        <AchatsSkeleton />
       ) : purchases.length === 0 && !subscription ? (
         <View style={styles.centerContainer}>
           <View style={styles.emptyIconContainer}>
@@ -175,7 +177,7 @@ const AchatsScreen = ({ navigation }: any) => {
           </Text>
           <TouchableOpacity
             style={styles.emptyButton}
-            onPress={() => navigation.navigate('Boutique')}
+            onPress={navigateToShop}
             activeOpacity={0.8}
           >
             <Text style={styles.emptyButtonText}>Visiter la boutique</Text>
@@ -232,11 +234,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: Colors.textSecondary,
   },
   emptyIconContainer: {
     width: 90,
@@ -350,15 +347,14 @@ const styles = StyleSheet.create({
   promoSubtitle: {
     fontSize: 12,
     color: Colors.textSecondary,
-    marginTop: 2,
-    lineHeight: 16,
+    marginTop: 4,
+    paddingRight: 12,
   },
   promoButton: {
     backgroundColor: Colors.primary,
-    paddingVertical: 8,
+    paddingVertical: 9,
     paddingHorizontal: 14,
-    borderRadius: 18,
-    marginLeft: 12,
+    borderRadius: 20,
   },
   promoButtonText: {
     color: '#FFF',
@@ -366,11 +362,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
-    color: Colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: Colors.text,
     marginBottom: 8,
   },
   card: {
@@ -386,14 +380,15 @@ const styles = StyleSheet.create({
   cardIconContainer: {
     width: 42,
     height: 42,
-    borderRadius: 21,
-    backgroundColor: Colors.primary + '15',
+    borderRadius: 10,
+    backgroundColor: Colors.primary + '12',
     justifyContent: 'center',
     alignItems: 'center',
   },
   cardContent: {
     flex: 1,
     marginLeft: 12,
+    marginRight: 8,
   },
   itemTitle: {
     fontSize: 14,
@@ -407,24 +402,23 @@ const styles = StyleSheet.create({
   },
   cardRight: {
     alignItems: 'flex-end',
-    marginLeft: 8,
   },
   itemPrice: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.primary,
+    color: Colors.text,
   },
   statusPill: {
-    marginTop: 4,
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 6,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,
+    marginTop: 4,
   },
   statusText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#059669',
+    color: '#15803D',
     textTransform: 'capitalize',
   },
 });

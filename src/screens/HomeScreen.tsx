@@ -24,10 +24,9 @@ import { Post } from '../models/Post';
 import { ArticleCard } from '../components/ArticleCard';
 import { PostSlider } from '../components/PostSlider';
 import { SectionHeader } from '../components/SectionHeader';
-import { LoadingSpinner } from '../components/LoadingSpinner';
+import { HomeSkeleton } from '../components/PageSkeletons';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { RootStackParamList } from '../navigation/RootNavigator';
-import { savedArticlesService } from '../services/supabaseService';
 import { analyticsService } from '../services/analytics.simple';
 import { AdBanner } from '../components/AdBanner';
 
@@ -38,25 +37,28 @@ const AD_BANNER_HEIGHT = ((screenWidth - 32) * 406) / 1300; // Ratio 1300x406
 const HOME_AD_ID = 21755;
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList> & {
-    navigate: (screen: string) => void;
+    navigate: (screen: string, params?: any) => void;
 };
 
 const SLIDER_TAG_ID = 184;
 const ESPACE_TENDRESSE_ID = 2483;
 const ENTREPRENEURIAT_ID = 115;
+const MINES_ID = 146;
 const GASTRONOMIE_ID = 20;
+const ENFER_DES_FEMMES_ID = 2361;
 
 const HomeScreen = () => {
     const navigation = useNavigation<HomeScreenNavigationProp>();
     const [sliderPosts, setSliderPosts] = useState<Post[]>([]);
     const [espaceTendressePosts, setEspaceTendressePosts] = useState<Post[]>([]);
     const [entrepreneuriatPosts, setEntrepreneuriatPosts] = useState<Post[]>([]);
+    const [minesPosts, setMinesPosts] = useState<Post[]>([]);
     const [gastronomiePosts, setGastronomiePosts] = useState<Post[]>([]);
+    const [enferDesFemmesPosts, setEnferDesFemmesPosts] = useState<Post[]>([]);
     const [latestPosts, setLatestPosts] = useState<Post[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [savedStatus, setSavedStatus] = useState<Record<number, boolean>>({});
     const [homeBannerAd, setHomeBannerAd] = useState<any>(null);
 
     useEffect(() => {
@@ -80,7 +82,6 @@ const HomeScreen = () => {
     // Récupérer l'URL de l'image de la bannière pub
     const getAdBannerImageUrl = (): string | null => {
         if (!homeBannerAd) return null;
-        // Essayer différentes sources d'image
         return homeBannerAd.better_featured_image?.source_url
             || homeBannerAd.dmks_featured_image?.src
             || homeBannerAd.dmks_featured_image?.sizes?.large?.url
@@ -96,44 +97,27 @@ const HomeScreen = () => {
                 sliderData,
                 espaceTendresseData,
                 entrepreneuriatData,
+                minesData,
                 gastronomieData,
+                enferDesFemmesData,
                 latestData,
             ] = await Promise.all([
                 getPostsByTag(SLIDER_TAG_ID, 1, 4).catch(() => []),
                 getPostsByCategory(ESPACE_TENDRESSE_ID, 1, 5).catch(() => []),
                 getPostsByCategory(ENTREPRENEURIAT_ID, 1, 4).catch(() => []),
+                getPostsByCategory(MINES_ID, 1, 6).catch(() => []),
                 getPostsByCategory(GASTRONOMIE_ID, 1, 4).catch(() => []),
+                getPostsByCategory(ENFER_DES_FEMMES_ID, 1, 5).catch(() => []),
                 getPosts(1, 4).catch(() => []),
             ]);
 
             setSliderPosts(sliderData);
             setEspaceTendressePosts(espaceTendresseData);
             setEntrepreneuriatPosts(entrepreneuriatData);
+            setMinesPosts(minesData.slice(0, 6));
             setGastronomiePosts(gastronomieData);
+            setEnferDesFemmesPosts(enferDesFemmesData);
             setLatestPosts(latestData);
-
-            const allPosts = [
-                ...sliderData,
-                ...espaceTendresseData,
-                ...entrepreneuriatData,
-                ...gastronomieData,
-                ...latestData,
-            ].filter(post =>
-                post &&
-                typeof post.id === 'number' &&
-                post.title?.rendered
-            );
-
-            const statusChecks = allPosts.map(post =>
-                savedArticlesService.isArticleSaved(post.id.toString()).then(saved => ({ id: post.id, saved }))
-            );
-            const statusResults = await Promise.all(statusChecks);
-
-            const status: Record<number, boolean> = {};
-            statusResults.forEach(({ id, saved }: { id: number; saved: boolean }) => {
-                status[id] = saved;
-            });
-            setSavedStatus(status);
         } catch (err) {
             setError('Impossible de charger le contenu');
             console.error('Error loading content:', err);
@@ -145,65 +129,40 @@ const HomeScreen = () => {
 
     const onRefresh = async () => {
         setRefreshing(true);
-
-        // Refresh optimisé : vider uniquement le cache des posts critiques
-        // pour forcer la récupération fraîche des catégories importantes
         clearCache('posts');
 
         try {
-            // Charger les catégories critiques en premier (priorité haute)
-            const [entrepreneuriatData, gastronomieData] = await Promise.all([
-                getPostsByCategory(ENTREPRENEURIAT_ID, 1, 4).catch(() => []),
-                getPostsByCategory(GASTRONOMIE_ID, 1, 4).catch(() => []),
-            ]);
-
-            // Mettre à jour immédiatement l'UI pour les catégories critiques
-            setEntrepreneuriatPosts(entrepreneuriatData);
-            setGastronomiePosts(gastronomieData);
-
-            // Charger le reste en parallèle
-            const [sliderData, espaceTendresseData, latestData] = await Promise.all([
+            const [
+                sliderData,
+                latestData,
+                espaceTendresseData,
+                entrepreneuriatData,
+                minesData,
+                gastronomieData,
+                enferDesFemmesData,
+            ] = await Promise.all([
                 getPostsByTag(SLIDER_TAG_ID, 1, 4).catch(() => []),
-                getPostsByCategory(ESPACE_TENDRESSE_ID, 1, 5).catch(() => []),
                 getPosts(1, 4).catch(() => []),
+                getPostsByCategory(ESPACE_TENDRESSE_ID, 1, 5).catch(() => []),
+                getPostsByCategory(ENTREPRENEURIAT_ID, 1, 4).catch(() => []),
+                getPostsByCategory(MINES_ID, 1, 6).catch(() => []),
+                getPostsByCategory(GASTRONOMIE_ID, 1, 4).catch(() => []),
+                getPostsByCategory(ENFER_DES_FEMMES_ID, 1, 5).catch(() => []),
             ]);
 
             setSliderPosts(sliderData);
-            setEspaceTendressePosts(espaceTendresseData);
             setLatestPosts(latestData);
-
-            // Mettre à jour les statuts de sauvegarde
-            const allPosts = [
-                ...sliderData,
-                ...espaceTendresseData,
-                ...entrepreneuriatData,
-                ...gastronomieData,
-                ...latestData,
-            ].filter(post =>
-                post &&
-                typeof post.id === 'number' &&
-                post.title?.rendered
-            );
-
-            const statusChecks = allPosts.map(post =>
-                savedArticlesService.isArticleSaved(post.id.toString()).then(saved => ({ id: post.id, saved }))
-            );
-            const statusResults = await Promise.all(statusChecks);
-
-            const newSavedStatus = statusResults.reduce((acc, { id, saved }) => {
-                acc[id] = saved;
-                return acc;
-            }, {} as Record<number, boolean>);
-
-            setSavedStatus(newSavedStatus);
-
+            setEspaceTendressePosts(espaceTendresseData);
+            setEntrepreneuriatPosts(entrepreneuriatData);
+            setMinesPosts(minesData.slice(0, 6));
+            setGastronomiePosts(gastronomieData);
+            setEnferDesFemmesPosts(enferDesFemmesData);
         } catch (error) {
             console.error('Erreur lors du refresh:', error);
         } finally {
             setRefreshing(false);
         }
 
-        // Recharger la bannière pub en arrière-plan (non bloquant)
         loadHomeBannerAd();
     };
 
@@ -216,17 +175,14 @@ const HomeScreen = () => {
     }, [navigation]);
 
     const handleSeeAllCategory = useCallback((categoryId: number, categoryName: string) => {
-        // Naviguer vers l'onglet Découvrir avec la catégorie pré-sélectionnée
         navigation.navigate('Main', {
             screen: 'Découvrir',
             params: { categoryId, categoryName },
         } as any);
     }, [navigation]);
 
-    // Les boutons sont maintenant intégrés dans ArticleCard
-
     if (loading) {
-        return <LoadingSpinner message="Chargement..." />;
+        return <HomeSkeleton />;
     }
 
     if (error) {
@@ -241,7 +197,6 @@ const HomeScreen = () => {
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
             }
         >
-
             <View style={styles.header}>
                 <Image
                     source={require('../../assets/FDA-gradient.png')}
@@ -267,7 +222,7 @@ const HomeScreen = () => {
             {getAdBannerImageUrl() && (
                 <View style={styles.adBannerSection}>
                     <TouchableOpacity
-                        onPress={() => navigation.navigate('Boutique')}
+                        onPress={() => navigation.navigate('Main', { screen: 'Boutique' })}
                         activeOpacity={0.9}
                     >
                         <Image
@@ -344,7 +299,27 @@ const HomeScreen = () => {
                 </View>
             )}
 
-            <AdBanner provider='supabase' zone="home" />
+            <AdBanner provider="supabase" zone="home" />
+
+            {/* Mines : 2 colonnes x 3 lignes (avant Gastronomie) */}
+            {minesPosts.length > 0 && (
+                <View style={styles.section}>
+                    <SectionHeader
+                        title="Mines"
+                        onSeeAll={() => handleSeeAllCategory(MINES_ID, 'Mines')}
+                    />
+                    <View style={styles.minesGrid}>
+                        {minesPosts.slice(0, 6).map((post, index) => (
+                            <ArticleCard
+                                key={`mines_${post.id}_${index}`}
+                                article={post}
+                                onPress={() => handleArticlePress(post)}
+                                variant="grid"
+                            />
+                        ))}
+                    </View>
+                </View>
+            )}
 
             {/* Gastronomie */}
             {gastronomiePosts.length > 0 && (
@@ -368,6 +343,24 @@ const HomeScreen = () => {
                             </View>
                         ))}
                     </ScrollView>
+                </View>
+            )}
+
+            {/* Enfer des femmes : liste comme Derniers articles mais un chouya plus compact */}
+            {enferDesFemmesPosts.length > 0 && (
+                <View style={styles.section}>
+                    <SectionHeader
+                        title="Enfer des femmes"
+                        onSeeAll={() => handleSeeAllCategory(ENFER_DES_FEMMES_ID, 'Enfer des femmes')}
+                    />
+                    {enferDesFemmesPosts.map((post, index) => (
+                        <ArticleCard
+                            key={`enfer_${post.id}_${index}`}
+                            article={post}
+                            onPress={() => handleArticlePress(post)}
+                            variant="compact"
+                        />
+                    ))}
                 </View>
             )}
 
@@ -410,6 +403,12 @@ const styles = StyleSheet.create({
     horizontalCard: {
         width: 200,
         marginRight: 16,
+    },
+    minesGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
     },
     footer: {
         height: 100,

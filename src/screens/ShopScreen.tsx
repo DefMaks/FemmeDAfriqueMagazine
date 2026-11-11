@@ -33,6 +33,8 @@ import { centralPaymentService, PaymentRequest } from '../services/centralPaymen
 import Constants from 'expo-constants';
 import { supabase } from '../lib/supabase';
 import { purchaseHistoryService } from '../services/purchaseHistoryService';
+import { ShopSkeleton } from '../components/PageSkeletons';
+import { decodeHtmlEntities } from '../utils/textUtils';
 
 const STORAGE_KEY_PHONE = '@fda_user_phone';
 
@@ -92,7 +94,7 @@ const ShopScreen = () => {
             // 3. Vérification du statut
             if (downloadResult && downloadResult.status === 200) {
                 Alert.alert(
-                    '✅ PDF Téléchargé',
+                    'PDF Téléchargé',
                     `Le magazine FAM N°${magazine.acf.numero} a été téléchargé avec succès !`,
                     [
                         {
@@ -290,7 +292,7 @@ const ShopScreen = () => {
         }
 
         setLoadingPayment(true);
-        setPaymentStatusMessage('🔄 Traitement du paiement...');
+        setPaymentStatusMessage('Traitement du paiement...');
 
         try {
             const result = await processPaymentWithCentralService('emoney', phone);
@@ -324,7 +326,7 @@ const ShopScreen = () => {
         if (!selectedMagazine) return;
 
         setLoadingPayment(true);
-        setPaymentStatusMessage('🔄 Traitement du paiement par carte...');
+        setPaymentStatusMessage('Traitement du paiement par carte...');
 
         try {
             const result = await processPaymentWithCentralService('ecard');
@@ -338,7 +340,7 @@ const ShopScreen = () => {
                 setPaymentStatusMessage('');
                 if (result.error === 'CARD_PAYMENT_PENDING') {
                     Alert.alert(
-                        '🔍 Vérification du paiement',
+                        'Vérification du paiement',
                         'Avez-vous complété le paiement par carte ?',
                         [
                             { text: 'Non, annuler', style: 'cancel' },
@@ -362,7 +364,7 @@ const ShopScreen = () => {
 
     const verifyCardPayment = async (orderNumber: string) => {
         setLoadingPayment(true);
-        setPaymentStatusMessage('🔄 Vérification en cours...');
+        setPaymentStatusMessage('Vérification en cours...');
 
         try {
             const result = await centralPaymentService.checkPaymentStatus(orderNumber, 'ecard');
@@ -375,13 +377,13 @@ const ShopScreen = () => {
             } else if (isPaymentFailed(result.status)) {
                 setPaymentStatusMessage('');
                 Alert.alert(
-                    '❌ Paiement échoué',
+                    'Paiement échoué',
                     `Le paiement a échoué: ${result.rawStatus || result.status}`
                 );
             } else {
                 setPaymentStatusMessage('');
                 Alert.alert(
-                    '⏳ Paiement en attente',
+                    'Paiement en attente',
                     'Le paiement n\'a pas encore été confirmé.',
                     [
                         { text: 'OK' },
@@ -434,12 +436,7 @@ const ShopScreen = () => {
     };
 
     if (loading) {
-        return (
-            <View style={styles.center}>
-                <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={styles.loadingText}>Chargement...</Text>
-            </View>
-        );
+        return <ShopSkeleton />;
     }
 
     return (
@@ -575,7 +572,7 @@ const ShopScreen = () => {
                                             maxLength={12}
                                         />
                                         {detectedProvider ? (
-                                            <Text style={styles.providerDetected}>📱 {detectedProvider} détecté</Text>
+                                            <Text style={styles.providerDetected}>{detectedProvider} détecté</Text>
                                         ) : null}
 
                                         <TouchableOpacity
@@ -667,7 +664,7 @@ const ShopScreen = () => {
                         <View style={styles.downloadPopupIconContainer}>
                             <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
                         </View>
-                        <Text style={styles.downloadPopupTitle}>🎉 Paiement réussi !</Text>
+                        <Text style={styles.downloadPopupTitle}>Paiement réussi !</Text>
                         <Text style={styles.downloadPopupSubtitle}>
                             Votre magazine N°{selectedMagazine?.acf.numero} est prêt !
                         </Text>

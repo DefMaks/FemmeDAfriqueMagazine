@@ -53,18 +53,21 @@ const ProfileScreen = () => {
     // États pour la photo de profil
     const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
 
     // États pour les statistiques
     const [stats, setStats] = useState({
         articlesRead: 0,
         purchases: 0,
-        activeDays: 0
+        activeDays: 1
     });
 
     const refreshAll = async () => {
-        await loadUserPreferences();
-        await checkActiveSession();
-        await loadStats();
+        await Promise.all([
+            loadUserPreferences(),
+            checkActiveSession(),
+            loadStats(),
+        ]);
     };
 
     // Recharger lors de l'accès à l'écran
@@ -78,54 +81,35 @@ const ProfileScreen = () => {
 
     const loadStats = async () => {
         try {
-            // Charger les statistiques depuis le profil
-            const currentProfile = await profileService.getCurrentProfile();
-
-            if (currentProfile && currentProfile.profile_data) {
-                const profileStats = currentProfile.profile_data.stats || {};
-                setStats({
-                    articlesRead: profileStats.articles_read || 0,
-                    purchases: (profileStats as any).purchases || 0, // Cast temporaire en attendant la mise à jour du type
-                    activeDays: profileStats.active_days || 0
-                });
-            } else {
-                // Valeurs par défaut
-                setStats({
-                    articlesRead: 0,
-                    purchases: 0,
-                    activeDays: 0
-                });
-            }
+            const dynamicStats = await getDynamicStats();
+            setStats(dynamicStats);
         } catch (error) {
-            console.error('❌ Erreur chargement statistiques:', error);
+            console.error('Erreur chargement statistiques:', error);
         }
     };
 
     // Fonction pour récupérer les vraies statistiques dynamiquement
     const getDynamicStats = async () => {
         try {
-            const [readCount, purchasesCount, currentProfile] = await Promise.all([
+            const [readCount, purchasesCount, activeDaysCount] = await Promise.all([
                 readingHistoryService.getArticlesReadCount(),
                 purchaseHistoryService.getPurchasesCount(),
-                profileService.getCurrentProfile(),
+                readingHistoryService.getActiveDaysCount(),
             ]);
-
-            const activeDays = currentProfile?.profile_data?.stats?.active_days || 1;
 
             const statsData = {
                 articlesRead: readCount,
                 purchases: purchasesCount,
-                activeDays: Math.max(activeDays, readCount > 0 ? 1 : 0),
+                activeDays: Math.max(1, activeDaysCount),
             };
 
-            console.log('📊 Statistiques réelles synchronisées:', statsData);
             return statsData;
         } catch (error) {
-            console.error('❌ Erreur getDynamicStats:', error);
+            console.error('Erreur getDynamicStats:', error);
             return {
                 articlesRead: 0,
                 purchases: 0,
-                activeDays: 0
+                activeDays: 1
             };
         }
     };
@@ -142,14 +126,10 @@ const ProfileScreen = () => {
     // Fonction pour rafraîchir les statistiques
     const refreshStats = async () => {
         try {
-            console.log('🔄 Rafraîchissement des statistiques...');
             const freshStats = await getDynamicStats();
             setStats(freshStats);
-
-            // Feedback haptique
-            console.log('✅ Statistiques rafraîchies');
         } catch (error) {
-            console.error('❌ Erreur rafraîchissement stats:', error);
+            console.error('Erreur rafraîchissement stats:', error);
         }
     };
 
@@ -158,7 +138,7 @@ const ProfileScreen = () => {
             const currentProfile = await profileService.getCurrentProfile();
 
             if (currentProfile) {
-                console.log('📂 Chargement données utilisateur:', currentProfile.username);
+                console.log('[ProfileScreen] Chargement donnees utilisateur:', currentProfile.username);
                 if (currentProfile.username) setUserName(currentProfile.username);
                 if (currentProfile.email) setUserEmail(currentProfile.email);
                 if (currentProfile.profile_data?.phone) setUserPhone(currentProfile.profile_data.phone);
@@ -241,8 +221,9 @@ const ProfileScreen = () => {
 
     const handleSaveProfile = async () => {
         try {
-            // Sauvegarder dans profile_data sur Supabase
+            setIsSavingProfile(true);
             await profileService.updatePreferences({
+                username: userName,
                 email: userEmail,
                 phone: userPhone,
                 social_x: socialX,
@@ -260,7 +241,6 @@ const ProfileScreen = () => {
                 } as any
             });
 
-            // Garder la compatibilité avec AsyncStorage (fallback)
             await Promise.all([
                 AsyncStorage.setItem(STORAGE_KEYS.USER_EMAIL, userEmail),
                 AsyncStorage.setItem(STORAGE_KEYS.USER_PHONE, userPhone),
@@ -269,16 +249,18 @@ const ProfileScreen = () => {
             ]);
 
             setShowEditModal(false);
-            Alert.alert('✅ Succès', 'Votre profil a été mis à jour et synchronisé.');
-        } catch (error) {
+            Alert.alert('Succès', 'Votre profil a été mis à jour et synchronisé.');
+        } catch (error: any) {
             console.error('Erreur sauvegarde profil:', error);
-            Alert.alert('Erreur', 'Impossible de sauvegarder vos informations.');
+            Alert.alert('Erreur', error?.message || 'Impossible de sauvegarder vos informations.');
+        } finally {
+            setIsSavingProfile(false);
         }
     };
 
     const handleUploadPhoto = async () => {
         if (!hasActiveSession) {
-            Alert.alert('⚠️ Session requise', 'Veuillez vous connecter pour modifier votre photo de profil.');
+            Alert.alert('Session requise', 'Veuillez vous connecter pour modifier votre photo de profil.');
             return;
         }
 
@@ -288,15 +270,15 @@ const ProfileScreen = () => {
             'Choisissez une option pour votre photo de profil:',
             [
                 {
-                    text: '📷 Prendre une photo',
+                    text: 'Prendre une photo',
                     onPress: () => handleTakePhoto(),
                 },
                 {
-                    text: '🖼️ Choisir dans la galerie',
+                    text: 'Choisir dans la galerie',
                     onPress: () => handleChooseFromGallery(),
                 },
                 {
-                    text: '❌ Annuler',
+                    text: 'Annuler',
                     style: 'cancel',
                 },
             ],
@@ -308,10 +290,9 @@ const ProfileScreen = () => {
         try {
             setIsUploadingPhoto(true);
 
-            // Demander la permission caméra
             const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
             if (permissionResult.status !== 'granted') {
-                Alert.alert('⚠️ Permission requise', 'Veuillez autoriser l\'accès à votre caméra.');
+                Alert.alert('Permission requise', 'Veuillez autoriser l\'accès à votre caméra.');
                 return;
             }
 
@@ -324,27 +305,24 @@ const ProfileScreen = () => {
 
             if (!pickerResult.canceled && pickerResult.assets && pickerResult.assets[0]) {
                 const asset = pickerResult.assets[0];
-                console.log('📸 Photo prise:', asset.uri);
 
                 try {
                     const uploadResult = await profilePhotoService.uploadProfilePhoto(asset.uri);
 
                     if (uploadResult.success && uploadResult.url) {
                         setProfilePhoto(uploadResult.url);
-                        console.log('✅ Photo uploadée via Uploadcare:', uploadResult.url);
-                        Alert.alert('✅ Succès', 'Votre photo de profil a été mise à jour.');
+                        Alert.alert('Succès', 'Votre photo de profil a été mise à jour.');
                     } else {
                         throw new Error(uploadResult.error || 'Erreur lors de l\'upload');
                     }
                 } catch (serviceError) {
-                    console.warn('⚠️ Uploadcare non disponible, utilisation du fallback local');
                     setProfilePhoto(asset.uri);
-                    Alert.alert('✅ Succès', 'Votre photo de profil a été mise à jour (mode temporaire).');
+                    Alert.alert('Succès', 'Votre photo de profil a été mise à jour (mode temporaire).');
                 }
             }
         } catch (error) {
-            console.error('❌ Erreur prise photo:', error);
-            Alert.alert('❌ Erreur', 'Impossible de prendre votre photo.');
+            console.error('Erreur prise photo:', error);
+            Alert.alert('Erreur', 'Impossible de prendre votre photo.');
         } finally {
             setIsUploadingPhoto(false);
         }
@@ -354,10 +332,9 @@ const ProfileScreen = () => {
         try {
             setIsUploadingPhoto(true);
 
-            // Demander la permission galerie
             const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
             if (permissionResult.status !== 'granted') {
-                Alert.alert('⚠️ Permission requise', 'Veuillez autoriser l\'accès à votre galerie.');
+                Alert.alert('Permission requise', 'Veuillez autoriser l\'accès à votre galerie.');
                 return;
             }
 
@@ -370,27 +347,24 @@ const ProfileScreen = () => {
 
             if (!pickerResult.canceled && pickerResult.assets && pickerResult.assets[0]) {
                 const asset = pickerResult.assets[0];
-                console.log('📸 Image sélectionnée:', asset.uri);
 
                 try {
                     const uploadResult = await profilePhotoService.uploadProfilePhoto(asset.uri);
 
                     if (uploadResult.success && uploadResult.url) {
                         setProfilePhoto(uploadResult.url);
-                        console.log('✅ Photo uploadée via Uploadcare:', uploadResult.url);
-                        Alert.alert('✅ Succès', 'Votre photo de profil a été mise à jour.');
+                        Alert.alert('Succès', 'Votre photo de profil a été mise à jour.');
                     } else {
                         throw new Error(uploadResult.error || 'Erreur lors de l\'upload');
                     }
                 } catch (serviceError) {
-                    console.warn('⚠️ Uploadcare non disponible, utilisation du fallback local');
                     setProfilePhoto(asset.uri);
-                    Alert.alert('✅ Succès', 'Votre photo de profil a été mise à jour (mode temporaire).');
+                    Alert.alert('Succès', 'Votre photo de profil a été mise à jour (mode temporaire).');
                 }
             }
         } catch (error) {
-            console.error('❌ Erreur sélection galerie:', error);
-            Alert.alert('❌ Erreur', 'Impossible de sélectionner votre photo.');
+            console.error('Erreur sélection galerie:', error);
+            Alert.alert('Erreur', 'Impossible de sélectionner votre photo.');
         } finally {
             setIsUploadingPhoto(false);
         }
@@ -435,7 +409,7 @@ const ProfileScreen = () => {
 
     const handleDeleteAccount = () => {
         Alert.alert(
-            '⚠️ Supprimer mon compte ?',
+            'Supprimer mon compte ?',
             'Cette action est irréversible. L\'ensemble de vos données, votre abonnement et vos favoris seront définitivement effacés.',
             [
                 { text: 'Annuler', style: 'cancel' },
@@ -451,7 +425,7 @@ const ProfileScreen = () => {
                             setUserPhone('243');
                             setSubscriptionInfo(null);
                             setProfilePhoto(null);
-                            Alert.alert('✅ Compte supprimé', 'Votre compte et vos données ont été définitivement effacés.');
+                            Alert.alert('Compte supprimé', 'Votre compte et vos données ont été définitivement effacés.');
                         } catch (e: any) {
                             Alert.alert('Erreur', e?.message || 'Impossible de supprimer le compte');
                         }
@@ -479,7 +453,7 @@ const ProfileScreen = () => {
                             setUserPhone('243');
                             setSubscriptionInfo(null);
                             setProfilePhoto(null);
-                            Alert.alert('✅ Déconnexion', 'Vous avez été déconnecté avec succès.');
+                            Alert.alert('Déconnexion', 'Vous avez été déconnecté avec succès.');
                         } catch (e: any) {
                             Alert.alert('Erreur', e?.message || 'Erreur lors de la déconnexion');
                         }
@@ -727,6 +701,15 @@ const ProfileScreen = () => {
                         </View>
 
                         <ScrollView showsVerticalScrollIndicator={false}>
+                            <Text style={styles.inputLabel}>Nom complet / Pseudonyme</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Ex: Amina Diallo"
+                                value={userName}
+                                onChangeText={setUserName}
+                                autoCapitalize="words"
+                            />
+
                             <Text style={styles.inputLabel}>Adresse email</Text>
                             <TextInput
                                 style={styles.input}
@@ -775,8 +758,14 @@ const ProfileScreen = () => {
                                 />
                             </View>
 
-                            <TouchableOpacity style={styles.saveButton} onPress={handleSaveProfile}>
-                                <Text style={styles.saveButtonText}>Enregistrer</Text>
+                            <TouchableOpacity
+                                style={[styles.saveButton, isSavingProfile && { opacity: 0.6 }]}
+                                onPress={handleSaveProfile}
+                                disabled={isSavingProfile}
+                            >
+                                <Text style={styles.saveButtonText}>
+                                    {isSavingProfile ? 'Enregistrement...' : 'Enregistrer'}
+                                </Text>
                             </TouchableOpacity>
                         </ScrollView>
                     </View>

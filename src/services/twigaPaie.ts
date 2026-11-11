@@ -632,7 +632,7 @@ export const handlePaymentError = (error: any): string => {
   console.error('🚨 Payment Error:', error);
 
   let errorMessage = 'Une erreur inconnue est survenue. Veuillez réessayer.';
-  let errorTitle = '❌ Erreur de Paiement';
+  let errorTitle = 'Erreur de Paiement';
 
   if (error instanceof PaymentError) {
     errorMessage = error.message;
@@ -646,15 +646,15 @@ export const handlePaymentError = (error: any): string => {
         break;
       case 'VALIDATION_ERROR':
       case 'FORMAT_ERROR':
-        errorTitle = '⚠️ Erreur de Validation';
+        errorTitle = 'Erreur de Validation';
         break;
       case 'FlexPaie_ERROR':
-        errorTitle = '💳 Erreur Paiement Carte';
+        errorTitle = 'Erreur Paiement Carte';
         errorMessage = 'Le service de paiement par carte est temporairement indisponible. Veuillez utiliser le paiement mobile money ou réessayer plus tard.';
         break;
       case 'CARD_STATUS_ERROR':
       case 'STATUS_CHECK_ERROR':
-        errorTitle = '🔍 Erreur de Vérification';
+        errorTitle = 'Erreur de Vérification';
         break;
     }
   } else if (error instanceof Error && error.message) {
@@ -673,21 +673,21 @@ export const showPaymentStatusAlert = (status: PaymentStatus, context: string = 
   switch (status) {
     case 'success':
     case 'completed':
-      Alert.alert('✅ Succès', `Votre ${context} a été effectué avec succès !`);
+      Alert.alert('Succès', `Votre ${context} a été effectué avec succès !`);
       break;
     case 'pending':
     case 'initiated':
     case 'processing':
-      Alert.alert('⏳ En cours', `Votre ${context} est en cours de traitement. Veuillez patienter.`);
+      Alert.alert('En cours', `Votre ${context} est en cours de traitement. Veuillez patienter.`);
       break;
     case 'failed':
-      Alert.alert('❌ Échec', `Votre ${context} a échoué. Veuillez réessayer.`);
+      Alert.alert('Échec', `Votre ${context} a échoué. Veuillez réessayer.`);
       break;
     case 'cancelled':
-      Alert.alert('🚫 Annulé', `Votre ${context} a été annulé.`);
+      Alert.alert('Annulé', `Votre ${context} a été annulé.`);
       break;
     case 'expired':
-      Alert.alert('⏰ Expiré', `Votre ${context} a expiré. Veuillez recommencer.`);
+      Alert.alert('Expiré', `Votre ${context} a expiré. Veuillez recommencer.`);
       break;
   }
 };

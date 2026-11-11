@@ -10,6 +10,7 @@ import {
     ScrollView,
     KeyboardAvoidingView,
     Platform,
+    ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
@@ -31,7 +32,7 @@ const AuthScreen = ({ navigation }: any) => {
 
     const handleLogin = async () => {
         if (!email || !password) {
-            Alert.alert('⚠️ Erreur', 'Veuillez remplir tous les champs');
+            Alert.alert('Erreur', 'Veuillez remplir tous les champs');
             return;
         }
 
@@ -46,12 +47,12 @@ const AuthScreen = ({ navigation }: any) => {
             // Analytics tracking
             await analyticsService.trackAuth('login_success', email);
 
-            Alert.alert('✅ Connexion réussie', 'Bienvenue !');
+            Alert.alert('Connexion réussie', 'Bienvenue !');
             navigation.goBack();
 
         } catch (error: any) {
             await analyticsService.trackAuth('login_failed', email);
-            Alert.alert('❌ Erreur', error.message || 'Identifiants incorrects');
+            Alert.alert('Erreur', error.message || 'Identifiants incorrects');
         } finally {
             setIsLoading(false);
         }
@@ -59,17 +60,17 @@ const AuthScreen = ({ navigation }: any) => {
 
     const handleRegister = async () => {
         if (!username || !email || !password) {
-            Alert.alert('⚠️ Erreur', 'Veuillez remplir tous les champs');
+            Alert.alert('Erreur', 'Veuillez remplir tous les champs');
             return;
         }
 
         if (password !== confirmPassword) {
-            Alert.alert('⚠️ Erreur', 'Les mots de passe ne correspondent pas');
+            Alert.alert('Erreur', 'Les mots de passe ne correspondent pas');
             return;
         }
 
         if (password.length < 6) {
-            Alert.alert('⚠️ Erreur', 'Le mot de passe doit contenir au moins 6 caractères');
+            Alert.alert('Erreur', 'Le mot de passe doit contenir au moins 6 caractères');
             return;
         }
 
@@ -85,14 +86,14 @@ const AuthScreen = ({ navigation }: any) => {
             await analyticsService.trackAuth('signup', username);
 
             Alert.alert(
-                '✅ Compte créé',
+                'Compte créé',
                 'Votre compte Femme d\'Afrique a été créé avec succès ! Si un e-mail de confirmation vous a été envoyé, pensez à valider votre boîte de réception.',
                 [{ text: 'Continuer', onPress: () => navigation.goBack() }]
             );
 
         } catch (error: any) {
             await analyticsService.trackAuth('login_failed', username);
-            Alert.alert('❌ Erreur', error.message || 'Impossible de créer le compte');
+            Alert.alert('Erreur', error.message || 'Impossible de créer le compte');
         } finally {
             setIsLoading(false);
         }
@@ -218,12 +219,13 @@ const AuthScreen = ({ navigation }: any) => {
                     onPress={handleSubmit}
                     disabled={isLoading}
                 >
-                    <Text style={styles.submitButtonText}>
-                        {isLoading
-                            ? 'Chargement...'
-                            : (mode === 'login' ? 'Se connecter' : 'Créer le compte')
-                        }
-                    </Text>
+                    {isLoading ? (
+                        <ActivityIndicator color="#FFFFFF" size="small" />
+                    ) : (
+                        <Text style={styles.submitButtonText}>
+                            {mode === 'login' ? 'Se connecter' : 'Créer le compte'}
+                        </Text>
+                    )}
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.toggleButton} onPress={toggleMode}>

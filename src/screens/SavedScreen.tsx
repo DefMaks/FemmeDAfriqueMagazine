@@ -1,5 +1,5 @@
 // src/screens/SavedScreen.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,26 +9,36 @@ import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { decodeHtmlEntities } from '../utils/textUtils';
 import { RootStackParamList } from '../navigation/RootNavigator';
+import { ArticleListSkeleton } from '../components/PageSkeletons';
 
 const formatTitle = (title: string) => decodeHtmlEntities(title);
-
 
 type SavedScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 const SavedScreen = () => {
   const navigation = useNavigation<SavedScreenNavigationProp>();
   const [savedPosts, setSavedPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadSaved = useCallback(async () => {
+    try {
+      const savedArticles = await savedArticlesService.getSavedArticles();
+      const posts = savedArticles.map(item => item.article_data).filter(Boolean);
+      setSavedPosts(posts);
+    } catch (e) {
+      console.error('Erreur chargement favoris:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     loadSaved();
-  }, []);
-
-  const loadSaved = async () => {
-    const savedArticles = await savedArticlesService.getSavedArticles();
-    // Extraire les Post depuis article_data
-    const posts = savedArticles.map(item => item.article_data);
-    setSavedPosts(posts);
-  };
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadSaved();
+    });
+    return unsubscribe;
+  }, [navigation, loadSaved]);
 
   const handleRemove = async (id: number) => {
     await savedArticlesService.unsaveArticle(id.toString());
@@ -45,7 +55,7 @@ const SavedScreen = () => {
       onPress={() => handleArticlePress(item)}
       activeOpacity={0.8}
     >
-      <Text style={styles.title} numberOfLines={2}>{formatTitle(item.title.rendered)}</Text>
+      <Text style={styles.title} numberOfLines={2}>{formatTitle(item.title?.rendered || '')}</Text>
       <TouchableOpacity
         onPress={() => handleRemove(item.id)}
         style={styles.removeButton}
@@ -56,31 +66,33 @@ const SavedScreen = () => {
     </TouchableOpacity>
   );
 
-  if (savedPosts.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Aucun article sauvegardé</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Favoris</Text>
       </View>
-      <FlatList
-        data={savedPosts}
-        renderItem={renderSavedPost}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.list}
-      />
+
+      {loading ? (
+        <ArticleListSkeleton count={5} />
+      ) : savedPosts.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Aucun article sauvegardé</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={savedPosts}
+          renderItem={renderSavedPost}
+          keyExtractor={(item, idx) => `${item?.id || idx}`}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background, padding: 16 },
+  container: { flex: 1, backgroundColor: Colors.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -95,7 +107,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginLeft: 8,
   },
-  list: { paddingBottom: 20 },
+  list: { padding: 16, paddingBottom: 40 },
   postCard: {
     backgroundColor: '#fff',
     padding: 16,

@@ -2,9 +2,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, getDeviceId } from '../lib/supabase';
 import { Post } from '../models/Post';
+import { decodeHtmlEntities } from '../utils/textUtils';
+
+const LOCAL_READ_KEY = '@fam_reading_history';
+const MAX_LOCAL_HISTORY = 100;
 
 export interface ReadArticleItem {
-  id: string;
+  id?: string;
   user_id: string;
   post_id: number;
   post_slug: string;
@@ -15,19 +19,16 @@ export interface ReadArticleItem {
   read_at: string;
 }
 
-const LOCAL_READ_KEY = 'fam_mobile_reading_history_v1';
-const MAX_LOCAL_ITEMS = 60;
-
 export const readingHistoryService = {
   /**
-   * Extraire l'URL de l'image d'un Post
+   * Extraire l'image principale d'un Post WordPress
    */
   extractImageUrl(post: Post): string | null {
-    if (post.dmks_featured_image?.sizes?.large?.url) {
-      return post.dmks_featured_image.sizes.large.url;
-    }
     if (post.dmks_featured_image?.sizes?.medium_large?.url) {
       return post.dmks_featured_image.sizes.medium_large.url;
+    }
+    if (post.dmks_featured_image?.sizes?.medium?.url) {
+      return post.dmks_featured_image.sizes.medium.url;
     }
     if (post.dmks_featured_image?.src) {
       return post.dmks_featured_image.src;
@@ -44,11 +45,13 @@ export const readingHistoryService = {
   async recordReading(post: Post): Promise<void> {
     if (!post || !post.id) return;
 
-    const title = post.title?.rendered || (typeof post.title === 'string' ? post.title : 'Article');
+    const rawTitle = post.title?.rendered || (typeof post.title === 'string' ? post.title : 'Article');
+    const title = decodeHtmlEntities(rawTitle);
     const slug = (post as any).slug || `post-${post.id}`;
     const image = this.extractImageUrl(post);
     const wpTerm = (post._embedded as any)?.['wp:term'];
-    const categoryName = Array.isArray(wpTerm) && Array.isArray(wpTerm[0]) ? wpTerm[0][0]?.name : (wpTerm?.[0]?.name || null);
+    const rawCatName = Array.isArray(wpTerm) && Array.isArray(wpTerm[0]) ? wpTerm[0][0]?.name : (wpTerm?.[0]?.name || null);
+    const categoryName = rawCatName ? decodeHtmlEntities(rawCatName) : null;
     const categorySlug = Array.isArray(wpTerm) && Array.isArray(wpTerm[0]) ? wpTerm[0][0]?.slug : (wpTerm?.[0]?.slug || null);
     const nowIso = new Date().toISOString();
 
@@ -70,96 +73,123 @@ export const readingHistoryService = {
           read_at: nowIso,
         },
         ...filtered,
-      ].slice(0, MAX_LOCAL_ITEMS);
+      ].slice(0, MAX_LOCAL_HISTORY);
 
       await AsyncStorage.setItem(LOCAL_READ_KEY, JSON.stringify(updated));
-    } catch (localErr) {
-      console.warn('⚠️ Erreur enregistrement local lecture:', localErr);
+    } catch (e) {
+      console.warn('Erreur sauvegarde locale lecture:', e);
     }
 
-    // 2. Synchronisation Supabase en arrière-plan
+    // 2. Synchronisation Supabase
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id || (await getDeviceId());
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData?.session?.user?.id || (await getDeviceId());
 
-      await supabase.from('reading_history').upsert(
-        {
-          user_id: userId,
-          post_id: post.id,
-          post_slug: slug,
-          post_title: title,
-          post_image: image,
-          category_name: categoryName,
-          category_slug: categorySlug,
-          read_at: nowIso,
-        },
-        { onConflict: 'user_id,post_slug' }
-      );
-    } catch (cloudErr) {
-      console.warn('⚠️ Erreur synchronisation cloud lecture:', cloudErr);
+      const { error } = await supabase
+        .from('reading_history')
+        .upsert(
+          {
+            user_id: userId,
+            post_id: post.id,
+            post_slug: slug,
+            post_title: title,
+            post_image: image,
+            category_name: categoryName,
+            category_slug: categorySlug,
+            read_at: nowIso,
+          },
+          { onConflict: 'user_id,post_slug' }
+        );
+
+      if (error) {
+        console.warn('Erreur synchro Supabase reading_history:', error.message);
+      }
+    } catch (e) {
+      console.warn('Exception synchro Supabase reading_history:', e);
     }
   },
 
   /**
-   * Récupérer l'historique complet des lectures
+   * Récupérer l'historique complet des lectures (Fusion Supabase + Local dédoublonnée)
    */
   async getReadingHistory(): Promise<ReadArticleItem[]> {
+    let remoteItems: ReadArticleItem[] = [];
+    let localItems: ReadArticleItem[] = [];
+
     try {
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id || (await getDeviceId());
+      const stored = await AsyncStorage.getItem(LOCAL_READ_KEY);
+      if (stored) {
+        localItems = JSON.parse(stored) || [];
+      }
+    } catch {
+      localItems = [];
+    }
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData?.session?.user?.id || (await getDeviceId());
 
       const { data, error } = await supabase
         .from('reading_history')
         .select('*')
         .eq('user_id', userId)
         .order('read_at', { ascending: false })
-        .limit(50);
+        .limit(MAX_LOCAL_HISTORY);
 
-      if (!error && data && data.length > 0) {
-        return data as ReadArticleItem[];
+      if (!error && data) {
+        remoteItems = data as ReadArticleItem[];
       }
     } catch (e) {
-      console.warn('⚠️ Fallback vers historique local:', e);
+      console.warn('Fallback vers historique local:', e);
     }
 
-    // Fallback local
-    try {
-      const stored = await AsyncStorage.getItem(LOCAL_READ_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      return [];
+    // Fusionner et dédoublonner par post_id / post_slug tout en nettoyant les entités HTML
+    const mergedMap = new Map<string, ReadArticleItem>();
+
+    for (const item of [...remoteItems, ...localItems]) {
+      if (!item) continue;
+      const key = item.post_id ? String(item.post_id) : item.post_slug;
+      if (!key) continue;
+
+      const cleaned: ReadArticleItem = {
+        ...item,
+        post_title: decodeHtmlEntities(item.post_title || 'Article'),
+        category_name: item.category_name ? decodeHtmlEntities(item.category_name) : null,
+      };
+
+      const existing = mergedMap.get(key);
+      if (!existing || new Date(cleaned.read_at).getTime() > new Date(existing.read_at).getTime()) {
+        mergedMap.set(key, cleaned);
+      }
     }
+
+    return Array.from(mergedMap.values()).sort(
+      (a, b) => new Date(b.read_at).getTime() - new Date(a.read_at).getTime()
+    );
   },
 
   /**
-   * Obtenir le nombre d'articles lus
+   * Obtenir le nombre exact d'articles lus (100% cohérent avec getReadingHistory)
    */
   async getArticlesReadCount(): Promise<number> {
-    try {
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id || (await getDeviceId());
+    const history = await this.getReadingHistory();
+    return history.length;
+  },
 
-      const { count, error } = await supabase
-        .from('reading_history')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
+  /**
+   * Obtenir le nombre de jours distincts d'activité de lecture
+   */
+  async getActiveDaysCount(): Promise<number> {
+    const history = await this.getReadingHistory();
+    if (history.length === 0) return 1;
 
-      if (!error && typeof count === 'number') {
-        return count;
+    const distinctDays = new Set<string>();
+    for (const item of history) {
+      if (item.read_at) {
+        distinctDays.add(item.read_at.slice(0, 10));
       }
-    } catch (e) {
-      // Ignorer
     }
-
-    try {
-      const stored = await AsyncStorage.getItem(LOCAL_READ_KEY);
-      if (stored) {
-        const list = JSON.parse(stored);
-        return Array.isArray(list) ? list.length : 0;
-      }
-    } catch (e) {}
-
-    return 0;
+    return Math.max(1, distinctDays.size);
   },
 
   /**
@@ -168,13 +198,13 @@ export const readingHistoryService = {
   async clearHistory(): Promise<boolean> {
     try {
       await AsyncStorage.removeItem(LOCAL_READ_KEY);
-      const { data: authData } = await supabase.auth.getUser();
-      const userId = authData?.user?.id || (await getDeviceId());
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData?.session?.user?.id || (await getDeviceId());
 
       await supabase.from('reading_history').delete().eq('user_id', userId);
       return true;
     } catch (e) {
-      console.warn('⚠️ Erreur effacement historique:', e);
+      console.warn('Erreur effacement historique:', e);
       return false;
     }
   },
@@ -187,13 +217,12 @@ export const readingHistoryService = {
       const deviceId = await getDeviceId();
       if (!deviceId || deviceId === authenticatedUserId) return;
 
-      console.log('🔄 Migration historique lecture device vers compte utilisateur:', deviceId, '->', authenticatedUserId);
       await supabase
         .from('reading_history')
         .update({ user_id: authenticatedUserId })
         .eq('user_id', deviceId);
     } catch (e) {
-      console.warn('⚠️ Erreur migration historique lecture:', e);
+      console.warn('Erreur migration historique lecture:', e);
     }
   },
 };

@@ -212,15 +212,15 @@ class TrustContentService {
     const defaultContent: TrustContent = {
       id: 'default',
       key: 'default',
-      title: '🛡️ Paiement Sécurisé',
+      title: 'Paiement Sécurisé',
       shortMessage: 'Transactions protégées et garanties par TwigaPaie',
-      modalTitle: '🛡️ Paiement 100% Sécurisé & Transparent',
+      modalTitle: 'Paiement 100% Sécurisé & Transparent',
       modalContent: 'Vous finalisez votre achat. Pour garantir la sécurité de votre transaction, celle-ci est traitée par TwigaPaie, la solution de paiement développée par DefMaks.',
       securityFeatures: [
-        '🔒 Transactions chiffrées de bout en bout',
-        '✅ Partenariat officiel avec les opérateurs mobiles',
-        '🛡️ Conformité aux standards de sécurité OHADA / PCI-DSS',
-        '📞 Support disponible 24/7 en cas de problème'
+        'Transactions chiffrées de bout en bout',
+        'Partenariat officiel avec les opérateurs mobiles',
+        'Conformité aux standards de sécurité OHADA / PCI-DSS',
+        'Support disponible 24/7 en cas de problème'
       ],
       partners: [
         {

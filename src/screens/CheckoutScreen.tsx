@@ -170,7 +170,7 @@ const CheckoutScreen = ({ route }: CheckoutScreenProps) => {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>✅ Paiement sécurisé et traçable</Text>
+                            <Text style={styles.modalTitle}>Paiement sécurisé et traçable</Text>
                         </View>
                         <ScrollView>
                             <Text style={styles.modalText}>
@@ -195,7 +195,7 @@ const CheckoutScreen = ({ route }: CheckoutScreenProps) => {
                                 En cas de questions ou de réclamations, notre équipe est à votre écoute. N’hésitez pas à nous contacter via le bouton ci-dessous :
                             </Text>
                             <TouchableOpacity style={styles.supportButton}>
-                                <Text style={styles.supportButtonText}>📧 Contactez notre support</Text>
+                                <Text style={styles.supportButtonText}>Contactez notre support</Text>
                             </TouchableOpacity>
                             <Text style={styles.modalText}>
                                 Nous sommes là pour vous accompagner à chaque étape et garantir votre satisfaction. Votre confiance est notre priorité, et nous mettons tout en œuvre pour vous offrir une expérience exceptionnelle.
@@ -244,7 +244,7 @@ const CheckoutScreen = ({ route }: CheckoutScreenProps) => {
             {/* Résumé après paiement réussi */}
             {paymentSuccess && (
                 <View style={styles.successContainer}>
-                    <Text style={styles.successTitle}>🎉 Paiement réussi !</Text>
+                    <Text style={styles.successTitle}>Paiement réussi !</Text>
                     <Text style={styles.successMessage}>
                         Vous avez bien acheté le magazine {magazine.title.rendered}.
                     </Text>
@@ -252,13 +252,13 @@ const CheckoutScreen = ({ route }: CheckoutScreenProps) => {
                         Le PDF est maintenant disponible pour téléchargement.
                     </Text>
                     <TouchableOpacity style={styles.downloadButton} onPress={downloadPdf}>
-                        <Text style={styles.downloadButtonText}>📥 Télécharger le PDF</Text>
+                        <Text style={styles.downloadButtonText}>Télécharger le PDF</Text>
                     </TouchableOpacity>
                     <Text style={styles.supportMessage}>
                         Si vous avez des questions, contactez notre support.
                     </Text>
                     <TouchableOpacity style={styles.supportButton} onPress={() => Alert.alert('Support', 'Contactez-nous à info@defmaks.com')}>
-                        <Text style={styles.supportButtonText}>📧 Contactez notre support</Text>
+                        <Text style={styles.supportButtonText}>Contactez notre support</Text>
                     </TouchableOpacity>
                 </View>
             )}

@@ -547,22 +547,27 @@ export class ProfileService {
   }
 
   /**
-   * Mettre à jour les préférences de profil
+   * Mettre à jour les préférences de profil et le nom
    */
-  async updatePreferences(preferences: Partial<UserProfile['profile_data']>): Promise<void> {
+  async updatePreferences(preferences: Partial<UserProfile['profile_data']> & { username?: string }): Promise<void> {
     try {
       const current = await this.getCurrentProfile();
       const localPrefs = await this.getLocalPreferences();
 
+      const { username, ...restPrefs } = preferences;
+
       const updatedPrefs: UserProfile['profile_data'] = {
         ...localPrefs,
         ...(current?.profile_data || {}),
-        ...preferences,
+        ...restPrefs,
       };
 
       await this.saveLocalPreferences(updatedPrefs);
 
       if (current) {
+        if (username && username.trim()) {
+          current.username = username.trim();
+        }
         current.profile_data = updatedPrefs;
         current.updated_at = new Date().toISOString();
         await this.saveProfileLocally(current);
@@ -581,9 +586,9 @@ export class ProfileService {
         }
       }
 
-      console.log('✅ Préférences mises à jour avec succès');
+      console.log('Préférences mises à jour avec succès');
     } catch (error) {
-      console.error('❌ Erreur mise à jour préférences:', error);
+      console.error('Erreur mise à jour préférences:', error);
       throw error;
     }
   }

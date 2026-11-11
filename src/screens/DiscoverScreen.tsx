@@ -1,5 +1,5 @@
 // src/screens/DiscoverScreen.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -7,27 +7,31 @@ import {
     TextInput,
     TouchableOpacity,
     FlatList,
-    ActivityIndicator,
+    ScrollView,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
 import {
     getCategories,
-    getPosts,
     getPostsByCategory,
     getPostsByTag,
     searchPosts,
 } from '../services/api';
 import { Category } from '../models/Category';
 import { Post } from '../models/Post';
-import { LoadingSpinner } from '../components/LoadingSpinner';
+import {
+    DiscoverSkeleton,
+    ArticleListSkeleton,
+    ArticleFooterSkeleton,
+} from '../components/PageSkeletons';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { ArticleCard } from '../components/ArticleCard';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import CategoryCard from '../components/CategoryCard';
 import { analyticsService } from '../services/analytics.simple';
+import { decodeHtmlEntities } from '../utils/textUtils';
 
 type DiscoverScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type DiscoverScreenRouteProps = {
@@ -56,6 +60,8 @@ const CATEGORY_ICONS: { [key: string]: string } = {
     'Santé': 'fitness-outline',
     'Tech': 'laptop-outline',
     'Art': 'color-palette-outline',
+    'Mines': 'construct-outline',
+    'Enfer des femmes': 'people-outline',
 };
 
 const DiscoverScreen = () => {
@@ -70,91 +76,47 @@ const DiscoverScreen = () => {
     const [error, setError] = useState<string | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
     const [selectedCategoryName, setSelectedCategoryName] = useState<string>('');
+    const [selectedIsTag, setSelectedIsTag] = useState<boolean>(false);
     const [categoryPosts, setCategoryPosts] = useState<Post[]>([]);
     const [searchResults, setSearchResults] = useState<Post[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [searchLoading, setSearchLoading] = useState(false);
     const [loadingCategoryPosts, setLoadingCategoryPosts] = useState(false);
 
-    // ⬇️ États pour le scroll infini (dans la vue principale)
-    const [posts, setPosts] = useState<Post[]>([]);
-    const [page, setPage] = useState(1);
-    const [hasMore, setHasMore] = useState(true);
-    const [loadingMore, setLoadingMore] = useState(false);
-
-    // ⬇️ États pour le scroll infini dans les catégories
+    // États pour le scroll infini dans les catégories
     const [categoryPage, setCategoryPage] = useState(1);
     const [categoryHasMore, setCategoryHasMore] = useState(true);
     const [loadingMoreCategory, setLoadingMoreCategory] = useState(false);
+    const loadingMoreCategoryRef = useRef(false);
 
-    // ⬇️ États pour le scroll infini dans la recherche
+    // États pour le scroll infini dans la recherche
     const [searchPage, setSearchPage] = useState(1);
     const [searchHasMore, setSearchHasMore] = useState(true);
     const [loadingMoreSearch, setLoadingMoreSearch] = useState(false);
+    const loadingMoreSearchRef = useRef(false);
     const [currentSearchQuery, setCurrentSearchQuery] = useState('');
 
     useEffect(() => {
-        loadCategories();
-        loadFeaturedCategories();
-        loadPosts(1);
-
+        loadInitialData();
         analyticsService.trackScreenView('Discover');
     }, []);
 
     // Gérer la navigation avec paramètre de catégorie
     useEffect(() => {
         if (params?.categoryId && params?.categoryName) {
-            handleCategoryPress(params.categoryId, params.categoryName);
+            handleCategoryPress(params.categoryId, params.categoryName, !!params.isTag);
         }
-    }, [params?.categoryId, params?.categoryName]);
+    }, [params?.categoryId, params?.categoryName, params?.isTag]);
 
-    // ⬇️ Fonction générique de chargement des posts
-    const loadPosts = async (pageNum: number, loadMore = false) => {
-        if (loadMore) {
-            setLoadingMore(true);
-        } else {
-            setLoading(true);
-        }
-
+    const loadInitialData = async () => {
+        setLoading(true);
+        setError(null);
         try {
-            let data;
-
-            // Si on a un categoryId, charger les posts de cette catégorie ou tag
-            if (params?.categoryId) {
-                if (params.isTag) {
-                    // Charger les posts par tag
-                    data = await getPostsByTag(params.categoryId, pageNum, 6);
-                } else {
-                    // Charger les posts par catégorie
-                    data = await getPostsByCategory(params.categoryId, pageNum, 6);
-                }
-            } else {
-                // Charger tous les posts
-                data = await getPosts(pageNum, 6);
-            }
-
-            if (data.length === 0) {
-                setHasMore(false);
-            } else {
-                setPosts(prev => (loadMore ? [...prev, ...data] : data));
-                if (!loadMore) setPage(pageNum);
-            }
-        } catch (error) {
-            console.error('Erreur chargement posts:', error);
-            setHasMore(false);
+            await Promise.all([loadCategories(), loadFeaturedCategories()]);
+        } catch (err) {
+            setError('Impossible de charger les catégories');
         } finally {
-            if (loadMore) {
-                setLoadingMore(false);
-            } else {
-                setLoading(false);
-            }
-        }
-    };
-
-    // ⬇️ Fonction appelée en fin de scroll
-    const loadMore = () => {
-        if (!loadingMore && hasMore) {
-            loadPosts(page + 1, true);
+            setLoading(false);
         }
     };
 
@@ -165,8 +127,6 @@ const DiscoverScreen = () => {
         } catch (err) {
             setError('Impossible de charger les catégories');
             console.error('Error loading categories:', err);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -188,15 +148,18 @@ const DiscoverScreen = () => {
         }
     };
 
-    const handleCategoryPress = async (categoryId: number, categoryName: string) => {
+    const handleCategoryPress = async (categoryId: number, categoryName: string, isTag = false) => {
         setSelectedCategory(categoryId);
-        setSelectedCategoryName(categoryName);
+        setSelectedCategoryName(decodeHtmlEntities(categoryName));
+        setSelectedIsTag(isTag);
         setLoadingCategoryPosts(true);
         setCategoryPage(1);
         setCategoryHasMore(true);
         setCategoryPosts([]);
         try {
-            const posts = await getPostsByCategory(categoryId, 1, 10);
+            const posts = isTag
+                ? await getPostsByTag(categoryId, 1, 10)
+                : await getPostsByCategory(categoryId, 1, 10);
             setCategoryPosts(posts);
             setCategoryHasMore(posts.length >= 10);
         } catch (err) {
@@ -206,18 +169,24 @@ const DiscoverScreen = () => {
         }
     };
 
-    // ⬇️ Fonction pour charger plus d'articles dans une catégorie
     const loadMoreCategoryPosts = async () => {
-        if (loadingMoreCategory || !categoryHasMore || !selectedCategory) return;
+        if (loadingMoreCategoryRef.current || loadingMoreCategory || !categoryHasMore || !selectedCategory) return;
 
+        loadingMoreCategoryRef.current = true;
         setLoadingMoreCategory(true);
         try {
             const nextPage = categoryPage + 1;
-            const morePosts = await getPostsByCategory(selectedCategory, nextPage, 10);
+            const morePosts = selectedIsTag
+                ? await getPostsByTag(selectedCategory, nextPage, 10)
+                : await getPostsByCategory(selectedCategory, nextPage, 10);
             if (morePosts.length === 0) {
                 setCategoryHasMore(false);
             } else {
-                setCategoryPosts(prev => [...prev, ...morePosts]);
+                setCategoryPosts(prev => {
+                    const existingIds = new Set(prev.map(p => p.id));
+                    const uniqueNew = morePosts.filter((p: Post) => !existingIds.has(p.id));
+                    return [...prev, ...uniqueNew];
+                });
                 setCategoryPage(nextPage);
                 setCategoryHasMore(morePosts.length >= 10);
             }
@@ -226,6 +195,7 @@ const DiscoverScreen = () => {
             setCategoryHasMore(false);
         } finally {
             setLoadingMoreCategory(false);
+            loadingMoreCategoryRef.current = false;
         }
     };
 
@@ -254,8 +224,6 @@ const DiscoverScreen = () => {
             const results = await searchPosts(trimmed, 1, 10);
             setSearchResults(results);
             setSearchHasMore(results.length >= 10);
-
-            // 📊 Track search event
             analyticsService.trackSearch(trimmed, results.length);
         } catch (err) {
             console.error('Error searching:', err);
@@ -264,10 +232,10 @@ const DiscoverScreen = () => {
         }
     };
 
-    // ⬇️ Fonction pour charger plus de résultats de recherche
     const loadMoreSearchResults = async () => {
-        if (loadingMoreSearch || !searchHasMore || !currentSearchQuery) return;
+        if (loadingMoreSearchRef.current || loadingMoreSearch || !searchHasMore || !currentSearchQuery) return;
 
+        loadingMoreSearchRef.current = true;
         setLoadingMoreSearch(true);
         try {
             const nextPage = searchPage + 1;
@@ -275,7 +243,11 @@ const DiscoverScreen = () => {
             if (moreResults.length === 0) {
                 setSearchHasMore(false);
             } else {
-                setSearchResults(prev => [...prev, ...moreResults]);
+                setSearchResults(prev => {
+                    const existingIds = new Set(prev.map(p => p.id));
+                    const uniqueNew = moreResults.filter((p: Post) => !existingIds.has(p.id));
+                    return [...prev, ...uniqueNew];
+                });
                 setSearchPage(nextPage);
                 setSearchHasMore(moreResults.length >= 10);
             }
@@ -284,6 +256,7 @@ const DiscoverScreen = () => {
             setSearchHasMore(false);
         } finally {
             setLoadingMoreSearch(false);
+            loadingMoreSearchRef.current = false;
         }
     };
 
@@ -291,28 +264,12 @@ const DiscoverScreen = () => {
         return CATEGORY_ICONS[categoryName] || 'folder-outline';
     };
 
-    const decodeEntities = (text: string): string => {
-        return text
-            .replace(/&rsquo;/g, "'")
-            .replace(/&eacute;/g, 'é')
-            .replace(/&egrave;/g, 'è')
-            .replace(/&ecirc;/g, 'ê')
-            .replace(/&agrave;/g, 'à')
-            .replace(/&acirc;/g, 'â')
-            .replace(/&ocirc;/g, 'ô')
-            .replace(/&ucirc;/g, 'û')
-            .replace(/&ccedil;/g, 'ç')
-            .replace(/&amp;/g, '&')
-            .replace(/&quot;/g, '"')
-            .replace(/&#039;/g, "'");
-    };
-
-    if (loading && posts.length === 0) {
-        return <LoadingSpinner message="Chargement..." />;
+    if (loading && categories.length === 0) {
+        return <DiscoverSkeleton />;
     }
 
-    if (error) {
-        return <ErrorMessage message={error} onRetry={loadCategories} />;
+    if (error && categories.length === 0) {
+        return <ErrorMessage message={error} onRetry={loadInitialData} />;
     }
 
     // === Affichage des résultats de recherche ===
@@ -333,10 +290,7 @@ const DiscoverScreen = () => {
                 </View>
 
                 {searchLoading ? (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="small" color={Colors.primary} />
-                        <Text style={styles.loadingText}>Chargement...</Text>
-                    </View>
+                    <ArticleListSkeleton count={6} />
                 ) : (
                     <FlatList
                         data={searchResults}
@@ -356,15 +310,13 @@ const DiscoverScreen = () => {
                         }
                         ListFooterComponent={
                             loadingMoreSearch ? (
-                                <View style={styles.loadingMore}>
-                                    <ActivityIndicator size="small" color={Colors.primary} />
-                                </View>
+                                <ArticleFooterSkeleton />
                             ) : !searchHasMore && searchResults.length > 0 ? (
                                 <Text style={styles.endOfList}>Fin des résultats</Text>
                             ) : undefined
                         }
                         onEndReached={loadMoreSearchResults}
-                        onEndReachedThreshold={0.3}
+                        onEndReachedThreshold={0.4}
                         showsVerticalScrollIndicator={false}
                     />
                 )}
@@ -383,21 +335,18 @@ const DiscoverScreen = () => {
                     <View style={styles.categoryHeader}>
                         <Ionicons
                             name={getCategoryIcon(selectedCategoryName) as any}
-                            size={30}
+                            size={28}
                             color={Colors.text}
-                            style={[styles.categoryIcon, { marginLeft: 15 }]}
+                            style={[styles.categoryIcon, { marginLeft: 12 }]}
                         />
-                        <Text style={styles.headerTitle}>
-                            {decodeEntities(selectedCategoryName)}
+                        <Text style={styles.headerTitle} numberOfLines={1}>
+                            {decodeHtmlEntities(selectedCategoryName)}
                         </Text>
                     </View>
                 </View>
 
                 {loadingCategoryPosts ? (
-                    <View style={styles.loadingContainer}>
-                        <ActivityIndicator size="small" color={Colors.primary} />
-                        <Text style={styles.loadingText}>Chargement des articles...</Text>
-                    </View>
+                    <ArticleListSkeleton count={6} />
                 ) : (
                     <FlatList
                         data={categoryPosts}
@@ -413,22 +362,20 @@ const DiscoverScreen = () => {
                         showsVerticalScrollIndicator={false}
                         ListFooterComponent={
                             loadingMoreCategory ? (
-                                <View style={styles.loadingMore}>
-                                    <ActivityIndicator size="small" color={Colors.primary} />
-                                </View>
+                                <ArticleFooterSkeleton />
                             ) : !categoryHasMore && categoryPosts.length > 0 ? (
                                 <Text style={styles.endOfList}>Fin des articles</Text>
                             ) : undefined
                         }
                         onEndReached={loadMoreCategoryPosts}
-                        onEndReachedThreshold={0.3}
+                        onEndReachedThreshold={0.4}
                     />
                 )}
             </View>
         );
     }
 
-    // === Affichage principal avec Infinite Scroll ===
+    // === Affichage principal (sans liste d'articles sous Toutes les catégories) ===
     return (
         <View style={styles.container}>
             <View style={styles.header}>
@@ -459,79 +406,63 @@ const DiscoverScreen = () => {
                 )}
             </View>
 
-            {/* ✅ FlatList avec Infinite Scroll */}
-            <FlatList
-                data={posts}
-                renderItem={({ item, index }) => (
-                    <ArticleCard
-                        article={item}
-                        onPress={() => handleArticlePress(item)}
-                        variant="horizontal"
-                    />
-                )}
-                keyExtractor={(item, index) => `post_${item.id}_${index}`}
-                onEndReached={loadMore}
-                onEndReachedThreshold={0.5}
+            <ScrollView
                 contentContainerStyle={styles.content}
-                ListHeaderComponent={
-                    <>
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Catégories en vedette</Text>
-                            {Object.entries(FEATURED_CATEGORIES).map(([name, id]) => (
-                                <View key={'head_cat_' + id} style={styles.featuredCategory}>
-                                    <TouchableOpacity
-                                        style={styles.featuredCategoryHeader}
-                                        onPress={() => handleCategoryPress(id, decodeEntities(name))}
-                                    >
-                                        <View style={[styles.featuredCategoryIcon, { backgroundColor: Colors.primary + '20' }]}>
-                                            <Ionicons name={getCategoryIcon(name) as any} size={24} color={Colors.primary} />
-                                        </View>
-                                        <Text style={styles.featuredCategoryName}>
-                                            {decodeEntities(name)}
-                                        </Text>
-                                        <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
-                                    </TouchableOpacity>
-                                    {featuredPosts[name] && featuredPosts[name].length > 0 && (
-                                        <FlatList
-                                            horizontal
-                                            showsHorizontalScrollIndicator={false}
-                                            data={featuredPosts[name]}
-                                            renderItem={({ item, index }) => (
-                                                <TouchableOpacity
-                                                    style={styles.featuredPostCard}
-                                                    onPress={() => handleArticlePress(item)}
-                                                >
-                                                    <Text style={styles.featuredPostTitle} numberOfLines={2}>
-                                                        {decodeEntities(item.title.rendered)}
-                                                    </Text>
-                                                </TouchableOpacity>
-                                            )}
-                                            keyExtractor={(item, index) => `featured_${name}_${item.id}_${index}`}
-                                            contentContainerStyle={styles.featuredPostsScroll}
-                                        />
-                                    )}
-                                </View>
-                            ))}
-                        </View>
-
-                        <View style={styles.section}>
-                            <Text style={styles.sectionTitle}>Toutes les catégories</Text>
-                            <View style={styles.categoriesGrid}>
-                                {categories.map((category) => (
-                                    <CategoryCard
-                                        key={'cat_' + category.id}
-                                        name={decodeEntities(category.name)}
-                                        count={category.count}
-                                        onPress={() => handleCategoryPress(category.id, category.name)}
-                                    />
-                                ))}
-                            </View>
-                        </View>
-
-                    </>
-                }
                 showsVerticalScrollIndicator={false}
-            />
+            >
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Catégories en vedette</Text>
+                    {Object.entries(FEATURED_CATEGORIES).map(([name, id]) => (
+                        <View key={'head_cat_' + id} style={styles.featuredCategory}>
+                            <TouchableOpacity
+                                style={styles.featuredCategoryHeader}
+                                onPress={() => handleCategoryPress(id, decodeHtmlEntities(name))}
+                            >
+                                <View style={[styles.featuredCategoryIcon, { backgroundColor: Colors.primary + '20' }]}>
+                                    <Ionicons name={getCategoryIcon(name) as any} size={24} color={Colors.primary} />
+                                </View>
+                                <Text style={styles.featuredCategoryName}>
+                                    {decodeHtmlEntities(name)}
+                                </Text>
+                                <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
+                            </TouchableOpacity>
+                            {featuredPosts[name] && featuredPosts[name].length > 0 && (
+                                <FlatList
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    data={featuredPosts[name]}
+                                    renderItem={({ item }) => (
+                                        <TouchableOpacity
+                                            style={styles.featuredPostCard}
+                                            onPress={() => handleArticlePress(item)}
+                                        >
+                                            <Text style={styles.featuredPostTitle} numberOfLines={2}>
+                                                {decodeHtmlEntities(item.title?.rendered || '')}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    )}
+                                    keyExtractor={(item, index) => `featured_${name}_${item.id}_${index}`}
+                                    contentContainerStyle={styles.featuredPostsScroll}
+                                />
+                            )}
+                        </View>
+                    ))}
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Toutes les catégories</Text>
+                    <View style={styles.categoriesGrid}>
+                        {categories.map((category) => (
+                            <CategoryCard
+                                key={'cat_' + category.id}
+                                name={decodeHtmlEntities(category.name)}
+                                count={category.count}
+                                onPress={() => handleCategoryPress(category.id, decodeHtmlEntities(category.name))}
+                            />
+                        ))}
+                    </View>
+                </View>
+            </ScrollView>
         </View>
     );
 };
@@ -550,14 +481,16 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.backgroundLight,
     },
     headerTitle: {
-        fontSize: 28,
+        fontSize: 24,
         fontWeight: '700',
         color: Colors.text,
         marginLeft: 8,
+        flexShrink: 1,
     },
     categoryHeader: {
         flexDirection: 'row',
         alignItems: 'center',
+        flex: 1,
     },
     categoryIcon: {
         marginRight: 8,
@@ -590,7 +523,7 @@ const styles = StyleSheet.create({
         paddingBottom: 100,
     },
     section: {
-        marginBottom: 32,
+        marginBottom: 28,
     },
     sectionTitle: {
         fontSize: 20,
@@ -672,21 +605,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: Colors.text,
-    },
-    loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: 20,
-    },
-    loadingText: {
-        marginTop: 10,
-        fontSize: 14,
-        color: Colors.textLight,
-    },
-    loadingMore: {
-        paddingVertical: 16,
-        alignItems: 'center',
     },
     endOfList: {
         textAlign: 'center',

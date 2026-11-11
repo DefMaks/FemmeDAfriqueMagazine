@@ -1,9 +1,8 @@
 // src/components/CategoryCard.tsx
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { Dimensions } from 'react-native';
-
+import { TouchableOpacity, Text, StyleSheet, Dimensions } from 'react-native';
 import { Colors } from '../theme/colors';
+import { decodeHtmlEntities } from '../utils/textUtils';
 
 interface CategoryCardProps {
     name: string;
@@ -15,32 +14,7 @@ const isTablet = windowWidth >= 768;
 const cardWidth = isTablet ? '22%' : '48%';
 
 const CategoryCard: React.FC<CategoryCardProps> = ({ name, count, onPress }) => {
-
-    // Décodage des entités HTML comme &rsquo; → ’
-    const decodeHtmlEntities = (str: string): string => {
-        const txt = document.createElement('textarea');
-        txt.innerHTML = str;
-        return txt.value;
-    };
-
-    // Pour React Native (sans DOM), on utilise une version simple :
-    const decodeEntities = (text: string): string => {
-        return text
-            .replace(/&rsquo;/g, "'")
-            .replace(/&eacute;/g, 'é')
-            .replace(/&egrave;/g, 'è')
-            .replace(/&ecirc;/g, 'ê')
-            .replace(/&agrave;/g, 'à')
-            .replace(/&acirc;/g, 'â')
-            .replace(/&ocirc;/g, 'ô')
-            .replace(/&ucirc;/g, 'û')
-            .replace(/&ccedil;/g, 'ç')
-            .replace(/&amp;/g, '&')
-            .replace(/&quot;/g, '"')
-            .replace(/&#039;/g, "'");
-    };
-
-    const cleanName = decodeEntities(name);
+    const cleanName = decodeHtmlEntities(name);
 
     return (
         <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.8}>

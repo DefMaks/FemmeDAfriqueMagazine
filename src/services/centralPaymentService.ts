@@ -134,8 +134,8 @@ class CentralPaymentService {
 
       // Afficher une alerte de remerciement
       Alert.alert(
-        '✅ Paiement réussi',
-        'Merci pour votre achat ! Votre contenu est désormais accessible.', // ✅
+        'Paiement réussi',
+        'Merci pour votre achat ! Votre contenu est désormais accessible.',
         [{ text: 'OK' }]
       );
 

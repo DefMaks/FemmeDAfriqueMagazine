@@ -128,7 +128,7 @@ const MonitoringScreen = () => {
         {/* Overview */}
         {dashboard && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📊 Overview</Text>
+            <Text style={styles.sectionTitle}>Vue d'ensemble</Text>
             <View style={styles.statsGrid}>
               <View style={styles.statCard}>
                 <Text style={styles.statValue}>{dashboard.overview.totalRequests}</Text>
@@ -153,7 +153,7 @@ const MonitoringScreen = () => {
         {/* Health Checks */}
         {healthChecks && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🏥 Health Checks</Text>
+            <Text style={styles.sectionTitle}>Etat des services</Text>
             {Object.entries(healthChecks).map(([service, health]: [string, any]) => (
               <View key={service} style={styles.healthCard}>
                 <View style={styles.healthHeader}>
@@ -181,7 +181,7 @@ const MonitoringScreen = () => {
         {/* Circuit Breakers */}
         {circuitStats && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>⚡ Circuit Breakers</Text>
+            <Text style={styles.sectionTitle}>Circuit Breakers</Text>
             {Object.entries(circuitStats).map(([service, stats]: [string, any]) => (
               <View key={service} style={styles.circuitCard}>
                 <View style={styles.circuitHeader}>
@@ -217,7 +217,7 @@ const MonitoringScreen = () => {
         {/* Cache Stats */}
         {cacheStats && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>💾 Cache Statistics</Text>
+            <Text style={styles.sectionTitle}>Cache Statistics</Text>
             <View style={styles.cacheCard}>
               <View style={styles.cacheRow}>
                 <Text style={styles.cacheLabel}>Memory Cache:</Text>
@@ -241,7 +241,7 @@ const MonitoringScreen = () => {
         {/* Timeout Stats */}
         {timeoutStats && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>⏱️ Timeout Performance</Text>
+            <Text style={styles.sectionTitle}>Timeout Performance</Text>
             {Object.entries(timeoutStats).map(([service, stats]: [string, any]) => (
               <View key={service} style={styles.timeoutCard}>
                 <Text style={styles.serviceName}>{service.toUpperCase()}</Text>
@@ -267,7 +267,7 @@ const MonitoringScreen = () => {
         {/* Recent Alerts */}
         {dashboard?.recentAlerts && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🚨 Recent Alerts</Text>
+            <Text style={styles.sectionTitle}>Recent Alerts</Text>
             {dashboard.recentAlerts.map((alert: any) => (
               <View key={alert.name} style={styles.alertCard}>
                 <View style={styles.alertHeader}>

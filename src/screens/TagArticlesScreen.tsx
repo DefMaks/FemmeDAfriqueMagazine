@@ -9,6 +9,7 @@ import { getPostsByTag, getPostsByCategory } from '../services/api';
 import { analyticsService } from '../services/analytics.simple';
 import { Colors } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
+import { ArticleListSkeleton } from '../components/PageSkeletons';
 
 type TagArticlesRouteProp = RouteProp<RootStackParamList, 'CategoryArticles'>;
 type TagArticlesNavigationProp = StackNavigationProp<RootStackParamList, 'CategoryArticles'>;
@@ -30,8 +31,8 @@ export const TagArticlesScreen: React.FC<TagArticlesScreenProps> = ({ route, nav
   const fromArticleScreen = fromArticle === true;
   const screenTitle = categoryName || (isTagScreen ? 'Mots-clés' : 'Catégorie');
 
-  // Debug : Afficher les paramètres reçus
-  console.log('🏷️ TagArticlesScreen params:', { categoryId, categoryName, isTag, isTagScreen, fromArticle, fromArticleScreen });
+  // Debug : Afficher les parametres recus
+  console.log('[TagArticlesScreen] params:', { categoryId, categoryName, isTag, isTagScreen, fromArticle, fromArticleScreen });
 
   useEffect(() => {
     navigation.setOptions({
@@ -128,12 +129,7 @@ export const TagArticlesScreen: React.FC<TagArticlesScreenProps> = ({ route, nav
   );
 
   if (loading && posts.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Chargement des articles...</Text>
-      </View>
-    );
+    return <ArticleListSkeleton count={6} />;
   }
 
   return (
