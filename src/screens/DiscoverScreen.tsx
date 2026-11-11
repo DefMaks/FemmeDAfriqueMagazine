@@ -483,6 +483,7 @@ const DiscoverScreen = () => {
                                                     variant="vertical"
                                                     showImage={!hasImages}
                                                     titleStyle={styles.featuredArticleTitle}
+                                                    titleNumberOfLines={2}
                                                 />
                                             </View>
                                         ))}

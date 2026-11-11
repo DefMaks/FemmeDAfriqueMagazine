@@ -17,6 +17,7 @@ interface ArticleCardProps {
   showActions?: boolean;
   showImage?: boolean;
   titleStyle?: StyleProp<TextStyle>;
+  titleNumberOfLines?: number;
 }
 
 const ArticleCardComponent: React.FC<ArticleCardProps> = ({
@@ -26,6 +27,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
   showActions = true,
   showImage = true,
   titleStyle,
+  titleNumberOfLines,
 }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -121,7 +123,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
           </View>
         )}
         <View style={[styles.gridContent, !showImage && { paddingTop: 12 }]}>
-          <Text style={[styles.gridTitle, titleStyle]} numberOfLines={!showImage ? 3 : 2}>
+          <Text style={[styles.gridTitle, titleStyle]} numberOfLines={titleNumberOfLines ?? (!showImage ? 3 : 2)}>
             {formatTitle(article.title?.rendered || '')}
           </Text>
           <View style={styles.metaItem}>
@@ -139,7 +141,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
       <TouchableOpacity style={[styles.horizontalCard, styles.compactCard]} activeOpacity={0.8} onPress={onPress}>
         <View style={styles.compactContent}>
           <View style={[styles.textContainer, !showImage && { flex: 1, paddingRight: 0 }]}>
-            <Text style={[styles.compactTitle, titleStyle]} numberOfLines={!showImage ? 3 : 2}>
+            <Text style={[styles.compactTitle, titleStyle]} numberOfLines={titleNumberOfLines ?? (!showImage ? 3 : 2)}>
               {formatTitle(article.title?.rendered || '')}
             </Text>
             <View style={styles.metaRow}>
@@ -217,7 +219,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
               !showImage && styles.textOnlyVerticalTitle,
               titleStyle,
             ]}
-            numberOfLines={!showImage ? 3 : 2}
+            numberOfLines={titleNumberOfLines ?? (!showImage ? 3 : 2)}
           >
             {formatTitle(article.title?.rendered || '')}
           </Text>
@@ -251,7 +253,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
     <TouchableOpacity style={styles.horizontalCard} activeOpacity={0.8} onPress={onPress}>
       <View style={styles.horizontalContent}>
         <View style={[styles.textContainer, !showImage && { flex: 1, paddingRight: 0 }]}>
-          <Text style={[styles.horizontalTitle, titleStyle]} numberOfLines={3}>
+          <Text style={[styles.horizontalTitle, titleStyle]} numberOfLines={titleNumberOfLines ?? 3}>
             {formatTitle(article.title?.rendered || '')}
           </Text>
           <View style={styles.metaRow}>
