@@ -1,5 +1,5 @@
 import React, { useState, useEffect, memo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Share, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Share, Dimensions, StyleProp, TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
@@ -16,6 +16,7 @@ interface ArticleCardProps {
   variant?: 'horizontal' | 'vertical' | 'compact' | 'grid';
   showActions?: boolean;
   showImage?: boolean;
+  titleStyle?: StyleProp<TextStyle>;
 }
 
 const ArticleCardComponent: React.FC<ArticleCardProps> = ({
@@ -24,6 +25,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
   variant = 'horizontal',
   showActions = true,
   showImage = true,
+  titleStyle,
 }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -119,7 +121,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
           </View>
         )}
         <View style={[styles.gridContent, !showImage && { paddingTop: 12 }]}>
-          <Text style={styles.gridTitle} numberOfLines={!showImage ? 3 : 2}>
+          <Text style={[styles.gridTitle, titleStyle]} numberOfLines={!showImage ? 3 : 2}>
             {formatTitle(article.title?.rendered || '')}
           </Text>
           <View style={styles.metaItem}>
@@ -137,7 +139,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
       <TouchableOpacity style={[styles.horizontalCard, styles.compactCard]} activeOpacity={0.8} onPress={onPress}>
         <View style={styles.compactContent}>
           <View style={[styles.textContainer, !showImage && { flex: 1, paddingRight: 0 }]}>
-            <Text style={styles.compactTitle} numberOfLines={!showImage ? 3 : 2}>
+            <Text style={[styles.compactTitle, titleStyle]} numberOfLines={!showImage ? 3 : 2}>
               {formatTitle(article.title?.rendered || '')}
             </Text>
             <View style={styles.metaRow}>
@@ -210,7 +212,11 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
         )}
         <View style={[styles.verticalContent, !showImage && styles.textOnlyVerticalContent]}>
           <Text
-            style={[styles.verticalTitle, !showImage && styles.textOnlyVerticalTitle]}
+            style={[
+              styles.verticalTitle,
+              !showImage && styles.textOnlyVerticalTitle,
+              titleStyle,
+            ]}
             numberOfLines={!showImage ? 3 : 2}
           >
             {formatTitle(article.title?.rendered || '')}
@@ -245,7 +251,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
     <TouchableOpacity style={styles.horizontalCard} activeOpacity={0.8} onPress={onPress}>
       <View style={styles.horizontalContent}>
         <View style={[styles.textContainer, !showImage && { flex: 1, paddingRight: 0 }]}>
-          <Text style={styles.horizontalTitle} numberOfLines={3}>
+          <Text style={[styles.horizontalTitle, titleStyle]} numberOfLines={3}>
             {formatTitle(article.title?.rendered || '')}
           </Text>
           <View style={styles.metaRow}>
@@ -489,14 +495,14 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   verticalTitle: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: Colors.text,
-    lineHeight: 18,
-    marginBottom: 8,
+    lineHeight: 16,
+    marginBottom: 6,
   },
   textOnlyVerticalCard: {
-    minHeight: 105,
+    minHeight: 100,
     justifyContent: 'space-between',
     padding: 12,
   },
@@ -506,11 +512,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   textOnlyVerticalTitle: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: Colors.text,
-    lineHeight: 20,
-    marginBottom: 8,
+    lineHeight: 16,
+    marginBottom: 6,
   },
   metaRowBetween: {
     flexDirection: 'row',

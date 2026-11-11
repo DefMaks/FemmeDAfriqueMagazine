@@ -482,6 +482,7 @@ const DiscoverScreen = () => {
                                                     onPress={() => handleArticlePress(item)}
                                                     variant="vertical"
                                                     showImage={!hasImages}
+                                                    titleStyle={styles.featuredArticleTitle}
                                                 />
                                             </View>
                                         ))}
@@ -654,10 +655,14 @@ const styles = StyleSheet.create({
         marginRight: 12,
     },
     featuredPostTitle: {
-        fontSize: 14,
+        fontSize: 12,
         fontWeight: '600',
         color: Colors.text,
-        lineHeight: 18,
+        lineHeight: 16,
+    },
+    featuredArticleTitle: {
+        fontSize: 12,
+        lineHeight: 16,
     },
     categoriesGrid: {
         flexDirection: 'row',
