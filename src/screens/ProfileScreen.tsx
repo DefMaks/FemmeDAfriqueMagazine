@@ -57,6 +57,7 @@ const ProfileScreen = () => {
     const [socialX, setSocialX] = useState('');
     const [socialFB, setSocialFB] = useState('');
     const [subscriptionInfo, setSubscriptionInfo] = useState<string | null>(null);
+    const [showImagesPref, setShowImagesPref] = useState<boolean>(true);
 
     // États pour la photo de profil
     const [profilePhoto, setProfilePhoto] = useState<string | null>(null);
@@ -195,6 +196,13 @@ const ProfileScreen = () => {
                 if (fb) setSocialFB(fb);
                 setSubscriptionInfo(null);
             }
+
+            const savedImgPref = await AsyncStorage.getItem('@fam_pref_show_images');
+            if (savedImgPref !== null) {
+                try {
+                    setShowImagesPref(JSON.parse(savedImgPref));
+                } catch {}
+            }
         } catch (error) {
             console.error('❌ Erreur chargement préférences:', error);
         }
@@ -232,6 +240,15 @@ const ProfileScreen = () => {
             console.log(`📱 Notifications ${value ? 'activées' : 'désactivées'}`);
         } catch (error) {
             console.error('Erreur sauvegarde notifications:', error);
+        }
+    };
+
+    const handleToggleShowImages = async (value: boolean) => {
+        setShowImagesPref(value);
+        try {
+            await AsyncStorage.setItem('@fam_pref_show_images', JSON.stringify(value));
+        } catch (error) {
+            console.error('Erreur sauvegarde preference images:', error);
         }
     };
 
@@ -494,7 +511,18 @@ const ProfileScreen = () => {
             icon: 'notifications-outline',
             title: 'Notifications',
             subtitle: notificationsEnabled ? 'Activées' : 'Désactivées',
-            isToggle: true
+            isToggle: true,
+            toggleValue: notificationsEnabled,
+            onToggle: handleToggleNotifications,
+        },
+        {
+            id: 'images_pref',
+            icon: 'images-outline',
+            title: 'Affichage des images',
+            subtitle: showImagesPref ? 'Visuels complets (qualité standard)' : 'Mode texte épuré (économie de données)',
+            isToggle: true,
+            toggleValue: showImagesPref,
+            onToggle: handleToggleShowImages,
         },
         {
             id: '3',
@@ -695,10 +723,10 @@ const ProfileScreen = () => {
                             </View>
                             {item.isToggle ? (
                                 <Switch
-                                    value={notificationsEnabled}
-                                    onValueChange={handleToggleNotifications}
+                                    value={item.toggleValue !== undefined ? item.toggleValue : notificationsEnabled}
+                                    onValueChange={item.onToggle || handleToggleNotifications}
                                     trackColor={{ false: '#D1D1D6', true: Colors.primary + '80' }}
-                                    thumbColor={notificationsEnabled ? Colors.primary : '#F4F3F4'}
+                                    thumbColor={(item.toggleValue !== undefined ? item.toggleValue : notificationsEnabled) ? Colors.primary : '#F4F3F4'}
                                 />
                             ) : (
                                 <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />

@@ -32,19 +32,26 @@ import { RootStackParamList } from '../navigation/RootNavigator';
 import CategoryCard from '../components/CategoryCard';
 import { analyticsService } from '../services/analytics.simple';
 import { decodeHtmlEntities } from '../utils/textUtils';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type DiscoverScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type DiscoverScreenRouteProps = {
     categoryId?: number;
     categoryName?: string;
     isTag?: boolean;
+    showImage?: boolean;
 };
 
-const FEATURED_CATEGORIES = {
-    'Communiqués': 3038,
-    'Espace Tendresse': 2483,
-    'Gastronomie': 20,
-    'Entrepreneuriat': 115,
+export type FeaturedCategoryConfig = {
+    id: number;
+    showImage?: boolean;
+};
+
+const FEATURED_CATEGORIES: Record<string, FeaturedCategoryConfig> = {
+    'Communiqués': { id: 3038, showImage: true },
+    'Espace Tendresse': { id: 2483, showImage: true },
+    'Gastronomie': { id: 20, showImage: true },
+    'Entrepreneuriat': { id: 115, showImage: true },
 };
 
 const CATEGORY_ICONS: { [key: string]: string } = {
@@ -72,6 +79,7 @@ const DiscoverScreen = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [categories, setCategories] = useState<Category[]>([]);
     const [featuredPosts, setFeaturedPosts] = useState<{ [key: string]: Post[] }>({});
+    const [showCategoryImages, setShowCategoryImages] = useState<boolean>(true);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -99,7 +107,20 @@ const DiscoverScreen = () => {
     useEffect(() => {
         loadInitialData();
         analyticsService.trackScreenView('Discover');
+        AsyncStorage.getItem('@fam_pref_show_images').then((val) => {
+            if (val !== null) {
+                setShowCategoryImages(JSON.parse(val));
+            }
+        }).catch(() => {});
     }, []);
+
+    const toggleShowCategoryImages = async () => {
+        const nextValue = !showCategoryImages;
+        setShowCategoryImages(nextValue);
+        try {
+            await AsyncStorage.setItem('@fam_pref_show_images', JSON.stringify(nextValue));
+        } catch {}
+    };
 
     // Gérer la navigation avec paramètre de catégorie
     useEffect(() => {
@@ -132,8 +153,8 @@ const DiscoverScreen = () => {
 
     const loadFeaturedCategories = async () => {
         try {
-            const promises = Object.entries(FEATURED_CATEGORIES).map(async ([name, id]) => {
-                const posts = await getPostsByCategory(id, 1, 5);
+            const promises = Object.entries(FEATURED_CATEGORIES).map(async ([name, config]) => {
+                const posts = await getPostsByCategory(config.id, 1, 5);
                 return { name, posts };
             });
 
@@ -411,44 +432,79 @@ const DiscoverScreen = () => {
                 showsVerticalScrollIndicator={false}
             >
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Catégories en vedette</Text>
-                    {Object.entries(FEATURED_CATEGORIES).map(([name, id]) => (
-                        <View key={'head_cat_' + id} style={styles.featuredCategory}>
-                            <TouchableOpacity
-                                style={styles.featuredCategoryHeader}
-                                onPress={() => handleCategoryPress(id, decodeHtmlEntities(name))}
-                                activeOpacity={0.7}
+                    <View style={styles.sectionHeaderWithToggle}>
+                        <Text style={styles.sectionTitleNoPadding}>Catégories en vedette</Text>
+                        <TouchableOpacity
+                            style={[
+                                styles.imageToggleBtn,
+                                !showCategoryImages && styles.imageToggleBtnActive
+                            ]}
+                            onPress={toggleShowCategoryImages}
+                            activeOpacity={0.7}
+                        >
+                            <Ionicons
+                                name={showCategoryImages ? 'images-outline' : 'document-text-outline'}
+                                size={14}
+                                color={showCategoryImages ? Colors.primary : Colors.textLight}
+                                style={{ marginRight: 5 }}
+                            />
+                            <Text
+                                style={[
+                                    styles.imageToggleText,
+                                    !showCategoryImages && styles.imageToggleTextMuted
+                                ]}
                             >
-                                <View style={[styles.featuredCategoryIcon, { backgroundColor: Colors.primary + '20' }]}>
-                                    <Ionicons name={getCategoryIcon(name) as any} size={24} color={Colors.primary} />
-                                </View>
-                                <Text style={styles.featuredCategoryName}>
-                                    {decodeHtmlEntities(name)}
-                                </Text>
-                                <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
-                            </TouchableOpacity>
-                            {featuredPosts[name] && featuredPosts[name].length > 0 && (
-                                <ScrollView
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    contentContainerStyle={styles.featuredPostsScroll}
+                                {showCategoryImages ? 'Images : Oui' : 'Images : Non'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                    {Object.entries(FEATURED_CATEGORIES).map(([name, config]) => {
+                        const hasImages = config.showImage !== undefined
+                            ? (config.showImage && showCategoryImages)
+                            : showCategoryImages;
+
+                        return (
+                            <View key={'head_cat_' + config.id} style={styles.featuredCategory}>
+                                <TouchableOpacity
+                                    style={styles.featuredCategoryHeader}
+                                    onPress={() => handleCategoryPress(config.id, decodeHtmlEntities(name))}
+                                    activeOpacity={0.7}
                                 >
-                                    {featuredPosts[name].map((item, index) => (
-                                        <View
-                                            key={`featured_${name}_${item.id}_${index}`}
-                                            style={styles.featuredCardWrapper}
-                                        >
-                                            <ArticleCard
-                                                article={item}
-                                                onPress={() => handleArticlePress(item)}
-                                                variant="vertical"
-                                            />
-                                        </View>
-                                    ))}
-                                </ScrollView>
-                            )}
-                        </View>
-                    ))}
+                                    <View style={[styles.featuredCategoryIcon, { backgroundColor: Colors.primary + '20' }]}>
+                                        <Ionicons name={getCategoryIcon(name) as any} size={24} color={Colors.primary} />
+                                    </View>
+                                    <Text style={styles.featuredCategoryName}>
+                                        {decodeHtmlEntities(name)}
+                                    </Text>
+                                    <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
+                                </TouchableOpacity>
+                                {featuredPosts[name] && featuredPosts[name].length > 0 && (
+                                    <ScrollView
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                        contentContainerStyle={styles.featuredPostsScroll}
+                                    >
+                                        {featuredPosts[name].map((item, index) => (
+                                            <View
+                                                key={`featured_${name}_${item.id}_${index}`}
+                                                style={[
+                                                    styles.featuredCardWrapper,
+                                                    !hasImages && styles.featuredCardWrapperNoImage
+                                                ]}
+                                            >
+                                                <ArticleCard
+                                                    article={item}
+                                                    onPress={() => handleArticlePress(item)}
+                                                    variant="vertical"
+                                                    showImage={hasImages}
+                                                />
+                                            </View>
+                                        ))}
+                                    </ScrollView>
+                                )}
+                            </View>
+                        );
+                    })}
                 </View>
 
                 <View style={styles.section}>
@@ -534,6 +590,37 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         marginBottom: 16,
     },
+    sectionHeaderWithToggle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        marginBottom: 16,
+    },
+    sectionTitleNoPadding: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: Colors.text,
+    },
+    imageToggleBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: Colors.primary + '15',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 14,
+    },
+    imageToggleBtnActive: {
+        backgroundColor: Colors.borderLight,
+    },
+    imageToggleText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: Colors.primary,
+    },
+    imageToggleTextMuted: {
+        color: Colors.textLight,
+    },
     featuredCategory: {
         marginBottom: 20,
     },
@@ -569,6 +656,10 @@ const styles = StyleSheet.create({
     featuredCardWrapper: {
         width: 200,
         marginRight: 14,
+    },
+    featuredCardWrapperNoImage: {
+        width: 175,
+        marginRight: 12,
     },
     featuredPostCard: {
         width: 200,

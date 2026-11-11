@@ -15,13 +15,15 @@ interface ArticleCardProps {
   onPress: () => void;
   variant?: 'horizontal' | 'vertical' | 'compact' | 'grid';
   showActions?: boolean;
+  showImage?: boolean;
 }
 
 const ArticleCardComponent: React.FC<ArticleCardProps> = ({
   article,
   onPress,
   variant = 'horizontal',
-  showActions = true
+  showActions = true,
+  showImage = true,
 }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -105,17 +107,19 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
   if (variant === 'grid') {
     return (
       <TouchableOpacity style={styles.gridCard} activeOpacity={0.85} onPress={onPress}>
-        <View style={styles.imageWrapper}>
-          <AppImage
-            source={{ uri: imageUrl || undefined }}
-            style={styles.gridImage}
-            resizeMode="cover"
-            borderRadius={12}
-            fallbackIcon="newspaper-outline"
-          />
-        </View>
-        <View style={styles.gridContent}>
-          <Text style={styles.gridTitle} numberOfLines={2}>
+        {showImage && (
+          <View style={styles.imageWrapper}>
+            <AppImage
+              source={{ uri: imageUrl || undefined }}
+              style={styles.gridImage}
+              resizeMode="cover"
+              borderRadius={12}
+              fallbackIcon="newspaper-outline"
+            />
+          </View>
+        )}
+        <View style={[styles.gridContent, !showImage && { paddingTop: 12 }]}>
+          <Text style={styles.gridTitle} numberOfLines={!showImage ? 3 : 2}>
             {formatTitle(article.title?.rendered || '')}
           </Text>
           <View style={styles.metaItem}>
@@ -132,8 +136,8 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
     return (
       <TouchableOpacity style={[styles.horizontalCard, styles.compactCard]} activeOpacity={0.8} onPress={onPress}>
         <View style={styles.compactContent}>
-          <View style={styles.textContainer}>
-            <Text style={styles.compactTitle} numberOfLines={2}>
+          <View style={[styles.textContainer, !showImage && { flex: 1, paddingRight: 0 }]}>
+            <Text style={styles.compactTitle} numberOfLines={!showImage ? 3 : 2}>
               {formatTitle(article.title?.rendered || '')}
             </Text>
             <View style={styles.metaRow}>
@@ -157,13 +161,15 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
               )}
             </View>
           </View>
-          <AppImage
-            source={{ uri: imageUrl || undefined }}
-            style={styles.compactImage}
-            resizeMode="cover"
-            borderRadius={10}
-            fallbackIcon="newspaper-outline"
-          />
+          {showImage && (
+            <AppImage
+              source={{ uri: imageUrl || undefined }}
+              style={styles.compactImage}
+              resizeMode="cover"
+              borderRadius={10}
+              fallbackIcon="newspaper-outline"
+            />
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -172,37 +178,62 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
   // Variant vertical (pour les listes horizontales)
   if (variant === 'vertical') {
     return (
-      <TouchableOpacity style={styles.verticalCard} activeOpacity={0.8} onPress={onPress}>
-        <View style={styles.imageWrapper}>
-          <AppImage
-            source={{ uri: imageUrl || undefined }}
-            style={styles.verticalImage}
-            resizeMode="cover"
-            borderRadius={12}
-            fallbackIcon="newspaper-outline"
-          />
-          {showActions && (
-            <View style={styles.actionsOverlay}>
-              <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
-                <Ionicons name="share-social-outline" size={16} color="#FFF" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.actionBtn} onPress={toggleSave} disabled={isLoading}>
-                <Ionicons
-                  name={isSaved ? 'heart' : 'heart-outline'}
-                  size={16}
-                  color={isSaved ? '#FF4D67' : '#FFF'}
-                />
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-        <View style={styles.verticalContent}>
-          <Text style={styles.verticalTitle} numberOfLines={2}>
+      <TouchableOpacity
+        style={[styles.verticalCard, !showImage && styles.textOnlyVerticalCard]}
+        activeOpacity={0.8}
+        onPress={onPress}
+      >
+        {showImage && (
+          <View style={styles.imageWrapper}>
+            <AppImage
+              source={{ uri: imageUrl || undefined }}
+              style={styles.verticalImage}
+              resizeMode="cover"
+              borderRadius={12}
+              fallbackIcon="newspaper-outline"
+            />
+            {showActions && (
+              <View style={styles.actionsOverlay}>
+                <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
+                  <Ionicons name="share-social-outline" size={16} color="#FFF" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtn} onPress={toggleSave} disabled={isLoading}>
+                  <Ionicons
+                    name={isSaved ? 'heart' : 'heart-outline'}
+                    size={16}
+                    color={isSaved ? '#FF4D67' : '#FFF'}
+                  />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
+        <View style={[styles.verticalContent, !showImage && styles.textOnlyVerticalContent]}>
+          <Text
+            style={[styles.verticalTitle, !showImage && styles.textOnlyVerticalTitle]}
+            numberOfLines={!showImage ? 3 : 2}
+          >
             {formatTitle(article.title?.rendered || '')}
           </Text>
-          <View style={styles.metaItem}>
-            <Ionicons name="time-outline" size={12} color={Colors.textLight} />
-            <Text style={styles.metaText}>{formatDate(article.date)}</Text>
+          <View style={styles.metaRowBetween}>
+            <View style={styles.metaItem}>
+              <Ionicons name="time-outline" size={12} color={Colors.textLight} />
+              <Text style={styles.metaText}>{formatDate(article.date)}</Text>
+            </View>
+            {!showImage && showActions && (
+              <View style={styles.compactActions}>
+                <TouchableOpacity style={styles.tinyActionBtn} onPress={handleShare}>
+                  <Ionicons name="share-social-outline" size={13} color="#666" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.tinyActionBtn} onPress={toggleSave} disabled={isLoading}>
+                  <Ionicons
+                    name={isSaved ? 'heart' : 'heart-outline'}
+                    size={13}
+                    color={isSaved ? Colors.primary : '#666'}
+                  />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </TouchableOpacity>
@@ -213,7 +244,7 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
   return (
     <TouchableOpacity style={styles.horizontalCard} activeOpacity={0.8} onPress={onPress}>
       <View style={styles.horizontalContent}>
-        <View style={styles.textContainer}>
+        <View style={[styles.textContainer, !showImage && { flex: 1, paddingRight: 0 }]}>
           <Text style={styles.horizontalTitle} numberOfLines={3}>
             {formatTitle(article.title?.rendered || '')}
           </Text>
@@ -222,31 +253,47 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
               <Ionicons name="time-outline" size={12} color={Colors.textLight} />
               <Text style={styles.metaText}>{formatDate(article.date)}</Text>
             </View>
+            {!showImage && showActions && (
+              <View style={styles.compactActions}>
+                <TouchableOpacity style={styles.tinyActionBtn} onPress={handleShare}>
+                  <Ionicons name="share-social-outline" size={13} color="#666" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.tinyActionBtn} onPress={toggleSave} disabled={isLoading}>
+                  <Ionicons
+                    name={isSaved ? 'heart' : 'heart-outline'}
+                    size={13}
+                    color={isSaved ? Colors.primary : '#666'}
+                  />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
-        <View style={styles.imageWithActions}>
-          <AppImage
-            source={{ uri: imageUrl || undefined }}
-            style={styles.horizontalImage}
-            resizeMode="cover"
-            borderRadius={12}
-            fallbackIcon="newspaper-outline"
-          />
-          {showActions && (
-            <View style={styles.horizontalActions}>
-              <TouchableOpacity style={styles.smallActionBtn} onPress={handleShare}>
-                <Ionicons name="share-social-outline" size={14} color="#666" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.smallActionBtn} onPress={toggleSave} disabled={isLoading}>
-                <Ionicons
-                  name={isSaved ? 'heart' : 'heart-outline'}
-                  size={14}
-                  color={isSaved ? Colors.primary : '#666'}
-                />
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
+        {showImage && (
+          <View style={styles.imageWithActions}>
+            <AppImage
+              source={{ uri: imageUrl || undefined }}
+              style={styles.horizontalImage}
+              resizeMode="cover"
+              borderRadius={12}
+              fallbackIcon="newspaper-outline"
+            />
+            {showActions && (
+              <View style={styles.horizontalActions}>
+                <TouchableOpacity style={styles.smallActionBtn} onPress={handleShare}>
+                  <Ionicons name="share-social-outline" size={14} color="#666" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.smallActionBtn} onPress={toggleSave} disabled={isLoading}>
+                  <Ionicons
+                    name={isSaved ? 'heart' : 'heart-outline'}
+                    size={14}
+                    color={isSaved ? Colors.primary : '#666'}
+                  />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -447,6 +494,28 @@ const styles = StyleSheet.create({
     color: Colors.text,
     lineHeight: 18,
     marginBottom: 8,
+  },
+  textOnlyVerticalCard: {
+    minHeight: 105,
+    justifyContent: 'space-between',
+    padding: 12,
+  },
+  textOnlyVerticalContent: {
+    padding: 0,
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  textOnlyVerticalTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  metaRowBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   // Common
   metaRow: {
