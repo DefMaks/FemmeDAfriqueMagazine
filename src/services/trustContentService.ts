@@ -24,6 +24,11 @@ export interface TrustContent {
   updatedAt: string;
 }
 
+const stripEmojis = (str?: string): string => {
+  if (!str) return '';
+  return str.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
+};
+
 class TrustContentService {
   /**
    * Récupère le contenu de confiance par clé
@@ -34,43 +39,36 @@ class TrustContentService {
     appName: string = 'fam'
   ): Promise<TrustContent | null> {
     try {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('trust_content')
         .select('*')
         .eq('key', key)
         .eq('language', language)
         .eq('app_name', appName)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
-      if (error) {
-        console.error('Error fetching trust content:', error);
-        return null;
+      if (data) {
+        return this.transformData(data);
       }
 
-      if (!data) {
-        // Essayer de récupérer le contenu par défaut (sans app_name)
-        const { data: defaultData, error: defaultError } = await supabase
-          .from('trust_content')
-          .select('*')
-          .eq('key', key)
-          .eq('language', language)
-          .eq('is_active', true)
-          .is('app_name', null)
-          .single();
+      // Essayer de récupérer le contenu par défaut (sans app_name)
+      const { data: defaultData } = await supabase
+        .from('trust_content')
+        .select('*')
+        .eq('key', key)
+        .eq('language', language)
+        .eq('is_active', true)
+        .is('app_name', null)
+        .maybeSingle();
 
-        if (defaultError) {
-          console.error('Error fetching default trust content:', defaultError);
-          return null;
-        }
-
-        return defaultData ? this.transformData(defaultData) : null;
+      if (defaultData) {
+        return this.transformData(defaultData);
       }
 
-      return this.transformData(data);
-    } catch (error) {
-      console.error('Unexpected error fetching trust content:', error);
-      return null;
+      return await this.getDefaultTrustContent();
+    } catch {
+      return await this.getDefaultTrustContent();
     }
   }
 
@@ -189,14 +187,17 @@ class TrustContentService {
     return {
       id: data.id,
       key: data.key,
-      title: data.title,
-      shortMessage: data.short_message,
-      modalTitle: data.modal_title,
-      modalContent: data.modal_content,
-      securityFeatures: data.security_features || [],
-      partners: data.partners || [],
-      ctaText: data.cta_text,
-      cancelText: data.cancel_text,
+      title: stripEmojis(data.title),
+      shortMessage: stripEmojis(data.short_message),
+      modalTitle: stripEmojis(data.modal_title),
+      modalContent: stripEmojis(data.modal_content),
+      securityFeatures: (data.security_features || []).map((f: string) => stripEmojis(f)),
+      partners: (data.partners || []).map((p: any) => ({
+        ...p,
+        description: stripEmojis(p.description),
+      })),
+      ctaText: stripEmojis(data.cta_text),
+      cancelText: stripEmojis(data.cancel_text),
       language: data.language,
       appName: data.app_name,
       isActive: data.is_active,
