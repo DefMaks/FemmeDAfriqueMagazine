@@ -18,6 +18,7 @@ import AuthScreen from '../screens/AuthScreen';
 import ContactScreen from '../screens/ContactScreen';
 import ArticlesLusScreen from '../screens/ArticlesLusScreen';
 import AchatsScreen from '../screens/AchatsScreen';
+import SubscriptionScreen from '../screens/SubscriptionScreen';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { Magazine } from '../models/Magazine';
@@ -35,6 +36,7 @@ export type RootStackParamList = {
     Contact: undefined;
     ArticlesLus: undefined;
     Achats: undefined;
+    Abonnement: undefined;
 };
 
 const Tab = createBottomTabNavigator();
@@ -268,6 +270,14 @@ export default function RootNavigator() {
                 />
                 <Stack.Screen name="ArticlesLus" component={ArticlesLusScreen} />
                 <Stack.Screen name="Achats" component={AchatsScreen} />
+                <Stack.Screen
+                    name="Abonnement"
+                    component={SubscriptionScreen}
+                    options={{ headerShown: false }}
+                    listeners={{
+                        focus: () => analyticsService.trackScreenView('Abonnement'),
+                    }}
+                />
             </Stack.Navigator>
         </NavigationContainer>
     );

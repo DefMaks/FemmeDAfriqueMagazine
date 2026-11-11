@@ -133,7 +133,7 @@ const DiscoverScreen = () => {
     const loadFeaturedCategories = async () => {
         try {
             const promises = Object.entries(FEATURED_CATEGORIES).map(async ([name, id]) => {
-                const posts = await getPostsByCategory(id, 1, 3);
+                const posts = await getPostsByCategory(id, 1, 5);
                 return { name, posts };
             });
 
@@ -427,6 +427,26 @@ const DiscoverScreen = () => {
                                 </Text>
                                 <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
                             </TouchableOpacity>
+                            {featuredPosts[name] && featuredPosts[name].length > 0 && (
+                                <ScrollView
+                                    horizontal
+                                    showsHorizontalScrollIndicator={false}
+                                    contentContainerStyle={styles.featuredPostsScroll}
+                                >
+                                    {featuredPosts[name].map((item, index) => (
+                                        <View
+                                            key={`featured_${name}_${item.id}_${index}`}
+                                            style={styles.featuredCardWrapper}
+                                        >
+                                            <ArticleCard
+                                                article={item}
+                                                onPress={() => handleArticlePress(item)}
+                                                variant="vertical"
+                                            />
+                                        </View>
+                                    ))}
+                                </ScrollView>
+                            )}
                         </View>
                     ))}
                 </View>
@@ -543,6 +563,12 @@ const styles = StyleSheet.create({
     },
     featuredPostsScroll: {
         paddingLeft: 20,
+        paddingRight: 6,
+        paddingBottom: 4,
+    },
+    featuredCardWrapper: {
+        width: 200,
+        marginRight: 14,
     },
     featuredPostCard: {
         width: 200,

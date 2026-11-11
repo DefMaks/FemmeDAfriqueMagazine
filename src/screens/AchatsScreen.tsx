@@ -55,6 +55,10 @@ const AchatsScreen = ({ navigation }: any) => {
     navigation.navigate('Main', { screen: 'Boutique' });
   };
 
+  const navigateToSubscription = () => {
+    navigation.navigate('Abonnement');
+  };
+
   const formatDate = (isoString?: string) => {
     if (!isoString) return '';
     try {
@@ -106,7 +110,7 @@ const AchatsScreen = ({ navigation }: any) => {
             </View>
             <TouchableOpacity
               style={styles.promoButton}
-              onPress={navigateToShop}
+              onPress={navigateToSubscription}
               activeOpacity={0.8}
             >
               <Text style={styles.promoButtonText}>S'abonner</Text>

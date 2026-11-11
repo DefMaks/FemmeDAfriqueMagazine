@@ -530,6 +530,16 @@ const ProfileScreen = () => {
             }
         },
         {
+            id: 'mon_abonnement',
+            icon: 'card-outline',
+            title: subscriptionInfo ? 'Mon abonnement' : "S'abonner au magazine",
+            subtitle: subscriptionInfo ? subscriptionInfo : 'Accès illimité aux éditions numériques',
+            action: () => {
+                analyticsService.trackEvent('screen_viewed', 'navigation', 'Abonnement', 1);
+                navigation.navigate('Abonnement');
+            }
+        },
+        {
             id: 'contact_news',
             icon: 'call-outline',
             title: 'Coordonnées & Rédaction',
