@@ -8,6 +8,7 @@ import {
     TouchableOpacity,
     FlatList,
     ScrollView,
+    Dimensions,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -33,6 +34,10 @@ import CategoryCard from '../components/CategoryCard';
 import { analyticsService } from '../services/analytics.simple';
 import { decodeHtmlEntities } from '../utils/textUtils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+// Configuration pour afficher exactement 1.5 carte à l'écran (1 carte complète + 50% de la suivante)
+const FEATURED_CARD_WIDTH = Math.round((SCREEN_WIDTH - 34) / 1.5);
 
 type DiscoverScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type DiscoverScreenRouteProps = {
@@ -111,7 +116,7 @@ const DiscoverScreen = () => {
             if (val !== null) {
                 setShowCategoryImages(JSON.parse(val));
             }
-        }).catch(() => {});
+        }).catch(() => { });
     }, []);
 
     const toggleShowCategoryImages = async () => {
@@ -119,7 +124,7 @@ const DiscoverScreen = () => {
         setShowCategoryImages(nextValue);
         try {
             await AsyncStorage.setItem('@fam_pref_show_images', JSON.stringify(nextValue));
-        } catch {}
+        } catch { }
     };
 
     // Gérer la navigation avec paramètre de catégorie
@@ -434,29 +439,6 @@ const DiscoverScreen = () => {
                 <View style={styles.section}>
                     <View style={styles.sectionHeaderWithToggle}>
                         <Text style={styles.sectionTitleNoPadding}>Catégories en vedette</Text>
-                        <TouchableOpacity
-                            style={[
-                                styles.imageToggleBtn,
-                                !showCategoryImages && styles.imageToggleBtnActive
-                            ]}
-                            onPress={toggleShowCategoryImages}
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons
-                                name={showCategoryImages ? 'images-outline' : 'document-text-outline'}
-                                size={14}
-                                color={showCategoryImages ? Colors.primary : Colors.textLight}
-                                style={{ marginRight: 5 }}
-                            />
-                            <Text
-                                style={[
-                                    styles.imageToggleText,
-                                    !showCategoryImages && styles.imageToggleTextMuted
-                                ]}
-                            >
-                                {showCategoryImages ? 'Images : Oui' : 'Images : Non'}
-                            </Text>
-                        </TouchableOpacity>
                     </View>
                     {Object.entries(FEATURED_CATEGORIES).map(([name, config]) => {
                         const hasImages = config.showImage !== undefined
@@ -483,6 +465,9 @@ const DiscoverScreen = () => {
                                         horizontal
                                         showsHorizontalScrollIndicator={false}
                                         contentContainerStyle={styles.featuredPostsScroll}
+                                        decelerationRate="fast"
+                                        snapToInterval={FEATURED_CARD_WIDTH + 14}
+                                        snapToAlignment="start"
                                     >
                                         {featuredPosts[name].map((item, index) => (
                                             <View
@@ -496,7 +481,7 @@ const DiscoverScreen = () => {
                                                     article={item}
                                                     onPress={() => handleArticlePress(item)}
                                                     variant="vertical"
-                                                    showImage={hasImages}
+                                                    showImage={!hasImages}
                                                 />
                                             </View>
                                         ))}
@@ -650,16 +635,16 @@ const styles = StyleSheet.create({
     },
     featuredPostsScroll: {
         paddingLeft: 20,
-        paddingRight: 6,
-        paddingBottom: 4,
+        paddingRight: 14,
+        paddingBottom: 6,
     },
     featuredCardWrapper: {
-        width: 200,
+        width: FEATURED_CARD_WIDTH,
         marginRight: 14,
     },
     featuredCardWrapperNoImage: {
-        width: 175,
-        marginRight: 12,
+        width: FEATURED_CARD_WIDTH,
+        marginRight: 14,
     },
     featuredPostCard: {
         width: 200,
