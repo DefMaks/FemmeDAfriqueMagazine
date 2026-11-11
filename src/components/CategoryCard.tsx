@@ -14,14 +14,19 @@ const isTablet = windowWidth >= 768;
 const cardWidth = isTablet ? '22%' : '48%';
 
 const CategoryCard: React.FC<CategoryCardProps> = ({ name, count, onPress }) => {
-    const cleanName = decodeHtmlEntities(name);
+    let cleanName = decodeHtmlEntities(name);
+    if (cleanName.toLowerCase() === 'mining') {
+        cleanName = 'Mines';
+    }
+
+    const pluralLabel = count > 1 ? 'articles' : 'article';
 
     return (
         <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.8}>
             <Text style={styles.name} numberOfLines={2}>
                 {cleanName}
             </Text>
-            <Text style={styles.count}>{count} articles</Text>
+            <Text style={styles.count}>{count} {pluralLabel}</Text>
         </TouchableOpacity>
     );
 };

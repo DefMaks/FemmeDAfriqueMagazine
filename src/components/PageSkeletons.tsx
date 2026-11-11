@@ -14,7 +14,7 @@ const { width: screenWidth } = Dimensions.get('window');
 
 interface SkeletonBoxProps {
   width?: number | string;
-  height?: number;
+  height?: number | string;
   borderRadius?: number;
   style?: ViewStyle | ViewStyle[];
 }

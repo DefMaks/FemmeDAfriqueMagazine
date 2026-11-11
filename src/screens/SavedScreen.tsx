@@ -76,7 +76,21 @@ const SavedScreen = () => {
         <ArticleListSkeleton count={5} />
       ) : savedPosts.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>Aucun article sauvegardé</Text>
+          <View style={styles.emptyIconCircle}>
+            <Ionicons name="bookmark-outline" size={42} color={Colors.primary} />
+          </View>
+          <Text style={styles.emptyTitle}>Aucun article sauvegardé</Text>
+          <Text style={styles.emptyText}>
+            Enregistrez vos articles préférés pour les retrouver et les lire facilement hors-ligne.
+          </Text>
+          <TouchableOpacity
+            style={styles.exploreButton}
+            onPress={() => navigation.navigate('Main' as any, { screen: 'Accueil' })}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="compass-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+            <Text style={styles.exploreButtonText}>Découvrir des articles</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -107,7 +121,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginLeft: 8,
   },
-  list: { padding: 16, paddingBottom: 40 },
+  list: { padding: 16, paddingBottom: 130 },
   postCard: {
     backgroundColor: '#fff',
     padding: 16,
@@ -124,8 +138,49 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 16, fontWeight: '600', color: Colors.text, flex: 1 },
   removeButton: { padding: 8 },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { fontSize: 16, color: '#666' },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 36,
+    paddingBottom: 80,
+  },
+  emptyIconCircle: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: Colors.primary + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  exploreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 25,
+  },
+  exploreButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '600',
+  },
 });
 
 export default SavedScreen;

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, memo } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Platform, Share, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Share, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { savedArticlesService } from '../services/supabaseService';
 import { decodeHtmlEntities, getShareMessage } from '../utils/textUtils';
+import { AppImage } from './AppImage';
 
 const { width: screenWidth } = Dimensions.get('window');
 const GRID_CARD_WIDTH = (screenWidth - 44) / 2;
@@ -105,13 +106,13 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
     return (
       <TouchableOpacity style={styles.gridCard} activeOpacity={0.85} onPress={onPress}>
         <View style={styles.imageWrapper}>
-          {imageUrl ? (
-            <Image source={{ uri: imageUrl }} style={styles.gridImage} resizeMode="cover" />
-          ) : (
-            <View style={[styles.gridImage, styles.placeholderBox]}>
-              <Ionicons name="newspaper-outline" size={24} color={Colors.textLight} />
-            </View>
-          )}
+          <AppImage
+            source={{ uri: imageUrl || undefined }}
+            style={styles.gridImage}
+            resizeMode="cover"
+            borderRadius={12}
+            fallbackIcon="newspaper-outline"
+          />
         </View>
         <View style={styles.gridContent}>
           <Text style={styles.gridTitle} numberOfLines={2}>
@@ -156,9 +157,13 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
               )}
             </View>
           </View>
-          {imageUrl && (
-            <Image source={{ uri: imageUrl }} style={styles.compactImage} />
-          )}
+          <AppImage
+            source={{ uri: imageUrl || undefined }}
+            style={styles.compactImage}
+            resizeMode="cover"
+            borderRadius={10}
+            fallbackIcon="newspaper-outline"
+          />
         </View>
       </TouchableOpacity>
     );
@@ -169,9 +174,13 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
     return (
       <TouchableOpacity style={styles.verticalCard} activeOpacity={0.8} onPress={onPress}>
         <View style={styles.imageWrapper}>
-          {imageUrl && (
-            <Image source={{ uri: imageUrl }} style={styles.verticalImage} />
-          )}
+          <AppImage
+            source={{ uri: imageUrl || undefined }}
+            style={styles.verticalImage}
+            resizeMode="cover"
+            borderRadius={12}
+            fallbackIcon="newspaper-outline"
+          />
           {showActions && (
             <View style={styles.actionsOverlay}>
               <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
@@ -216,9 +225,13 @@ const ArticleCardComponent: React.FC<ArticleCardProps> = ({
           </View>
         </View>
         <View style={styles.imageWithActions}>
-          {imageUrl && (
-            <Image source={{ uri: imageUrl }} style={styles.horizontalImage} />
-          )}
+          <AppImage
+            source={{ uri: imageUrl || undefined }}
+            style={styles.horizontalImage}
+            resizeMode="cover"
+            borderRadius={12}
+            fallbackIcon="newspaper-outline"
+          />
           {showActions && (
             <View style={styles.horizontalActions}>
               <TouchableOpacity style={styles.smallActionBtn} onPress={handleShare}>

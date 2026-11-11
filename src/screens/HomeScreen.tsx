@@ -28,6 +28,7 @@ import { HomeSkeleton } from '../components/PageSkeletons';
 import { ErrorMessage } from '../components/ErrorMessage';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { analyticsService } from '../services/analytics.simple';
+import { AppImage } from '../components/AppImage';
 import { AdBanner } from '../components/AdBanner';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -225,10 +226,12 @@ const HomeScreen = () => {
                         onPress={() => navigation.navigate('Main', { screen: 'Boutique' })}
                         activeOpacity={0.9}
                     >
-                        <Image
+                        <AppImage
                             source={{ uri: getAdBannerImageUrl()! }}
                             style={styles.adBannerImage}
                             resizeMode="cover"
+                            borderRadius={12}
+                            fallbackIcon="megaphone-outline"
                         />
                     </TouchableOpacity>
                 </View>
@@ -411,7 +414,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
     },
     footer: {
-        height: 100,
+        height: 140,
     },
 });
 

@@ -121,13 +121,21 @@ const AchatsScreen = ({ navigation }: any) => {
 
   const renderItem = ({ item }: { item: PurchaseItem }) => {
     const isMagazine = item.type === 'magazine';
+    const rawStatus = (item.status || '').toLowerCase();
+    const isPending = rawStatus.includes('pend') || rawStatus.includes('attente');
+    const isFailed = rawStatus.includes('fail') || rawStatus.includes('échou');
+
+    const statusLabel = isPending ? 'En attente' : isFailed ? 'Échoué' : 'Confirmé';
+    const pillBg = isPending ? '#FEF3C7' : isFailed ? '#FEE2E2' : '#DCFCE7';
+    const pillColor = isPending ? '#B45309' : isFailed ? '#B91C1C' : '#15803D';
+
     return (
       <View style={styles.card}>
-        <View style={styles.cardIconContainer}>
+        <View style={[styles.cardIconContainer, isMagazine ? styles.magIconBg : styles.subIconBg]}>
           <Ionicons
-            name={isMagazine ? 'book' : 'star'}
-            size={22}
-            color={Colors.primary}
+            name={isMagazine ? 'book-outline' : 'ribbon-outline'}
+            size={20}
+            color={isMagazine ? Colors.primary : '#D97706'}
           />
         </View>
 
@@ -140,8 +148,8 @@ const AchatsScreen = ({ navigation }: any) => {
           <Text style={styles.itemPrice}>
             {item.amount > 0 ? `${item.amount} ${item.currency}` : 'Inclus'}
           </Text>
-          <View style={styles.statusPill}>
-            <Text style={styles.statusText}>{item.status}</Text>
+          <View style={[styles.statusPill, { backgroundColor: pillBg }]}>
+            <Text style={[styles.statusText, { color: pillColor }]}>{statusLabel}</Text>
           </View>
         </View>
       </View>
@@ -271,6 +279,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
+    paddingBottom: 130,
   },
   headerSection: {
     marginBottom: 16,
@@ -384,6 +393,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary + '12',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  magIconBg: {
+    backgroundColor: Colors.primary + '12',
+  },
+  subIconBg: {
+    backgroundColor: '#FEF3C7',
   },
   cardContent: {
     flex: 1,

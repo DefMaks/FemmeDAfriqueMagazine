@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { Colors } from '../theme/colors';
 import { getAds } from '../services/api';
 import { supabase } from '../lib/supabase';
+import { AppImage } from './AppImage';
 
 // Interface Unifiée pour le composant
 interface AdItem {
@@ -108,7 +109,13 @@ export const AdBanner: React.FC<AdBannerProps> = ({
 
   return (
     <TouchableOpacity style={styles.container} onPress={handleAdPress} activeOpacity={0.8}>
-      <Image source={{ uri: ad.imageUrl }} style={styles.image} resizeMode="cover" />
+      <AppImage
+        source={{ uri: ad.imageUrl }}
+        style={styles.image}
+        resizeMode="cover"
+        borderRadius={16}
+        fallbackIcon="megaphone-outline"
+      />
       <View style={styles.badge}>
         <Text style={styles.badgeText}>SPONSORISÉ</Text>
       </View>

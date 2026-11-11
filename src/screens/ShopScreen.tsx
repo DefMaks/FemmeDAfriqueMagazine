@@ -28,6 +28,7 @@ import {
 // import * as FileSystem from 'expo-file-system';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import { AppImage } from '../components/AppImage';
 import { Ionicons } from '@expo/vector-icons';
 import { centralPaymentService, PaymentRequest } from '../services/centralPaymentService';
 import Constants from 'expo-constants';
@@ -415,11 +416,15 @@ const ShopScreen = () => {
                 onPress={() => handleOpenCheckout(item)}
             >
                 <View style={styles.imageContainer}>
-                    <Image
+                    <AppImage
                         source={{
                             uri: item.better_featured_image?.source_url || item.dmks_featured_image?.src,
                         }}
                         style={styles.coverMagImage}
+                        resizeMode="cover"
+                        dark
+                        borderRadius={12}
+                        fallbackIcon="book-outline"
                     />
                     <View style={styles.dateBadge}>
                         <Text style={styles.dateBadgeText}>{formatMagazineDate(item.date)}</Text>
@@ -441,8 +446,8 @@ const ShopScreen = () => {
 
     return (
         <View style={styles.container}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: "auto" }}>
-                <Image source={require('../../assets/FDA-white.png')} style={{ width: 60, height: 25, marginTop: -15 }} resizeMode="contain" />
+            <View style={styles.headerContainer}>
+                <Image source={require('../../assets/FDA-white.png')} style={styles.headerLogo} resizeMode="contain" />
                 <Text style={styles.header}>Boutique</Text>
             </View>
             <TrustBadge
@@ -731,8 +736,10 @@ const ShopScreen = () => {
 /* Garder la même feuille de style qu'initialement */
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#111', paddingTop: 50, paddingHorizontal: 16 },
-    header: { fontSize: 24, fontWeight: '200', marginBottom: 16, color: '#FFF', textAlign: 'center' },
-    list: { paddingBottom: 100 },
+    headerContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    headerLogo: { width: 64, height: 28, marginRight: 10 },
+    header: { fontSize: 22, fontWeight: '700', color: '#FFF' },
+    list: { paddingBottom: 130 },
     columnWrapper: { justifyContent: 'space-between' },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111' },
     loadingText: { marginTop: 12, color: '#888', fontSize: 16 },

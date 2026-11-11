@@ -232,7 +232,8 @@ const styles = StyleSheet.create({
         width: 40,
     },
     list: {
-        paddingVertical: 16,
+        paddingTop: 16,
+        paddingBottom: 130,
     },
     endText: {
         textAlign: 'center',

@@ -1,8 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { decodeHtmlEntities } from '../utils/textUtils';
+import { AppImage } from './AppImage';
 
 const { width } = Dimensions.get('window');
 const DEFAULT_SLIDER_WIDTH = width - 40;
@@ -90,10 +91,13 @@ export const PostSlider: React.FC<PostSliderProps> = ({
             activeOpacity={0.9}
             onPress={() => onPress(post)}
           >
-            <Image
+            <AppImage
               source={{ uri: getImageUrl(post) }}
               style={styles.image}
               resizeMode="cover"
+              dark
+              borderRadius={fullWidth ? 0 : 20}
+              fallbackIcon="newspaper-outline"
             />
             <View style={styles.gradient}>
               <View style={styles.content}>
@@ -128,7 +132,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
     marginRight: 20,
-    backgroundColor: Colors.backgroundLight,
+    backgroundColor: '#1F1F1F',
     shadowColor: Colors.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,

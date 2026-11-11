@@ -1,5 +1,5 @@
 // src/screens/ProfileScreen.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     View,
     Text,
@@ -11,6 +11,7 @@ import {
     TextInput,
     Image,
     Alert,
+    Linking,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { MediaTypeOptions } from 'expo-image-picker';
@@ -24,8 +25,7 @@ import { purchaseHistoryService } from '../services/purchaseHistoryService';
 import { analyticsService } from '../services/analytics.simple';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
-import { Linking } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 
 const STORAGE_KEYS = {
@@ -34,6 +34,14 @@ const STORAGE_KEYS = {
     USER_PHONE: '@fda_user_phone',
     SOCIAL_X: '@fda_social_x',
     SOCIAL_FB: '@fda_social_fb',
+    STATS: '@fam_cached_profile_stats',
+};
+
+// Cache en mémoire pour garantir la continuité des statistiques entre écrans
+let memoryProfileStats = {
+    articlesRead: 0,
+    purchases: 0,
+    activeDays: 1,
 };
 
 const ProfileScreen = () => {
@@ -55,29 +63,27 @@ const ProfileScreen = () => {
     const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
     const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-    // États pour les statistiques
-    const [stats, setStats] = useState({
-        articlesRead: 0,
-        purchases: 0,
-        activeDays: 1
-    });
+    // États pour les statistiques initialisés avec le cache mémoire pour éviter tout reset à 0
+    const [stats, setStats] = useState(memoryProfileStats);
 
-    const refreshAll = async () => {
-        await Promise.all([
-            loadUserPreferences(),
-            checkActiveSession(),
-            loadStats(),
-        ]);
-    };
-
-    // Recharger lors de l'accès à l'écran
+    // Initialiser les stats depuis AsyncStorage au montage
     useEffect(() => {
-        refreshAll();
-        const unsubscribe = navigation.addListener('focus', () => {
-            refreshAll();
+        let isMounted = true;
+        AsyncStorage.getItem(STORAGE_KEYS.STATS).then((raw) => {
+            if (raw && isMounted) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed.articlesRead === 'number') {
+                        memoryProfileStats = parsed;
+                        setStats(parsed);
+                    }
+                } catch {}
+            }
         });
-        return unsubscribe;
-    }, [navigation]);
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     const loadStats = async () => {
         try {
@@ -97,31 +103,26 @@ const ProfileScreen = () => {
                 readingHistoryService.getActiveDaysCount(),
             ]);
 
+            // Protection anti-chute : si les requêtes renvoient 0 suite à une temporisation réseau
+            // mais qu'on a déjà des valeurs valides mémorisées, on préserve l'acquis
+            const resolvedArticles = Math.max(readCount, memoryProfileStats.articlesRead);
+            const resolvedPurchases = Math.max(purchasesCount, memoryProfileStats.purchases);
+            const resolvedDays = Math.max(1, activeDaysCount, memoryProfileStats.activeDays);
+
             const statsData = {
-                articlesRead: readCount,
-                purchases: purchasesCount,
-                activeDays: Math.max(1, activeDaysCount),
+                articlesRead: resolvedArticles,
+                purchases: resolvedPurchases,
+                activeDays: resolvedDays,
             };
 
+            memoryProfileStats = statsData;
+            await AsyncStorage.setItem(STORAGE_KEYS.STATS, JSON.stringify(statsData));
             return statsData;
         } catch (error) {
-            console.error('Erreur getDynamicStats:', error);
-            return {
-                articlesRead: 0,
-                purchases: 0,
-                activeDays: 1
-            };
+            console.error('Erreur getDynamicStats (maintien des stats en cache):', error);
+            return memoryProfileStats;
         }
     };
-
-    // Mettre à jour les stats avec les vraies données
-    useEffect(() => {
-        const updateStats = async () => {
-            const dynamicStats = await getDynamicStats();
-            setStats(dynamicStats);
-        };
-        updateStats();
-    }, []);
 
     // Fonction pour rafraîchir les statistiques
     const refreshStats = async () => {
@@ -132,6 +133,21 @@ const ProfileScreen = () => {
             console.error('Erreur rafraîchissement stats:', error);
         }
     };
+
+    const refreshAll = useCallback(async () => {
+        await Promise.all([
+            loadUserPreferences(),
+            checkActiveSession(),
+            loadStats(),
+        ]);
+    }, []);
+
+    // Recharger à chaque fois que l'écran Profil devient actif
+    useFocusEffect(
+        useCallback(() => {
+            refreshAll();
+        }, [refreshAll])
+    );
 
     const loadUserPreferences = async () => {
         try {
@@ -795,7 +811,7 @@ const styles = StyleSheet.create({
         color: Colors.text,
     },
     content: {
-        paddingBottom: 100,
+        paddingBottom: 140,
     },
     profileCard: {
         backgroundColor: Colors.backgroundLight,

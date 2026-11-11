@@ -15,6 +15,7 @@ import { Colors } from '../theme/colors';
 import { readingHistoryService, ReadArticleItem } from '../services/readingHistoryService';
 import { ArticleListSkeleton } from '../components/PageSkeletons';
 import { decodeHtmlEntities } from '../utils/textUtils';
+import { AppImage } from '../components/AppImage';
 
 const ArticlesLusScreen = ({ navigation }: any) => {
   const [items, setItems] = useState<ReadArticleItem[]>([]);
@@ -114,13 +115,13 @@ const ArticlesLusScreen = ({ navigation }: any) => {
           });
         }}
       >
-        {item.post_image ? (
-          <Image source={{ uri: item.post_image }} style={styles.image} resizeMode="cover" />
-        ) : (
-          <View style={[styles.image, styles.placeholderImage]}>
-            <Ionicons name="newspaper-outline" size={24} color={Colors.textSecondary} />
-          </View>
-        )}
+        <AppImage
+          source={{ uri: item.post_image || undefined }}
+          style={styles.image}
+          resizeMode="cover"
+          borderRadius={8}
+          fallbackIcon="newspaper-outline"
+        />
 
         <View style={styles.cardContent}>
           {cleanCategory && (
@@ -273,6 +274,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
+    paddingBottom: 130,
   },
   card: {
     flexDirection: 'row',

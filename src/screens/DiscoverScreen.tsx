@@ -417,6 +417,7 @@ const DiscoverScreen = () => {
                             <TouchableOpacity
                                 style={styles.featuredCategoryHeader}
                                 onPress={() => handleCategoryPress(id, decodeHtmlEntities(name))}
+                                activeOpacity={0.7}
                             >
                                 <View style={[styles.featuredCategoryIcon, { backgroundColor: Colors.primary + '20' }]}>
                                     <Ionicons name={getCategoryIcon(name) as any} size={24} color={Colors.primary} />
@@ -426,25 +427,6 @@ const DiscoverScreen = () => {
                                 </Text>
                                 <Ionicons name="chevron-forward" size={20} color={Colors.textLight} />
                             </TouchableOpacity>
-                            {featuredPosts[name] && featuredPosts[name].length > 0 && (
-                                <FlatList
-                                    horizontal
-                                    showsHorizontalScrollIndicator={false}
-                                    data={featuredPosts[name]}
-                                    renderItem={({ item }) => (
-                                        <TouchableOpacity
-                                            style={styles.featuredPostCard}
-                                            onPress={() => handleArticlePress(item)}
-                                        >
-                                            <Text style={styles.featuredPostTitle} numberOfLines={2}>
-                                                {decodeHtmlEntities(item.title?.rendered || '')}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    )}
-                                    keyExtractor={(item, index) => `featured_${name}_${item.id}_${index}`}
-                                    contentContainerStyle={styles.featuredPostsScroll}
-                                />
-                            )}
                         </View>
                     ))}
                 </View>
@@ -520,7 +502,7 @@ const styles = StyleSheet.create({
         color: Colors.text,
     },
     content: {
-        paddingBottom: 100,
+        paddingBottom: 140,
     },
     section: {
         marginBottom: 28,

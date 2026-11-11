@@ -23,6 +23,7 @@ import { savedArticlesService } from '../services/supabaseService';
 import { readingHistoryService } from '../services/readingHistoryService';
 import { CommentsSection } from '../components/CommentsSection';
 import { getAds, api } from '../services/api';
+import { AppImage } from '../components/AppImage';
 import { analyticsService } from '../services/analytics.simple';
 import { useTaxonomyMapping } from '../hooks/useTaxonomyMapping';
 import { InlineAdBanner } from '../components/InlineAdBanner';
@@ -317,17 +318,16 @@ AppStore : Bientôt disponible`;
 
       <ScrollView showsVerticalScrollIndicator={false} ref={scrollViewRef}>
         {/* Featured Image */}
-        {article.dmks_featured_image?.src ? (
-          <Image
-            source={{ uri: article.dmks_featured_image.src }}
+        {article.dmks_featured_image?.src || article._embedded?.['wp:featuredmedia']?.[0]?.source_url ? (
+          <AppImage
+            source={{
+              uri:
+                article.dmks_featured_image?.src ||
+                article._embedded?.['wp:featuredmedia']?.[0]?.source_url,
+            }}
             style={styles.featuredImage}
             resizeMode="cover"
-          />
-        ) : article._embedded?.['wp:featuredmedia']?.[0]?.source_url ? (
-          <Image
-            source={{ uri: article._embedded['wp:featuredmedia'][0].source_url }}
-            style={styles.featuredImage}
-            resizeMode="cover"
+            fallbackIcon="newspaper-outline"
           />
         ) : (
           <View style={styles.featuredImagePlaceholder}>
