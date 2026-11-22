@@ -10,7 +10,10 @@ import {
   Dimensions,
   Share,
   StyleSheet,
+  Platform,
 } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -62,6 +65,9 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
     loading: taxonomyLoading,
   } = useTaxonomyMapping();
 
+  const insets = useSafeAreaInsets();
+  const topButtonOffset = insets.top > 0 ? insets.top + 6 : (Platform.OS === 'ios' ? 44 : 36);
+
   // Fonction pour récupérer le nombre d'articles de l'auteur
   const fetchAuthorPostCount = async (authorId: number) => {
     if (!article) return;
@@ -74,12 +80,12 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
       let retries = 0;
       const maxRetries = 2;
       const baseDelay = 1000;
-      const maxDelay = 3000;
 
       while (retries < maxRetries) {
+        let timeoutId: any;
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000);
+          timeoutId = setTimeout(() => controller.abort(), 8000);
 
           const response = await api.get(`posts`, {
             params: {
@@ -87,42 +93,34 @@ const ArticleDetailScreen = ({ route, navigation }: ArticleDetailScreenProps) =>
               per_page: 1,
               _fields: 'id',
             },
-            timeout: 3000,
+            timeout: 8000,
             signal: controller.signal,
           });
 
           clearTimeout(timeoutId);
 
           const totalPosts = response.headers['x-wp-total'];
-          setAuthorPostCount(parseInt(totalPosts) || 0);
-          console.log("✅ Nombre d'articles auteur récupéré:", totalPosts);
+          const count = parseInt(totalPosts, 10);
+          if (!isNaN(count)) {
+            setAuthorPostCount(count);
+          }
           return;
         } catch (error: any) {
+          if (timeoutId) clearTimeout(timeoutId);
           retries++;
-          console.error(`Tentative ${retries} échouée:`, error);
-
-          if (error.name === 'AbortError' || error.code === 'ECONNABORTED') {
-            console.warn('⏱️ Timeout ou requête abortée, nouvelle tentative...');
+          // Log discret sans console.error pour ne pas afficher de toast LogBox rouge
+          if (__DEV__) {
+            console.log(`[AuthorCount] Tentative ${retries} non aboutie:`, error?.message || error);
           }
 
           if (retries >= maxRetries) {
-            console.error(
-              "Erreur récupération nombre d'articles auteur après",
-              maxRetries,
-              'tentatives, utilisation du fallback'
-            );
             setAuthorPostCount(null);
           } else {
-            const delay = Math.min(
-              baseDelay * Math.pow(2, retries - 1) + Math.random() * 500,
-              maxDelay
-            );
-            await new Promise((resolve) => setTimeout(resolve, delay));
+            await new Promise((resolve) => setTimeout(resolve, baseDelay));
           }
         }
       }
-    } catch (error) {
-      console.error("Erreur générale récupération nombre d'articles auteur:", error);
+    } catch {
       setAuthorPostCount(null);
     }
   };
@@ -254,66 +252,96 @@ AppStore : Bientôt disponible`;
     return (
       <View style={[styles.container, styles.emptyStateContainer]}>
         <Text style={styles.emptyText}>Aucun article sélectionné.</Text>
-        <TouchableOpacity style={styles.headerButton} onPress={goBack}>
-          <Ionicons name="arrow-back" size={24} color={Colors.text} />
+        <TouchableOpacity style={styles.floatingButton} onPress={goBack} activeOpacity={0.7}>
+          <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
     );
   }
 
+  const hasFeaturedImage = !!(
+    article.dmks_featured_image?.src ||
+    article._embedded?.['wp:featuredmedia']?.[0]?.source_url
+  );
+
   return (
     <View style={styles.container}>
-      <View style={[styles.header, styles.glassmorphismHeader]}>
-        <TouchableOpacity style={styles.headerButton} onPress={goBack}>
-          <Ionicons name="arrow-back" size={24} color={Colors.text} />
+      <StatusBar style="light" />
+
+      {/* Barre d'actions flottante intégrée directement sur la photo */}
+      <View style={[styles.floatingHeader, { top: topButtonOffset }]}>
+        <TouchableOpacity
+          style={styles.floatingButton}
+          onPress={goBack}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
         </TouchableOpacity>
-        <View style={styles.headerActions}>
+
+        <View style={styles.floatingHeaderActions}>
           {allowComments && (
-            <TouchableOpacity style={styles.headerButton} onPress={scrollToComments}>
-              <Ionicons name="chatbubble-outline" size={24} color={Colors.text} />
+            <TouchableOpacity
+              style={styles.floatingButton}
+              onPress={scrollToComments}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chatbubble-outline" size={20} color="#FFFFFF" />
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity style={styles.headerButton} onPress={handleShare}>
-            <Ionicons name="share-social-outline" size={24} color={Colors.text} />
+          <TouchableOpacity
+            style={styles.floatingButton}
+            onPress={handleShare}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="share-social-outline" size={20} color="#FFFFFF" />
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.headerButton}
+            style={styles.floatingButton}
             onPress={toggleSave}
             disabled={isLoading}
+            activeOpacity={0.7}
           >
             <Ionicons
               name={isSaved ? 'bookmark' : 'bookmark-outline'}
-              size={24}
-              color={isSaved ? Colors.primary : Colors.text}
+              size={20}
+              color={isSaved ? Colors.primary : '#FFFFFF'}
             />
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} ref={scrollViewRef}>
-        {/* Featured Image */}
-        {article.dmks_featured_image?.src || article._embedded?.['wp:featuredmedia']?.[0]?.source_url ? (
-          <AppImage
-            source={{
-              uri:
-                article.dmks_featured_image?.src ||
-                article._embedded?.['wp:featuredmedia']?.[0]?.source_url,
-            }}
-            style={styles.featuredImage}
-            resizeMode="cover"
-            fallbackIcon="newspaper-outline"
-          />
-        ) : (
-          <View style={styles.featuredImagePlaceholder}>
-            <Image
-              source={require('../../assets/logo.png')}
-              style={styles.placeholderLogo}
-              resizeMode="contain"
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        ref={scrollViewRef}
+        contentInsetAdjustmentBehavior="never"
+      >
+        {/* Image principale (démarre directement au sommet de l'écran) */}
+        <View style={styles.imageWrapper}>
+          {hasFeaturedImage ? (
+            <AppImage
+              source={{
+                uri:
+                  article.dmks_featured_image?.src ||
+                  article._embedded?.['wp:featuredmedia']?.[0]?.source_url,
+              }}
+              style={styles.featuredImage}
+              resizeMode="cover"
+              fallbackIcon="newspaper-outline"
             />
-          </View>
-        )}
+          ) : (
+            <View style={styles.featuredImagePlaceholder}>
+              <Image
+                source={require('../../assets/logo.png')}
+                style={styles.placeholderLogo}
+                resizeMode="contain"
+              />
+            </View>
+          )}
+          {/* Léger voile sombre en haut pour garantir un contraste optimal des boutons blancs */}
+          <View style={styles.imageTopOverlay} />
+        </View>
 
         <View style={styles.content}>
           {/* Catégorie */}
@@ -519,47 +547,58 @@ const styles = StyleSheet.create({
     color: Colors.text,
     marginBottom: 16,
   },
-  header: {
+  floatingHeader: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: 'transparent',
+    zIndex: 100,
+    elevation: 10,
   },
-  glassmorphismHeader: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  headerButton: {
+  floatingButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.42)',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  headerActions: {
+  floatingHeaderActions: {
     flexDirection: 'row',
-    gap: 12,
+    alignItems: 'center',
+    gap: 10,
+  },
+  imageWrapper: {
+    position: 'relative',
+    width: width,
+    height: width * 0.65,
+    backgroundColor: Colors.backgroundLight,
   },
   featuredImage: {
     width: width,
-    height: width * 0.6,
+    height: width * 0.65,
   },
   featuredImagePlaceholder: {
     width: width,
-    height: width * 0.6,
+    height: width * 0.65,
     backgroundColor: Colors.backgroundLight,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  imageTopOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 90,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
   },
   postArticleInfo: {
     flexDirection: 'row',
