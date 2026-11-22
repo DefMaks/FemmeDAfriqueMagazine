@@ -429,6 +429,17 @@ const ProfileScreen = () => {
         Linking.openURL('mailto:support@defmaks.com?subject=Support FAM App');
     };
 
+    const openTermsOfService = async () => {
+        try {
+            await WebBrowser.openBrowserAsync('https://femmedafrique.net/conditions-d-utilisation', {
+                showTitle: true,
+                enableBarCollapsing: true,
+            });
+        } catch (error) {
+            console.error('Erreur ouverture conditions utilisation:', error);
+        }
+    };
+
     const openPrivacyPolicy = async () => {
         try {
             await WebBrowser.openBrowserAsync('https://femmedafrique.net/politique-de-confidentialite', {
@@ -605,6 +616,13 @@ const ProfileScreen = () => {
             title: 'Aide & Support',
             subtitle: 'Contactez-nous par email',
             action: openSupportEmail
+        },
+        {
+            id: 'terms_of_service',
+            icon: 'document-text-outline',
+            title: 'Conditions d\'utilisation',
+            subtitle: 'Règles de service et cadre légal',
+            action: openTermsOfService
         },
         {
             id: 'privacy_policy',
