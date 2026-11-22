@@ -2,7 +2,7 @@
   "expo": {
     "name": "Femme d'Afrique Magazine",
     "slug": "FemmeDAfriqueMagazine",
-    "version": "2.0.1",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -59,7 +59,9 @@
         }
       ]
     },
-    "plugins": [],
+    "plugins": [
+      "./plugins/withPortraitOptional.js"
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     },

@@ -78,7 +78,7 @@ const ProfileScreen = () => {
                         memoryProfileStats = parsed;
                         setStats(parsed);
                     }
-                } catch {}
+                } catch { }
             }
         });
         return () => {
@@ -201,7 +201,7 @@ const ProfileScreen = () => {
             if (savedImgPref !== null) {
                 try {
                     setShowImagesPref(JSON.parse(savedImgPref));
-                } catch {}
+                } catch { }
             }
         } catch (error) {
             console.error('❌ Erreur chargement préférences:', error);
@@ -429,6 +429,17 @@ const ProfileScreen = () => {
         Linking.openURL('mailto:support@defmaks.com?subject=Support FAM App');
     };
 
+    const openPrivacyPolicy = async () => {
+        try {
+            await WebBrowser.openBrowserAsync('https://femmedafrique.net/politique-de-confidentialite', {
+                showTitle: true,
+                enableBarCollapsing: true,
+            });
+        } catch (error) {
+            console.error('Erreur ouverture politique confidentialité:', error);
+        }
+    };
+
     const openAccountDeletionPolicy = async () => {
         try {
             await WebBrowser.openBrowserAsync('https://femmedafrique.net/suppression-compte', {
@@ -515,15 +526,15 @@ const ProfileScreen = () => {
             toggleValue: notificationsEnabled,
             onToggle: handleToggleNotifications,
         },
-        {
-            id: 'images_pref',
-            icon: 'images-outline',
-            title: 'Affichage des images',
-            subtitle: showImagesPref ? 'Visuels complets (qualité standard)' : 'Mode texte épuré (économie de données)',
-            isToggle: true,
-            toggleValue: showImagesPref,
-            onToggle: handleToggleShowImages,
-        },
+        // {
+        //     id: 'images_pref',
+        //     icon: 'images-outline',
+        //     title: 'Affichage des images',
+        //     subtitle: showImagesPref ? 'Visuels complets (qualité standard)' : 'Mode texte épuré (économie de données)',
+        //     isToggle: true,
+        //     toggleValue: showImagesPref,
+        //     onToggle: handleToggleShowImages,
+        // },
         {
             id: '3',
             icon: 'bookmark-outline',
@@ -594,6 +605,13 @@ const ProfileScreen = () => {
             title: 'Aide & Support',
             subtitle: 'Contactez-nous par email',
             action: openSupportEmail
+        },
+        {
+            id: 'privacy_policy',
+            icon: 'lock-closed-outline',
+            title: 'Politique de confidentialité',
+            subtitle: 'Protection des données et vie privée',
+            action: openPrivacyPolicy
         },
         {
             id: 'privacy_deletion',
