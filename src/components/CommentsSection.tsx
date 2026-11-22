@@ -157,7 +157,7 @@ export const CommentsSection: React.FC<CommentsSectionProps> = ({ postId }) => {
                     <Text style={styles.commentDate}>{formatDate(item.date)}</Text>
                 </View>
             </View>
-            <Text style={styles.commentContent} selectable>
+            <Text style={styles.commentContent} selectable={false} textBreakStrategy="simple">
                 {decodeHtmlEntities(item.content.rendered.replace(/<[^>]*>/g, ''))}
             </Text>
         </View>

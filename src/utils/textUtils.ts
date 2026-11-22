@@ -15,6 +15,12 @@ export const decodeHtmlEntities = (text: string): string => {
       .replace(/&#160;/g, ' ')
       .replace(/&#xa0;/gi, ' ')
       .replace(/\u00A0/g, ' ')
+      // Césures invisibles et caractères de contrôle (responsables de coupures de mots sur Android)
+      .replace(/&shy;/gi, '')
+      .replace(/&#173;/g, '')
+      .replace(/&#xad;/gi, '')
+      .replace(/\u00AD/g, '')
+      .replace(/[\u200B-\u200D\uFEFF\u2060]/g, '')
       // Apostrophes
       .replace(/&rsquo;/gi, "'")
       .replace(/&lsquo;/gi, "'")

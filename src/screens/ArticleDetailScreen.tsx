@@ -27,6 +27,7 @@ import { AppImage } from '../components/AppImage';
 import { analyticsService } from '../services/analytics.simple';
 import { useTaxonomyMapping } from '../hooks/useTaxonomyMapping';
 import { InlineAdBanner } from '../components/InlineAdBanner';
+import { decodeHtmlEntities } from '../utils/textUtils';
 
 const { width } = Dimensions.get('window');
 const screenWidth = Dimensions.get('window').width;
@@ -220,31 +221,6 @@ AppStore : Bientôt disponible`;
     }
   };
 
-  const decodeHtmlEntities = (text: string): string => {
-    if (!text) return '';
-    return text
-      .replace(/&rsquo;/g, "'")
-      .replace(/&lsquo;/g, "'")
-      .replace(/&#039;/g, "'")
-      .replace(/&#8217;/g, "'")
-      .replace(/&ldquo;/g, '"')
-      .replace(/&rdquo;/g, '"')
-      .replace(/&quot;/g, '"')
-      .replace(/&eacute;/g, 'é')
-      .replace(/&egrave;/g, 'è')
-      .replace(/&ecirc;/g, 'ê')
-      .replace(/&agrave;/g, 'à')
-      .replace(/&acirc;/g, 'â')
-      .replace(/&ocirc;/g, 'ô')
-      .replace(/&ucirc;/g, 'û')
-      .replace(/&ccedil;/g, 'ç')
-      .replace(/&amp;/g, '&')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&ndash;/g, '–')
-      .replace(/&mdash;/g, '—')
-      .replace(/&hellip;/g, '…');
-  };
-
   const formatDate = (dateString?: string) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -352,7 +328,11 @@ AppStore : Bientôt disponible`;
             </TouchableOpacity>
           )}
 
-          <Text style={styles.title} selectable>
+          <Text
+            style={styles.title}
+            textBreakStrategy="simple"
+            selectable={false}
+          >
             {decodeHtmlEntities(article.title?.rendered || '')}
           </Text>
 
@@ -379,7 +359,8 @@ AppStore : Bientôt disponible`;
             contentWidth={screenWidth - 40}
             source={{ html: article.content?.rendered || '' }}
             defaultTextProps={{
-              selectable: true,
+              selectable: false,
+              textBreakStrategy: 'simple',
             }}
             baseStyle={{
               fontSize: 17,
@@ -652,6 +633,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
     lineHeight: 34,
     marginBottom: 16,
+    includeFontPadding: false,
   },
   meta: {
     flexDirection: 'row',
