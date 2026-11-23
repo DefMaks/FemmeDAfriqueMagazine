@@ -23,6 +23,7 @@ import { profilePhotoService } from '../services/profilePhotoService';
 import { readingHistoryService } from '../services/readingHistoryService';
 import { purchaseHistoryService } from '../services/purchaseHistoryService';
 import { analyticsService } from '../services/analytics.simple';
+import { updateService } from '../services/updateService';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -637,6 +638,15 @@ const ProfileScreen = () => {
             title: 'Suppression des données',
             subtitle: 'Politique et droit à l\'oubli (RGPD)',
             action: openAccountDeletionPolicy
+        },
+        {
+            id: 'check_updates',
+            icon: 'cloud-download-outline',
+            title: 'Mises à jour de l\'application',
+            subtitle: 'Vérifier la disponibilité d\'une mise à jour OTA',
+            action: async () => {
+                await updateService.checkManually();
+            }
         },
         ...(hasActiveSession ? [
             {
