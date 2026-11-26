@@ -12,6 +12,7 @@ import {
     Image,
     Alert,
     Linking,
+    Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { MediaTypeOptions } from 'expo-image-picker';
@@ -583,8 +584,12 @@ const ProfileScreen = () => {
         {
             id: 'mon_abonnement',
             icon: 'card-outline',
-            title: subscriptionInfo ? 'Mon abonnement' : "S'abonner au magazine",
-            subtitle: subscriptionInfo ? subscriptionInfo : 'Accès illimité aux éditions numériques',
+            title: subscriptionInfo
+                ? 'Mon abonnement'
+                : (Platform.OS === 'ios' ? 'Espace Abonné' : "S'abonner au magazine"),
+            subtitle: subscriptionInfo
+                ? subscriptionInfo
+                : (Platform.OS === 'ios' ? 'Accéder à vos éditions et privilèges' : 'Accès illimité aux éditions numériques'),
             action: () => {
                 analyticsService.trackEvent('screen_viewed', 'navigation', 'Abonnement', 1);
                 navigation.navigate('Abonnement');

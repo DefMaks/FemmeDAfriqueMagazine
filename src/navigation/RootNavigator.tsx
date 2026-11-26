@@ -22,7 +22,7 @@ import SubscriptionScreen from '../screens/SubscriptionScreen';
 import { Colors } from '../theme/colors';
 import { Post } from '../models/Post';
 import { Magazine } from '../models/Magazine';
-import { Text, TouchableOpacity } from 'react-native';
+import { Text, TouchableOpacity, Platform } from 'react-native';
 import { analyticsService } from '../services/analytics.simple';
 
 export type RootStackParamList = {
@@ -90,57 +90,59 @@ function MainTabs() {
                     focus: () => analyticsService.trackScreenView('Découvrir'),
                 }}
             />
-            <Tab.Screen
-                name="Boutique"
-                component={ShopScreen}
-                options={{
-                    tabBarIcon: ({ focused }) => (
-                        <>
-                            <Ionicons
-                                name={focused ? 'bag' : 'bag-outline'}
-                                size={26}
-                                color="#FFFFFF"
-                            />
-                            <Text>Boutique</Text>
-                        </>
-                    ),
-                    tabBarLabel: ({ focused }) => (
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF', marginTop: 4 }}>
-                            Boutique
-                        </Text>
-                    ),
-                    tabBarButton: (props) => (
-                        <TouchableOpacity
-                            onPress={props.onPress}
-                            accessibilityLabel={props.accessibilityLabel}
-                            accessibilityRole={props.accessibilityRole}
-                            accessibilityState={props.accessibilityState}
-                            testID={props.testID}
-                            style={{
-                                top: -35,
-                                marginBottom: -15,
-                                backgroundColor: Colors.primary,
-                                borderRadius: 35,
-                                width: 70,
-                                height: 70,
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                shadowColor: '#000',
-                                shadowOffset: { width: 0, height: 4 },
-                                shadowOpacity: 0.25,
-                                shadowRadius: 6,
-                                elevation: 6,
-                                marginHorizontal: 10
-                            }}
-                        >
-                            <Ionicons name="bag" size={26} color="#FFFFFF" />
-                        </TouchableOpacity>
-                    ),
-                }}
-                listeners={{
-                    focus: () => analyticsService.trackScreenView('Boutique'),
-                }}
-            />
+            {Platform.OS !== 'ios' && (
+                <Tab.Screen
+                    name="Boutique"
+                    component={ShopScreen}
+                    options={{
+                        tabBarIcon: ({ focused }) => (
+                            <>
+                                <Ionicons
+                                    name={focused ? 'bag' : 'bag-outline'}
+                                    size={26}
+                                    color="#FFFFFF"
+                                />
+                                <Text>Boutique</Text>
+                            </>
+                        ),
+                        tabBarLabel: ({ focused }) => (
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF', marginTop: 4 }}>
+                                Boutique
+                            </Text>
+                        ),
+                        tabBarButton: (props) => (
+                            <TouchableOpacity
+                                onPress={props.onPress}
+                                accessibilityLabel={props.accessibilityLabel}
+                                accessibilityRole={props.accessibilityRole}
+                                accessibilityState={props.accessibilityState}
+                                testID={props.testID}
+                                style={{
+                                    top: -35,
+                                    marginBottom: -15,
+                                    backgroundColor: Colors.primary,
+                                    borderRadius: 35,
+                                    width: 70,
+                                    height: 70,
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    shadowColor: '#000',
+                                    shadowOffset: { width: 0, height: 4 },
+                                    shadowOpacity: 0.25,
+                                    shadowRadius: 6,
+                                    elevation: 6,
+                                    marginHorizontal: 10
+                                }}
+                            >
+                                <Ionicons name="bag" size={26} color="#FFFFFF" />
+                            </TouchableOpacity>
+                        ),
+                    }}
+                    listeners={{
+                        focus: () => analyticsService.trackScreenView('Boutique'),
+                    }}
+                />
+            )}
             <Tab.Screen
                 name="Favoris"
                 component={SavedScreen}

@@ -7,6 +7,7 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme/colors';
@@ -102,6 +103,13 @@ const AchatsScreen = ({ navigation }: any) => {
               </View>
             )}
           </View>
+        ) : Platform.OS === 'ios' ? (
+          <View style={styles.promoCard}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.promoTitle}>Espace Abonnés & Numéros</Text>
+              <Text style={styles.promoSubtitle}>Retrouvez ici tous les magazines débloqués avec votre compte lecteur.</Text>
+            </View>
+          </View>
         ) : (
           <View style={styles.promoCard}>
             <View style={{ flex: 1 }}>
@@ -185,15 +193,27 @@ const AchatsScreen = ({ navigation }: any) => {
           </View>
           <Text style={styles.emptyTitle}>Aucun achat pour le moment</Text>
           <Text style={styles.emptySubtitle}>
-            Retrouvez ici vos numéros de magazine achetés ainsi que votre abonnement Femme d'Afrique Magazine.
+            {Platform.OS === 'ios'
+              ? "Connectez-vous avec votre compte pour retrouver vos numéros et abonnements acquis sur cet appareil."
+              : "Retrouvez ici vos numéros de magazine achetés ainsi que votre abonnement Femme d'Afrique Magazine."}
           </Text>
-          <TouchableOpacity
-            style={styles.emptyButton}
-            onPress={navigateToShop}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.emptyButtonText}>Visiter la boutique</Text>
-          </TouchableOpacity>
+          {Platform.OS === 'ios' ? (
+            <TouchableOpacity
+              style={styles.emptyButton}
+              onPress={() => navigation.navigate('AuthScreen')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.emptyButtonText}>Se connecter à mon compte</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.emptyButton}
+              onPress={navigateToShop}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.emptyButtonText}>Visiter la boutique</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <FlatList

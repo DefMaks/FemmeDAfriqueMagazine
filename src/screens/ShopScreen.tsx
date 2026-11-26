@@ -13,7 +13,9 @@ import {
     Keyboard,
     ActivityIndicator,
     RefreshControl,
+    Platform,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getMagazines, getMedia } from '../services/api';
 import { Magazine } from '../models/Magazine';
@@ -43,6 +45,7 @@ const isTest = false;
 const TEST_PRICE_CDF = 100;
 
 const ShopScreen = () => {
+    const navigation = useNavigation<any>();
     const [magazines, setMagazines] = useState<Magazine[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -184,6 +187,18 @@ const ShopScreen = () => {
     const currency = isTest ? 'CDF' : 'USD';
 
     const handleOpenCheckout = async (mag: Magazine) => {
+        if (Platform.OS === 'ios') {
+            Alert.alert(
+                'Édition Numérique',
+                'Connectez-vous avec votre compte lecteur Femme d\'Afrique pour accéder à vos magazines acquis.',
+                [
+                    { text: 'Annuler', style: 'cancel' },
+                    { text: 'Se connecter', onPress: () => navigation.navigate('AuthScreen') }
+                ]
+            );
+            return;
+        }
+
         if (selectedMagazine?.id === mag.id && showCheckoutModal) return;
 
         setSelectedMagazine(mag);
@@ -406,9 +421,11 @@ const ShopScreen = () => {
     };
 
     const renderMagazine = ({ item }: { item: Magazine }) => {
-        const displayPrice = isTest
-            ? `${TEST_PRICE_CDF} CDF`
-            : `$${(item.acf.prix_mag + item.acf.tva).toFixed(2)} TTC`;
+        const displayPrice = Platform.OS === 'ios'
+            ? 'Édition numérique'
+            : (isTest
+                ? `${TEST_PRICE_CDF} CDF`
+                : `$${(item.acf.prix_mag + item.acf.tva).toFixed(2)} TTC`);
 
         return (
             <TouchableOpacity
@@ -450,13 +467,15 @@ const ShopScreen = () => {
                 <Image source={require('../../assets/FDA-white.png')} style={styles.headerLogo} resizeMode="contain" />
                 <Text style={styles.header}>Boutique</Text>
             </View>
-            <TrustBadge
-                contentKey="shop_screen_default"
-                appName="fam"
-                language="fr"
-                onCtaPress={() => console.log('Trust CTA pressed')}
-                style={styles.trustBadge}
-            />
+            {Platform.OS !== 'ios' && (
+                <TrustBadge
+                    contentKey="shop_screen_default"
+                    appName="fam"
+                    language="fr"
+                    onCtaPress={() => console.log('Trust CTA pressed')}
+                    style={styles.trustBadge}
+                />
+            )}
 
             <FlatList
                 data={magazines}

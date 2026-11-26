@@ -222,7 +222,7 @@ export const SubscriptionScreen = ({ navigation }: any) => {
         >
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Abonnement</Text>
+        <Text style={styles.headerTitle}>{Platform.OS === 'ios' ? 'Espace Abonné' : 'Abonnement'}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -230,7 +230,7 @@ export const SubscriptionScreen = ({ navigation }: any) => {
         {/* Intro Banner */}
         <View style={styles.introSection}>
           <View style={styles.badgePill}>
-            <Text style={styles.badgeText}>Formules d'abonnement</Text>
+            <Text style={styles.badgeText}>{Platform.OS === 'ios' ? 'Édition Numérique' : "Formules d'abonnement"}</Text>
           </View>
           <Text style={styles.heroTitle}>Lisez tout Femme d'Afrique</Text>
           <Text style={styles.heroSubtitle}>
@@ -238,185 +238,268 @@ export const SubscriptionScreen = ({ navigation }: any) => {
           </Text>
         </View>
 
-        {/* Abonnement déjà actif */}
-        {currentSubscription && (
-          <View style={styles.activeSubCard}>
-            <View style={styles.activeSubHeader}>
-              <Ionicons name="shield-checkmark" size={24} color="#15803D" />
-              <View style={{ marginLeft: 12, flex: 1 }}>
-                <Text style={styles.activeSubTitle}>Abonnement actuellement actif</Text>
-                <Text style={styles.activeSubText}>
-                  Formule {currentSubscription.plan === 'yearly' ? 'Annuelle' : 'Mensuelle'}
-                  {currentSubscription.ends_at
-                    ? ` • Valide jusqu'au ${new Date(currentSubscription.ends_at).toLocaleDateString('fr-FR')}`
-                    : ''}
+        {Platform.OS === 'ios' ? (
+          /* Mode Reader conforme iOS : aucun prix, aucun formulaire de paiement externe */
+          <View style={styles.readerContainer}>
+            {currentSubscription ? (
+              <View style={styles.activeSubCard}>
+                <View style={styles.activeSubHeader}>
+                  <Ionicons name="shield-checkmark" size={24} color="#15803D" />
+                  <View style={{ marginLeft: 12, flex: 1 }}>
+                    <Text style={styles.activeSubTitle}>Abonnement actuellement actif</Text>
+                    <Text style={styles.activeSubText}>
+                      Formule {currentSubscription.plan === 'yearly' ? 'Annuelle' : 'Mensuelle'}
+                      {currentSubscription.ends_at
+                        ? ` • Valide jusqu'au ${new Date(currentSubscription.ends_at).toLocaleDateString('fr-FR')}`
+                        : ''}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={styles.readerActionButton}
+                  onPress={() => navigation.navigate('Achats')}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="book-outline" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.readerActionButtonText}>Consulter mes magazines</Text>
+                </TouchableOpacity>
+              </View>
+            ) : currentUser ? (
+              <View style={styles.readerInfoCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                  <Ionicons name="person-circle-outline" size={24} color={Colors.primary} />
+                  <Text style={styles.readerInfoTitle}>Compte connecté</Text>
+                </View>
+                <Text style={styles.readerInfoSub}>
+                  {currentUser?.profile_data?.email || currentUser?.email || 'Lectrice connectée'}
                 </Text>
+                <Text style={styles.readerInfoText}>
+                  Les éditions numériques et abonnements associés à votre compte Femme d'Afrique sont automatiquement synchronisés sur cette application.
+                </Text>
+                <TouchableOpacity
+                  style={styles.readerActionButton}
+                  onPress={() => navigation.navigate('Achats')}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="book-outline" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.readerActionButtonText}>Accéder à mes achats</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-          </View>
-        )}
-
-        {/* Sélection des Formules */}
-        <Text style={styles.sectionTitle}>Choisissez votre formule</Text>
-        <View style={styles.plansContainer}>
-          {/* Formule Mensuelle */}
-          <TouchableOpacity
-            style={[
-              styles.planCard,
-              selectedPlan === 'monthly' && styles.selectedPlanCard,
-            ]}
-            onPress={() => setSelectedPlan('monthly')}
-            activeOpacity={0.85}
-          >
-            <View style={styles.planHeader}>
-              <View>
-                <Text style={styles.planName}>Mensuel</Text>
-                <Text style={styles.planNote}>{SUBSCRIPTION_PLANS.monthly.note}</Text>
-              </View>
-              <View style={[styles.radioCircle, selectedPlan === 'monthly' && styles.selectedRadio]}>
-                {selectedPlan === 'monthly' && <View style={styles.radioDot} />}
-              </View>
-            </View>
-            <View style={styles.planPriceRow}>
-              <Text style={styles.planPrice}>${monthlyPrice.toFixed(2)}</Text>
-              <Text style={styles.planPeriod}> / mois</Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Formule Annuelle */}
-          <TouchableOpacity
-            style={[
-              styles.planCard,
-              selectedPlan === 'yearly' && styles.selectedPlanCard,
-            ]}
-            onPress={() => setSelectedPlan('yearly')}
-            activeOpacity={0.85}
-          >
-            <View style={styles.popularBadge}>
-              <Text style={styles.popularBadgeText}>2 mois offerts</Text>
-            </View>
-            <View style={styles.planHeader}>
-              <View>
-                <Text style={styles.planName}>Annuel</Text>
-                <Text style={styles.planNote}>{SUBSCRIPTION_PLANS.yearly.note}</Text>
-              </View>
-              <View style={[styles.radioCircle, selectedPlan === 'yearly' && styles.selectedRadio]}>
-                {selectedPlan === 'yearly' && <View style={styles.radioDot} />}
-              </View>
-            </View>
-            <View style={styles.planPriceRow}>
-              <Text style={styles.planPrice}>${yearlyPrice.toFixed(2)}</Text>
-              <Text style={styles.planPeriod}> / an</Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Avantages inclus */}
-        <View style={styles.benefitsCard}>
-          <Text style={styles.benefitsTitle}>Ce qui est inclus dans votre formule :</Text>
-          {SUBSCRIPTION_BENEFITS.map((benefit, idx) => (
-            <View key={`benefit_${idx}`} style={styles.benefitRow}>
-              <Ionicons name="checkmark-circle" size={18} color={Colors.primary} style={{ marginRight: 10, marginTop: 1 }} />
-              <Text style={styles.benefitText}>{benefit}</Text>
-            </View>
-          ))}
-        </View>
-
-        {/* Choix du mode de paiement */}
-        <Text style={styles.sectionTitle}>Mode de paiement sécurisé</Text>
-        <View style={styles.paymentMethodsRow}>
-          <TouchableOpacity
-            style={[
-              styles.methodTab,
-              method === 'emoney' && styles.selectedMethodTab,
-            ]}
-            onPress={() => setMethod('emoney')}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="phone-portrait-outline"
-              size={18}
-              color={method === 'emoney' ? Colors.primary : Colors.textLight}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.methodTabText, method === 'emoney' && styles.selectedMethodTabText]}>
-              Mobile Money
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.methodTab,
-              method === 'ecard' && styles.selectedMethodTab,
-            ]}
-            onPress={() => setMethod('ecard')}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="card-outline"
-              size={18}
-              color={method === 'ecard' ? Colors.primary : Colors.textLight}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.methodTabText, method === 'ecard' && styles.selectedMethodTabText]}>
-              Carte bancaire
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Détails selon le mode */}
-        {method === 'emoney' ? (
-          <View style={styles.methodDetailsBox}>
-            <Text style={styles.inputLabel}>Numéro de téléphone Mobile Money (RDC)</Text>
-            <TextInput
-              style={styles.phoneInput}
-              placeholder="Ex: 243810000000"
-              value={phone}
-              onChangeText={handlePhoneChange}
-              keyboardType="phone-pad"
-              maxLength={13}
-            />
-            {detectedProvider && (
-              <View style={styles.providerPill}>
-                <Ionicons name="checkmark-circle-outline" size={14} color="#15803D" style={{ marginRight: 4 }} />
-                <Text style={styles.providerText}>{detectedProvider} détecté</Text>
+            ) : (
+              <View style={styles.readerAuthCard}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                  <Ionicons name="lock-closed-outline" size={22} color={Colors.primary} />
+                  <Text style={styles.readerInfoTitle}>Déjà abonnée ?</Text>
+                </View>
+                <Text style={styles.readerInfoText}>
+                  Connectez-vous avec votre compte Femme d'Afrique Magazine pour retrouver immédiatement vos éditions numériques et vos accès sur cet appareil.
+                </Text>
+                <TouchableOpacity
+                  style={styles.readerActionButton}
+                  onPress={() => navigation.navigate('AuthScreen')}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="log-in-outline" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
+                  <Text style={styles.readerActionButtonText}>Se connecter à mon compte</Text>
+                </TouchableOpacity>
               </View>
             )}
-            <Text style={styles.operatorList}>
-              Opérateurs supportés : Vodacom M-Pesa, Orange Money, Airtel Money, Africell
-            </Text>
+
+            {/* Avantages inclus pour les abonnées */}
+            <View style={styles.benefitsCard}>
+              <Text style={styles.benefitsTitle}>Inclus dans l'expérience abonnée :</Text>
+              {SUBSCRIPTION_BENEFITS.map((benefit, idx) => (
+                <View key={`benefit_ios_${idx}`} style={styles.benefitRow}>
+                  <Ionicons name="checkmark-circle" size={18} color={Colors.primary} style={{ marginRight: 10, marginTop: 1 }} />
+                  <Text style={styles.benefitText}>{benefit}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         ) : (
-          <View style={styles.methodDetailsBox}>
-            <Text style={styles.cardInfoText}>
-              Vous serez redirigé vers une page de paiement chiffrée conforme aux normes bancaires PCI-DSS. Cartes acceptées : Visa, Mastercard.
-            </Text>
-          </View>
+          /* Mode standard Android avec formules et paiement TwigaPaie */
+          <>
+            {/* Abonnement déjà actif */}
+            {currentSubscription && (
+              <View style={styles.activeSubCard}>
+                <View style={styles.activeSubHeader}>
+                  <Ionicons name="shield-checkmark" size={24} color="#15803D" />
+                  <View style={{ marginLeft: 12, flex: 1 }}>
+                    <Text style={styles.activeSubTitle}>Abonnement actuellement actif</Text>
+                    <Text style={styles.activeSubText}>
+                      Formule {currentSubscription.plan === 'yearly' ? 'Annuelle' : 'Mensuelle'}
+                      {currentSubscription.ends_at
+                        ? ` • Valide jusqu'au ${new Date(currentSubscription.ends_at).toLocaleDateString('fr-FR')}`
+                        : ''}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Sélection des Formules */}
+            <Text style={styles.sectionTitle}>Choisissez votre formule</Text>
+            <View style={styles.plansContainer}>
+              {/* Formule Mensuelle */}
+              <TouchableOpacity
+                style={[
+                  styles.planCard,
+                  selectedPlan === 'monthly' && styles.selectedPlanCard,
+                ]}
+                onPress={() => setSelectedPlan('monthly')}
+                activeOpacity={0.85}
+              >
+                <View style={styles.planHeader}>
+                  <View>
+                    <Text style={styles.planName}>Mensuel</Text>
+                    <Text style={styles.planNote}>{SUBSCRIPTION_PLANS.monthly.note}</Text>
+                  </View>
+                  <View style={[styles.radioCircle, selectedPlan === 'monthly' && styles.selectedRadio]}>
+                    {selectedPlan === 'monthly' && <View style={styles.radioDot} />}
+                  </View>
+                </View>
+                <View style={styles.planPriceRow}>
+                  <Text style={styles.planPrice}>${monthlyPrice.toFixed(2)}</Text>
+                  <Text style={styles.planPeriod}> / mois</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Formule Annuelle */}
+              <TouchableOpacity
+                style={[
+                  styles.planCard,
+                  selectedPlan === 'yearly' && styles.selectedPlanCard,
+                ]}
+                onPress={() => setSelectedPlan('yearly')}
+                activeOpacity={0.85}
+              >
+                <View style={styles.popularBadge}>
+                  <Text style={styles.popularBadgeText}>2 mois offerts</Text>
+                </View>
+                <View style={styles.planHeader}>
+                  <View>
+                    <Text style={styles.planName}>Annuel</Text>
+                    <Text style={styles.planNote}>{SUBSCRIPTION_PLANS.yearly.note}</Text>
+                  </View>
+                  <View style={[styles.radioCircle, selectedPlan === 'yearly' && styles.selectedRadio]}>
+                    {selectedPlan === 'yearly' && <View style={styles.radioDot} />}
+                  </View>
+                </View>
+                <View style={styles.planPriceRow}>
+                  <Text style={styles.planPrice}>${yearlyPrice.toFixed(2)}</Text>
+                  <Text style={styles.planPeriod}> / an</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Avantages inclus */}
+            <View style={styles.benefitsCard}>
+              <Text style={styles.benefitsTitle}>Ce qui est inclus dans votre formule :</Text>
+              {SUBSCRIPTION_BENEFITS.map((benefit, idx) => (
+                <View key={`benefit_${idx}`} style={styles.benefitRow}>
+                  <Ionicons name="checkmark-circle" size={18} color={Colors.primary} style={{ marginRight: 10, marginTop: 1 }} />
+                  <Text style={styles.benefitText}>{benefit}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Choix du mode de paiement */}
+            <Text style={styles.sectionTitle}>Mode de paiement sécurisé</Text>
+            <View style={styles.paymentMethodsRow}>
+              <TouchableOpacity
+                style={[
+                  styles.methodTab,
+                  method === 'emoney' && styles.selectedMethodTab,
+                ]}
+                onPress={() => setMethod('emoney')}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="phone-portrait-outline"
+                  size={18}
+                  color={method === 'emoney' ? Colors.primary : Colors.textLight}
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={[styles.methodTabText, method === 'emoney' && styles.selectedMethodTabText]}>
+                  Mobile Money
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.methodTab,
+                  method === 'ecard' && styles.selectedMethodTab,
+                ]}
+                onPress={() => setMethod('ecard')}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="card-outline"
+                  size={18}
+                  color={method === 'ecard' ? Colors.primary : Colors.textLight}
+                  style={{ marginRight: 6 }}
+                />
+                <Text style={[styles.methodTabText, method === 'ecard' && styles.selectedMethodTabText]}>
+                  Carte bancaire
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Détails selon le mode */}
+            {method === 'emoney' ? (
+              <View style={styles.methodDetailsBox}>
+                <Text style={styles.inputLabel}>Numéro de téléphone Mobile Money (RDC)</Text>
+                <TextInput
+                  style={styles.phoneInput}
+                  placeholder="Ex: 243810000000"
+                  value={phone}
+                  onChangeText={handlePhoneChange}
+                  keyboardType="phone-pad"
+                  maxLength={13}
+                />
+                {detectedProvider && (
+                  <View style={styles.providerPill}>
+                    <Ionicons name="checkmark-circle-outline" size={14} color="#15803D" style={{ marginRight: 4 }} />
+                    <Text style={styles.providerText}>{detectedProvider} détecté</Text>
+                  </View>
+                )}
+                <Text style={styles.operatorList}>
+                  Opérateurs supportés : Vodacom M-Pesa, Orange Money, Airtel Money, Africell
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.methodDetailsBox}>
+                <Text style={styles.cardInfoText}>
+                  Vous serez redirigé vers une page de paiement chiffrée conforme aux normes bancaires PCI-DSS. Cartes acceptées : Visa, Mastercard.
+                </Text>
+              </View>
+            )}
+
+            {/* Badge de confiance TwigaPaie */}
+            <TrustBadge
+              contentKey="subscription_screen_default"
+              appName="fam"
+              language="fr"
+              style={styles.trustBadge}
+            />
+
+            {/* Bouton d'action principal */}
+            <TouchableOpacity
+              style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+              onPress={handleSubscribe}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.submitButtonText}>
+                  S'abonner maintenant — ${currentPlanPrice.toFixed(2)} / {currentPlanPeriod}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </>
         )}
-
-        {/* Badge de confiance TwigaPaie */}
-        <TrustBadge
-          contentKey="subscription_screen_default"
-          appName="fam"
-          language="fr"
-          style={styles.trustBadge}
-        />
-
-        {/* Bouton d'action principal */}
-        <TouchableOpacity
-          style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-          onPress={handleSubscribe}
-          disabled={loading}
-          activeOpacity={0.85}
-        >
-          {loading ? (
-            <ActivityIndicator color="#FFFFFF" size="small" />
-          ) : (
-            <Text style={styles.submitButtonText}>
-              S'abonner maintenant — ${currentPlanPrice.toFixed(2)} / {currentPlanPeriod}
-            </Text>
-          )}
-        </TouchableOpacity>
       </ScrollView>
 
       {/* Modal de suivi de confirmation */}
@@ -839,6 +922,58 @@ const styles = StyleSheet.create({
   closeModalText: {
     color: Colors.textSecondary,
     fontSize: 13,
+  },
+  readerContainer: {
+    marginBottom: 20,
+  },
+  readerInfoCard: {
+    backgroundColor: '#EFF6FF',
+    borderRadius: 14,
+    padding: 18,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  readerAuthCard: {
+    backgroundColor: Colors.backgroundLight,
+    borderRadius: 14,
+    padding: 18,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  readerInfoTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text,
+    marginLeft: 8,
+  },
+  readerInfoSub: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.primary,
+    marginBottom: 8,
+  },
+  readerInfoText: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 19,
+    marginBottom: 16,
+  },
+  readerActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 22,
+    marginTop: 8,
+  },
+  readerActionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
 
